@@ -1,0 +1,7 @@
+flask
+gunicorn
+requests
+psycopg2-binary
+qrcode
+Pillow
+python-dotenv
