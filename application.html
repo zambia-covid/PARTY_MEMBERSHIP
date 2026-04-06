@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campaign Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f8f9fa; }
+    .card { border-radius: 0.75rem; }
+    .card h3 { font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<div class="container py-4">
+
+<div class="mb-3">
+  <a href="/" class="btn btn-secondary">
+    ← Back to Dashboard
+  </a>
+</div>
+
+  <!-- TOP CARDS -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-2">
+      <div class="card text-white bg-dark">
+        <div class="card-body">
+          <h6>Total Applicants</h6>
+          <h3 id="totalApplicants">0</h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-2">
+      <div class="card text-white bg-primary">
+        <div class="card-body">
+          <h6>MPs</h6>
+          <h3 id="mpCount">0</h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-2">
+      <div class="card text-white bg-success">
+        <div class="card-body">
+          <h6>Mayors</h6>
+          <h3 id="mayorCount">0</h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card text-white bg-warning">
+        <div class="card-body">
+          <h6>Chairpersons</h6>
+          <h3 id="chairCount">0</h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card text-white bg-danger">
+        <div class="card-body">
+          <h6>Councillors</h6>
+          <h3 id="councillorCount">0</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MIDDLE SECTION -->
+  <div class="row g-3 mb-4">
+    <!-- Province Breakdown -->
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-light">
+          <strong>Applicants by Province</strong>
+        </div>
+        <div class="card-body">
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th>Province</th>
+                <th>MP</th>
+                <th>Mayor</th>
+                <th>Chairperson</th>
+                <th>Councillor</th>
+              </tr>
+            </thead>
+            <tbody id="provinceTable">
+              <!-- Dynamic data here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Constituency Drilldown -->
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-light">
+          <strong>Constituency Drilldown</strong>
+        </div>
+        <div class="card-body">
+          <select id="provinceFilter" class="form-select mb-3">
+            <option value="">Select Province</option>
+          </select>
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>Constituency</th>
+                <th>MP</th>
+                <th>Councillors</th>
+              </tr>
+            </thead>
+            <tbody id="constituencyTable">
+              <!-- Dynamic data here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM SECTION -->
+  <div class="row g-3">
+    <!-- Recent Applicants -->
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-light">
+          <strong>Recent Applicants</strong>
+        </div>
+        <div class="card-body">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Position</th>
+                <th>Province</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="recentApplicants">
+              <!-- Dynamic data here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Approval Queue -->
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-header bg-danger text-white">
+          <strong>Approval Queue</strong>
+        </div>
+        <div class="card-body">
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Position</th>
+                <th>Constituency</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="approvalQueue">
+              <!-- Dynamic data here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Sample JS hooks (replace with API calls)
+  function approveApplicant(id) {
+    console.log('Approved:', id);
+    // fetch(`/approve/${id}`, { method: 'POST' }).then(() => location.reload());
+  }
+
+  function rejectApplicant(id) {
+    console.log('Rejected:', id);
+    // fetch(`/reject/${id}`, { method: 'POST' }).then(() => location.reload());
+  }
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+
+  let res = await fetch("/api/dashboard");
+  let data = await res.json();
+
+  // TOP CARDS
+  document.getElementById('totalApplicants').textContent = data.total;
+  document.getElementById('mpCount').textContent = data.mps;
+  document.getElementById('mayorCount').textContent = data.mayors;
+  document.getElementById('chairCount').textContent = data.chairs;
+  document.getElementById('councillorCount').textContent = data.councillors;
+
+  // PROVINCE TABLE
+  const tbody = document.getElementById('provinceTable');
+  tbody.innerHTML = "";
+  data.provinces.forEach(p => {
+    let tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${p[0]}</td>
+      <td>${p[1]}</td>
+      <td>${p[2]}</td>
+      <td>${p[3]}</td>
+      <td>${p[4]}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // RECENT APPLICANTS
+  const recentTable = document.getElementById('recentApplicants');
+  recentTable.innerHTML = "";
+  data.recent.forEach(r => {
+    let tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${r[0]}</td>
+      <td>${r[1]}</td>
+      <td>${r[2]}</td>
+      <td>${r[3]}</td>
+    `;
+    recentTable.appendChild(tr);
+  });
+
+  // APPROVAL QUEUE
+  const queueTable = document.getElementById('approvalQueue');
+  queueTable.innerHTML = "";
+  data.queue.forEach(q => {
+    let tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${q[1]}</td>
+      <td>${q[2]}</td>
+      <td>${q[3]}</td>
+      <td>
+        <button onclick="approveApplicant(${q[0]})">Approve</button>
+        <button onclick="rejectApplicant(${q[0]})">Reject</button>
+      </td>
+    `;
+    queueTable.appendChild(tr);
+  });
+
+});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
