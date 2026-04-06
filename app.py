@@ -5,6 +5,7 @@ import psycopg2
 import requests
 
 from flask import Flask, request, jsonify, render_template, redirect, Response, session
+from twilio.rest import Client
 from PIL import Image, ImageDraw, ImageFont
 from datetime import date
 
@@ -372,8 +373,38 @@ import re
 
 def validate_name(name):
     if not name:
-        return False
-    return bool(re.match(r"^[A-Za-z\s'-]{2,50}$", name))
+        raise ValueError("Name is required")
+    name = name.strip()
+    if not re.match(r"^[A-Za-z\s'-]{2,50}$", name):
+        raise ValueError("Invalid name format")
+    return name
+
+
+def validate_location(value, field):
+    if not value:
+        raise ValueError(f"{field.capitalize()} is required")
+
+    value = value.strip()
+
+    if len(value) < 2:
+        raise ValueError(f"Invalid {field}")
+
+    return value
+
+
+def normalize_phone(phone):
+    if not phone:
+        raise ValueError("Phone number is required")
+
+    phone = phone.strip()
+
+    if phone.startswith("0"):
+        phone = "+260" + phone[1:]
+
+    if not phone.startswith("+260") or len(phone) < 12:
+        raise ValueError("Invalid Zambian phone number")
+
+    return phone
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -654,14 +685,29 @@ def whatsapp_webhook():
 
 @app.route('/approve/<int:id>', methods=['POST'])
 def approve(id):
+    conn = get_db()
+    cur = conn.cursor()
+
     cur.execute("UPDATE applicants SET status='Approved' WHERE id=%s", (id,))
     conn.commit()
+
+    cur.close()
+    conn.close()
+
     return '', 204
+
 
 @app.route('/reject/<int:id>', methods=['POST'])
 def reject(id):
+    conn = get_db()
+    cur = conn.cursor()
+
     cur.execute("UPDATE applicants SET status='Rejected' WHERE id=%s", (id,))
     conn.commit()
+
+    cur.close()
+    conn.close()
+
     return '', 204
 
 # ==============================
