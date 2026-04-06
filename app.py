@@ -368,11 +368,12 @@ def assign_polling_station(member):
 # INPUT VALIDATION
 # ==============================
 
-from validators import (
-    validate_name,
-    validate_location,
-    normalize_phone
-)
+import re
+
+def validate_name(name):
+    if not name:
+        return False
+    return bool(re.match(r"^[A-Za-z\s'-]{2,50}$", name))
 
 @app.route('/register', methods=['POST'])
 def register():
