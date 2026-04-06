@@ -5,3 +5,4 @@ psycopg2-binary
 qrcode
 Pillow
 python-dotenv
+validators==0.22.0
