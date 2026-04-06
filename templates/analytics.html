@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>Campaign Analytics</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #ecfdf5;
+}
+
+/* NAVBAR */
+.navbar {
+    background: #16a34a;
+    color: white;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-links a {
+    color: white;
+    text-decoration: none;
+    margin-left: 20px;
+    font-weight: bold;
+}
+
+.nav-links a:hover {
+    text-decoration: underline;
+}
+
+/* CONTAINER */
+.container {
+    padding: 30px;
+}
+
+/* CARDS */
+.card {
+    background: #065f46;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    color: white;
+}
+
+/* TABLE */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    padding: 10px;
+    border-bottom: 1px solid #10b981;
+    text-align: left;
+    color: white;
+}
+
+th {
+    background: #047857;
+}
+
+/* STAT */
+.stat {
+    font-size: 32px;
+    font-weight: bold;
+    color: #34d399;
+}
+</style>
+</head>
+
+<body>
+
+<div class="navbar">
+    <h2>Campaign Analytics</h2>
+    <div class="nav-links">
+        <a href="/">Dashboard</a>
+        <a href="/members">Members</a>
+        <a href="/polling_intelligence">Polling Intelligence</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- PROVINCE CHART -->
+    <div class="card">
+        <h3>Province Membership Chart</h3>
+        <canvas id="provinceChart"></canvas>
+    </div>
+
+    <!-- MEMBERS TABLE -->
+    <div class="card">
+        <h3>Members by Province</h3>
+        <table>
+            <tr>
+                <th>Province</th>
+                <th>Total Members</th>
+            </tr>
+            {% for p in provinces %}
+            <tr>
+                <td>{{ p[0] }}</td>
+                <td>{{ p[1] }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+</div>
+
+<script>
+const provinces = {{ provinces | tojson }};
+const labels = provinces.map(p => p[0]);
+const data = provinces.map(p => p[1]);
+
+new Chart(document.getElementById("provinceChart"), {
+    type: "bar",
+    data: {
+        labels: labels,
+        datasets: [{
+            label: "Members",
+            data: data,
+            backgroundColor: "#34d399"
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            title: { display: true, text: "Members per Province", color: "white", font: { size: 18 } }
+        },
+        scales: {
+            x: { ticks: { color: "white" }, grid: { color: "#065f46" } },
+            y: { ticks: { color: "white" }, grid: { color: "#065f46" } }
+        }
+    }
+});
+</script>
+
+</body>
+</html>
