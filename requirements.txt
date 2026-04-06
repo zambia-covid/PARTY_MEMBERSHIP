@@ -6,3 +6,4 @@ qrcode
 Pillow
 python-dotenv
 validators==0.22.0
+twilio==9.0.0
