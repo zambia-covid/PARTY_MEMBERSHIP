@@ -1539,10 +1539,3 @@ def export_excel():
         as_attachment=True,
         download_name="members.xlsx"
     )
-
-# ==============================
-# SERVER START
-# ==============================
-
-if __name__ == "__main__":
-    app.run
