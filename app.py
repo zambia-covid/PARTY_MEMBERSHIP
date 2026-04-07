@@ -26,22 +26,53 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Missing BOT_TOKEN")
 
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_NAME = os.getenv("DB_NAME", "membership_db")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
+
+# ==============================
+# DATABASE CONNECTION
+# ==============================
+
+import os
+import psycopg2
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
+
+# ==============================
+# ENVIRONMENT
+# ==============================
+
+ENV = os.getenv("ENV", "development")
+
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise ValueError("Missing BOT_TOKEN")
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 # ==============================
 # DATABASE CONNECTION
 # ==============================
 
 def get_db():
-    return psycopg2.connect(
-        host=DB_HOST,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD
-    )
+    if ENV == "production":
+        if not DATABASE_URL:
+            raise ValueError("DATABASE_URL not set in production")
+
+        return psycopg2.connect(
+            DATABASE_URL,
+            sslmode="require"
+        )
+    else:
+        # LOCAL DEV (your laptop)
+        return psycopg2.connect(
+            host="localhost",
+            database="membership_db",
+            user="postgres",
+            password=os.getenv("DB_PASSWORD")
+        )
 
 # ==============================
 # TELEGRAM FUNCTIONS
