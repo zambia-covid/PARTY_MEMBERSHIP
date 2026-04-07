@@ -17,27 +17,12 @@ app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
 # CONFIG (MOVE THESE TO ENV IN PRODUCTION)
 # ==============================
 
-load_dotenv()
 
 ENV = os.getenv("ENV", "development")
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
     raise ValueError("Missing BOT_TOKEN")
-
-
-# ==============================
-# DATABASE CONNECTION
-# ==============================
-
-import os
-import psycopg2
-from dotenv import load_dotenv
-
-load_dotenv()
-
-app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
 
 # ==============================
 # ENVIRONMENT
@@ -56,22 +41,22 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # ==============================
 
 def get_db():
-    if ENV == "production":
-        if not DATABASE_URL:
-            raise ValueError("DATABASE_URL not set in production")
+    db_url = os.getenv("DATABASE_URL")
 
-        return psycopg2.connect(
-            DATABASE_URL,
-            sslmode="require"
-        )
-    else:
-        # LOCAL DEV (your laptop)
+    if not db_url:
+        # LOCAL DEV ONLY
         return psycopg2.connect(
             host="localhost",
             database="membership_db",
             user="postgres",
             password=os.getenv("DB_PASSWORD")
         )
+
+    # 🔴 RENDER / PRODUCTION
+    return psycopg2.connect(
+        db_url,
+        sslmode="require"
+    )
 
 # ==============================
 # TELEGRAM FUNCTIONS
@@ -980,7 +965,7 @@ def broadcast():
             except Exception as e:
                 print(f"TG failed {chat_id}: {e}")
 
-        time.sleep(0.5)  # ⚠️ Reduced delay (1s is too slow at scale)
+        time.sleep(0.1)  # ⚠️ Reduced delay (1s is too slow at scale)
 
     cur.close()
     conn.close()
@@ -990,7 +975,9 @@ def broadcast():
         "whatsapp_sent": whatsapp_sent,
         "telegram_sent": telegram_sent,
         "total_targeted": len(rows)
-    }), 200# ==============================
+    }), 200
+    
+# ==============================
 # LIVE STATS
 # ==============================
 
