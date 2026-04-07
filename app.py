@@ -4,6 +4,7 @@ import qrcode
 import psycopg2
 import requests
 
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify, render_template, redirect, Response, session
 from twilio.rest import Client
 from PIL import Image, ImageDraw, ImageFont
@@ -15,8 +16,6 @@ app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
 # ==============================
 # CONFIG (MOVE THESE TO ENV IN PRODUCTION)
 # ==============================
-import os
-from dotenv import load_dotenv
 
 load_dotenv()
 
