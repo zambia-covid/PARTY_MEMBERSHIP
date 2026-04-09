@@ -1169,9 +1169,11 @@ def toggle_agent(agent_id):
 # ==============================
 
 @app.route("/members")
-@login_required
-@admin_required
 def members():
+    key = request.args.get("key")
+
+    if key != os.getenv("ADMIN_KEY"):
+        return {"error": "Unauthorized"}, 403
 
     conn = get_db()
     cur = conn.cursor()
