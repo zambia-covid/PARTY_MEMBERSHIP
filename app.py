@@ -14,17 +14,6 @@ app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
 
 # ==============================
-# CONFIG (MOVE THESE TO ENV IN PRODUCTION)
-# ==============================
-
-
-ENV = os.getenv("ENV", "development")
-
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not BOT_TOKEN:
-    raise ValueError("Missing BOT_TOKEN")
-
-# ==============================
 # ENVIRONMENT
 # ==============================
 
