@@ -340,24 +340,120 @@ def normalize_phone(phone):
 
     return phone
 
-@app.route('/register', methods=['POST'])
+@app.route("/download_card/<member_id>")
+def download_card(member_id):
+    path = f"cards/{member_id}.png"
+
+    if not os.path.exists(path):
+        return "Card not found", 404
+
+    return send_file(path, as_attachment=True)
+
+@app.route('/register', methods=['GET', 'POST'])
 def register():
-    data = request.get_json()
+
+    # =========================
+    # SHOW FORM
+    # =========================
+    if request.method == "GET":
+        return render_template("register.html")
+
+    # =========================
+    # HANDLE DATA (JSON or FORM)
+    # =========================
+    data = request.get_json() if request.is_json else request.form
 
     try:
         full_name = validate_name(data.get("full_name"))
         province = validate_location(data.get("province"), "province")
         district = validate_location(data.get("district"), "district")
         constituency = validate_location(data.get("constituency"), "constituency")
+        ward = validate_location(data.get("ward"), "ward")
         phone = normalize_phone(data.get("phone"))
 
     except ValueError as e:
-        return {"error": str(e)}, 400
+        return str(e), 400
 
-    # Now safe to store
-    # insert into DB here
+    conn = get_db()
+    cur = conn.cursor()
 
-    return {"message": "Registered successfully"}
+    try:
+        # =========================
+        # CHECK EXISTING MEMBER
+        # =========================
+        cur.execute("SELECT membership_id FROM members WHERE phone=%s", (phone,))
+        existing = cur.fetchone()
+
+        if existing:
+            member_id = existing[0]
+            card_url = f"/download_card/{member_id}"
+
+            return render_template(
+                "success.html",
+                member_id=member_id,
+                card_url=card_url,
+                message="You are already registered"
+            )
+
+        # =========================
+        # GENERATE MEMBER ID
+        # =========================
+        member_id = generate_member_id()
+
+        # =========================
+        # ASSIGN POLLING STATION
+        # =========================
+        polling_station = assign_polling_station({
+            "province": province,
+            "district": district,
+            "constituency": constituency
+        })
+
+        # =========================
+        # INSERT INTO DATABASE
+        # =========================
+        cur.execute("""
+            INSERT INTO members
+            (membership_id, full_name, province, district, constituency, ward, phone, polling_station, status)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'Active')
+        """, (
+            member_id,
+            full_name,
+            province,
+            district,
+            constituency,
+            ward,
+            phone,
+            polling_station
+        ))
+
+        conn.commit()
+
+        # =========================
+        # GENERATE CARD
+        # =========================
+        generate_qr(member_id)
+        generate_membership_card(full_name, province, constituency, member_id)
+
+        card_url = f"/download_card/{member_id}"
+
+        # =========================
+        # RESPONSE
+        # =========================
+        return render_template(
+            "success.html",
+            member_id=member_id,
+            card_url=card_url,
+            message="Registration successful"
+        )
+
+    except Exception as e:
+        conn.rollback()
+        return f"Error: {e}", 500
+
+    finally:
+        cur.close()
+        conn.close()
 
 
 
