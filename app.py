@@ -129,18 +129,12 @@ def login():
         conn = get_db()
         cur = conn.cursor()
 
-        try:
-            cur.execute(
-                "SELECT id, role FROM users WHERE username=%s AND password=%s",
-                (username, password)
-            )
-            user = cur.fetchone()
+        cur.execute(
+            "SELECT id, role FROM users WHERE username=%s AND password=%s",
+            (username, password)
+        )
 
-        except Exception as e:
-            print("LOGIN ERROR:", e)
-            cur.close()
-            conn.close()
-            return "Login failed (server error)", 500
+        user = cur.fetchone()
 
         cur.close()
         conn.close()
