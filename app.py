@@ -116,77 +116,6 @@ def send_whatsapp_message(phone, message):
         print(f"Failed to send to {phone}: {e}")
 
 # ==============================
-# LOGIN
-# ==============================
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-
-        conn = get_db()
-        cur = conn.cursor()
-
-        cur.execute(
-            "SELECT id, role FROM users WHERE username=%s AND password=%s",
-            (username, password)
-        )
-
-        user = cur.fetchone()
-
-        cur.close()
-        conn.close()
-
-        if user:
-            session["user_id"] = user[0]
-            session["role"] = user[1]
-
-            if user[1] == "admin":
-                return redirect("/")
-            else:
-                return redirect("/agent_dashboard")
-
-        return "Invalid credentials"
-
-    return render_template("login.html")
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/login")
-
-from functools import wraps
-from flask import redirect
-
-def login_required(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if "user_id" not in session:
-            return redirect("/login")
-        return f(*args, **kwargs)
-    return wrapper
-
-
-def admin_required(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if session.get("role") != "admin":
-            return "Access denied (Admin only)"
-        return f(*args, **kwargs)
-    return wrapper
-
-
-def agent_required(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if session.get("role") != "agent":
-            return "Access denied (Agent only)"
-        return f(*args, **kwargs)
-    return wrapper
-
-# ==============================
 # QR CODE
 # ==============================
 
@@ -1078,8 +1007,6 @@ def alerts():
 # ==============================
 
 @app.route("/")
-@login_required
-@admin_required
 def dashboard():
 
     conn = get_db()
