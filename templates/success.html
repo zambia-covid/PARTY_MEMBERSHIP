@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Success</title>
+
+<style>
+body {
+    font-family: Arial;
+    background: #0B5D1E;
+    color: white;
+    text-align: center;
+    padding: 30px;
+}
+
+.card {
+    background: #083D14;
+    padding: 20px;
+    border-radius: 10px;
+    max-width: 400px;
+    margin: auto;
+}
+
+a {
+    display: block;
+    margin-top: 15px;
+    background: gold;
+    color: black;
+    padding: 12px;
+    text-decoration: none;
+    font-weight: bold;
+    border-radius: 8px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+    <h2>{{ message }}</h2>
+    <p>Your Membership ID:</p>
+    <h3>{{ member_id }}</h3>
+
+    <a href="{{ card_url }}">Download Membership Card</a>
+</div>
+
+</body>
+</html>

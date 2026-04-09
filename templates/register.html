@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Membership Registration</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #0B5D1E;
+        margin: 0;
+        padding: 0;
+        color: white;
+    }
+
+    .container {
+        max-width: 420px;
+        margin: auto;
+        padding: 20px;
+    }
+
+    .card {
+        background: #083D14;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+
+    h2 {
+        text-align: center;
+        margin-bottom: 10px;
+    }
+
+    p {
+        text-align: center;
+        font-size: 14px;
+        margin-bottom: 20px;
+        color: #c8e6c9;
+    }
+
+    input, select {
+        width: 100%;
+        padding: 12px;
+        margin-bottom: 12px;
+        border-radius: 8px;
+        border: none;
+        font-size: 16px;
+    }
+
+    input:focus, select:focus {
+        outline: 2px solid gold;
+    }
+
+    button {
+        width: 100%;
+        padding: 14px;
+        background: gold;
+        border: none;
+        border-radius: 8px;
+        font-weight: bold;
+        font-size: 16px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        opacity: 0.9;
+    }
+
+    .footer {
+        text-align: center;
+        margin-top: 15px;
+        font-size: 12px;
+        color: #aaa;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <div class="card">
+        <h2>PF Pamodzi Alliance</h2>
+        <p>Membership Registration</p>
+
+        <form method="POST" action="/register">
+
+            <input type="text" name="full_name" placeholder="Full Name" required>
+
+            <select name="province" required>
+                <option value="">Select Province</option>
+                <option>Lusaka</option>
+                <option>Copperbelt</option>
+                <option>Central</option>
+                <option>Eastern</option>
+                <option>Southern</option>
+                <option>Western</option>
+                <option>North-Western</option>
+                <option>Northern</option>
+                <option>Luapula</option>
+                <option>Muchinga</option>
+            </select>
+
+            <input type="text" name="district" placeholder="District" required>
+
+            <input type="text" name="constituency" placeholder="Constituency" required>
+
+            <input type="text" name="ward" placeholder="Ward" required>
+
+            <input type="text" name="phone" placeholder="Phone (097xxxxxxx)" required>
+
+            <button type="submit">Register</button>
+
+        </form>
+
+        <div class="footer">
+            Powered by PF Pamodzi Digital System
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
