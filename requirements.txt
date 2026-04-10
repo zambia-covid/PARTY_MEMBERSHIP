@@ -8,3 +8,4 @@ python-dotenv
 validators==0.22.0
 twilio==9.0.0
 openpyxl
+Flask-Login==0.6.3
