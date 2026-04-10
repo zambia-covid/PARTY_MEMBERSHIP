@@ -3,6 +3,7 @@ import random
 import qrcode
 import psycopg2
 import requests
+import threading
 
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, render_template, redirect, Response, session, url_for, send_file, flash
@@ -33,8 +34,12 @@ login_manager.login_view = "login"
 def block_anonymous():
     allowed = {"login", "register", "telegram_webhook", "whatsapp_webhook", "static"}
 
-    if request.endpoint is None:
-        return
+    if request.endpoint:
+        if request.endpoint.startswith("static") or request.endpoint in allowed:
+            return
+
+    if not current_user.is_authenticated:
+        return redirect("/login")
 
     if request.endpoint not in allowed and not current_user.is_authenticated:
         return redirect("/login")
@@ -356,6 +361,18 @@ def assign_polling_station(member):
     return stations[0][0]
 
 # ==============================
+# GENERATE ASSET
+# ==============================
+
+def generate_assets_async(name, province, constituency, member_id):
+    try:
+        qr = generate_qr(member_id)
+        card = generate_membership_card(name, province, constituency, member_id)
+        print(f"[ASYNC] Generated assets for {member_id}")
+    except Exception as e:
+        print(f"[ASYNC ERROR] {e}")
+
+# ==============================
 # INPUT VALIDATION
 # ==============================
 
@@ -415,7 +432,7 @@ def register():
         return render_template("register.html")
 
     # =========================
-    # HANDLE DATA (JSON or FORM)
+    # HANDLE INPUT
     # =========================
     data = request.get_json() if request.is_json else request.form
 
@@ -430,14 +447,19 @@ def register():
     except ValueError as e:
         return str(e), 400
 
-    conn = get_db()
-    cur = conn.cursor()
+    conn = None
 
     try:
+        conn = get_db()
+        cur = conn.cursor()
+
         # =========================
         # CHECK EXISTING MEMBER
         # =========================
-        cur.execute("SELECT membership_id FROM members WHERE phone=%s", (phone,))
+        cur.execute(
+            "SELECT membership_id FROM members WHERE phone=%s",
+            (phone,)
+        )
         existing = cur.fetchone()
 
         if existing:
@@ -455,6 +477,7 @@ def register():
         # GENERATE MEMBER ID
         # =========================
         member_id = generate_member_id()
+        card_url = f"/download_card/{member_id}"
 
         # =========================
         # ASSIGN POLLING STATION
@@ -466,7 +489,7 @@ def register():
         })
 
         # =========================
-        # INSERT INTO DATABASE
+        # INSERT MEMBER
         # =========================
         cur.execute("""
             INSERT INTO members
@@ -485,32 +508,32 @@ def register():
 
         conn.commit()
 
-        # =========================
-        # GENERATE CARD
-        # =========================
-        generate_qr(member_id)
-        generate_membership_card(full_name, province, constituency, member_id)
-
-        card_url = f"/download_card/{member_id}"
-
-        # =========================
-        # RESPONSE
-        # =========================
-        return render_template(
-            "success.html",
-            member_id=member_id,
-            card_url=card_url,
-            message="Registration successful"
-        )
-
     except Exception as e:
-        conn.rollback()
-        return f"Error: {e}", 500
+        if conn:
+            conn.rollback()
+        return f"Error: {str(e)}", 500
 
     finally:
-        cur.close()
-        conn.close()
+        if conn:
+            conn.close()
 
+    # =========================
+    # GENERATE ASSETS (SAFE MODE)
+    # =========================
+    try:
+        generate_assets_async(full_name, province, constituency, member_id)
+    except Exception as e:
+        print(f"[ASSET ERROR] {e}")
+
+    # =========================
+    # RESPONSE
+    # =========================
+    return render_template(
+        "success.html",
+        member_id=member_id,
+        card_url=card_url,
+        message="Registration successful. Your card is ready."
+    )
 
 
 # ==============================
