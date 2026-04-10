@@ -5,14 +5,24 @@ import psycopg2
 import requests
 
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, render_template, redirect, Response, session
+from flask import Flask, request, jsonify, render_template, redirect, Response, session, url_for
 from twilio.rest import Client
 from PIL import Image, ImageDraw, ImageFont
 from datetime import date
 from flask import send_file
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "login"
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
+
+users = {
+    "admin": generate_password_hash("admin123")
+}
 
 # ==============================
 # ENVIRONMENT
@@ -739,6 +749,28 @@ def reject(id):
     conn.close()
 
     return '', 204
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+
+        if username in users and check_password_hash(users[username], password):
+            user = User(username)
+            login_user(user)
+            return redirect("/dashboard")
+
+        flash("Invalid credentials")
+        return redirect("/login")
+
+    return render_template("login.html")
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect("/login")
 
 # ==============================
 # AGENT VOTE SEND
