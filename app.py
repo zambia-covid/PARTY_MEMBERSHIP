@@ -5,24 +5,66 @@ import psycopg2
 import requests
 
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, render_template, redirect, Response, session, url_for
+from flask import Flask, request, jsonify, render_template, redirect, Response, session, url_for, send_file, flash
 from twilio.rest import Client
 from PIL import Image, ImageDraw, ImageFont
 from datetime import date
-from flask import send_file
+from functools import wraps
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
+# ======================
+# CREATE APP FIRST
+# ======================
+app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
+
+# ======================
+# LOGIN MANAGER
+# ======================
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
-app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
+# ======================
+# GLOBAL ACCESS CONTROL
+# ======================
+@app.before_request
+def block_anonymous():
+    allowed = {"login", "register", "telegram_webhook", "whatsapp_webhook", "static"}
 
-users = {
-    "admin": generate_password_hash("admin123")
-}
+    if request.endpoint is None:
+        return
+
+    if request.endpoint not in allowed and not current_user.is_authenticated:
+        return redirect("/login")
+
+# ======================
+# ADMIN
+# ======================
+def admin_required(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if current_user.id != "admin":
+            return "Forbidden", 403
+        return func(*args, **kwargs)
+    return wrapper
+
+# ======================
+# USER CLASS
+# ======================
+class User(UserMixin):
+    def __init__(self, id):
+        self.id = id
+
+# ======================
+# USER LOADER 
+# ======================
+@login_manager.user_loader
+def load_user(user_id):
+    if user_id in users:
+        return User(user_id)
+    return None
 
 # ==============================
 # ENVIRONMENT
@@ -35,6 +77,10 @@ if not BOT_TOKEN:
     raise ValueError("Missing BOT_TOKEN")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+
+users = {
+    "admin": generate_password_hash(os.getenv("ADMIN_PASSWORD"))
+}
 
 # ==============================
 # DATABASE CONNECTION
@@ -351,6 +397,7 @@ def normalize_phone(phone):
     return phone
 
 @app.route("/download_card/<member_id>")
+@login_required
 def download_card(member_id):
     path = f"cards/{member_id}.png"
 
@@ -723,7 +770,9 @@ def whatsapp_webhook():
 
         return str(resp)
 
-@app.route('/approve/<int:id>', methods=['POST'])
+@app.route("/approve/<int:id>", methods=['POST'])
+@login_required
+@admin_required
 def approve(id):
     conn = get_db()
     cur = conn.cursor()
@@ -737,7 +786,9 @@ def approve(id):
     return '', 204
 
 
-@app.route('/reject/<int:id>', methods=['POST'])
+@app.route("/reject/<int:id>", methods=['POST'])
+@login_required
+@admin_required
 def reject(id):
     conn = get_db()
     cur = conn.cursor()
@@ -759,7 +810,7 @@ def login():
         if username in users and check_password_hash(users[username], password):
             user = User(username)
             login_user(user)
-            return redirect("/dashboard")
+            return redirect(url_for("dashboard"))
 
         flash("Invalid credentials")
         return redirect("/login")
@@ -790,6 +841,7 @@ def send_votes_for_constituency(constituency):
     return len(phones)
 
 @app.route("/agent_vote_send", methods=["POST"])
+@login_required
 def agent_vote_send():
     incoming_msg = request.form.get("Body")
     sender = request.form.get("From")
@@ -853,6 +905,7 @@ def agent_vote_send():
 # ==============================
 
 @app.route('/broadcast', methods=['POST'])
+@login_required
 def broadcast():
 
     # Accept both JSON and form data
@@ -971,6 +1024,7 @@ def broadcast():
 # ==============================
 
 @app.route("/live_stats")
+@login_required
 def live_stats():
     conn = get_db()
     cur = conn.cursor()
@@ -1008,6 +1062,7 @@ def live_stats():
 # ==============================
 
 @app.route("/map_data")
+@login_required
 def map_data():
     conn = get_db()
     cur = conn.cursor()
@@ -1046,6 +1101,7 @@ def map_data():
 # ==============================
 
 @app.route("/alerts")
+@login_required
 def alerts():
     conn = get_db()
     cur = conn.cursor()
@@ -1078,6 +1134,7 @@ def alerts():
 # ==============================
 
 @app.route("/")
+@login_required
 def dashboard():
 
     conn = get_db()
@@ -1128,6 +1185,7 @@ def dashboard():
 # ==============================
 
 @app.route("/polling_intelligence")
+@login_required
 def polling_intelligence():
 
     conn = get_db()
@@ -1155,6 +1213,7 @@ def polling_intelligence():
 # ==============================
 
 @app.route("/analytics")
+@login_required
 def analytics():
 
     conn = get_db()
@@ -1182,6 +1241,7 @@ def analytics():
 # ==============================
 
 @app.route("/agents", methods=["GET", "POST"])
+@login_required
 def agents():
     conn = get_db()
     cur = conn.cursor()
@@ -1218,6 +1278,7 @@ def agents():
 # ==============================
 
 @app.route("/toggle_agent/<int:agent_id>")
+@login_required
 def toggle_agent(agent_id):
     conn = get_db()
     cur = conn.cursor()
@@ -1240,6 +1301,8 @@ def toggle_agent(agent_id):
 # ==============================
 
 @app.route("/members")
+@login_required
+@admin_required
 def members():
     key = request.args.get("key")
 
@@ -1282,6 +1345,7 @@ def members():
 # ==============================
 
 @app.route("/edit/<membership_id>", methods=["GET","POST"])
+@login_required
 def edit_member(membership_id):
 
     conn = get_db()
@@ -1339,6 +1403,7 @@ def edit_member(membership_id):
 # ==============================
 
 @app.route("/search")
+@login_required
 def search():
     q = request.args.get("q", "").strip()
 
@@ -1438,6 +1503,7 @@ def send_cards_to_existing_members():
     return sent
 
 @app.route("/send_existing_cards")
+@login_required
 def send_existing_cards():
     key = request.args.get("key")
 
@@ -1453,6 +1519,7 @@ def send_existing_cards():
 # ==============================
 
 @app.route("/delete_member/<membership_id>")
+@login_required
 def delete_member(membership_id):
 
     key = request.args.get("key")
@@ -1489,9 +1556,8 @@ from tempfile import NamedTemporaryFile
 load_dotenv()
 
 
-
-
 @app.route("/export_excel")
+@login_required
 def export_excel():
 
     if request.args.get("key") != os.getenv("EXPORT_KEY"):
