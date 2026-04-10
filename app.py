@@ -397,7 +397,6 @@ def normalize_phone(phone):
     return phone
 
 @app.route("/download_card/<member_id>")
-@login_required
 def download_card(member_id):
     path = f"cards/{member_id}.png"
 
