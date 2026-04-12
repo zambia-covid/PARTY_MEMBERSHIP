@@ -1169,37 +1169,23 @@ def live_stats():
     conn = get_db()
     cur = conn.cursor()
 
-cur.execute("""
-    SELECT 
-        m.constituency,
-        COUNT(DISTINCT m.membership_id) AS members,
-        COALESCE(SUM(r.pf_votes), 0) AS pf_votes
-    FROM members m
-    LEFT JOIN polling_station_results r
-        ON m.polling_station = r.polling_station
-    GROUP BY m.constituency
-""")
+    cur.execute("""
+        SELECT 
+            m.constituency,
+            COUNT(DISTINCT m.membership_id) AS members,
+            COALESCE(SUM(r.pf_votes), 0) AS pf_votes
+        FROM members m
+        LEFT JOIN polling_station_results r
+            ON m.polling_station = r.polling_station
+        GROUP BY m.constituency
+    """)
 
-    pf, upnd = cur.fetchone()
-
-    margin = pf - upnd
-
-    if pf > upnd:
-        status = "Winning"
-    elif pf < upnd:
-        status = "Losing"
-    else:
-        status = "Tied"
+    results = cur.fetchall()
 
     cur.close()
     conn.close()
 
-    return jsonify({
-        "pf": pf,
-        "upnd": upnd,
-        "margin": margin,
-        "status": status
-    })
+    return jsonify(results)
 
 # ==============================
 # MAP DATA
