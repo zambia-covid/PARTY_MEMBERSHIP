@@ -1296,7 +1296,6 @@ def agent_login():
     return render_template("agent_login.html")
 
 @app.route("/agent_dashboard")
-@login_required
 def agent_dashboard():
 
     # Extract agent_id from logged-in user
