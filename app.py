@@ -33,16 +33,35 @@ login_manager.login_view = "login"
 # ======================
 @app.before_request
 def block_anonymous():
-    allowed = {"login", "register", "telegram_webhook", "whatsapp_webhook", "static"}
 
+    allowed = {
+        "login",
+        "register",
+        "telegram_webhook",
+        "whatsapp_webhook",
+        "static",
+        "agent_login"
+    }
+
+    # ----------------------
+    # 🔐 AGENT ROUTES
+    # ----------------------
+    if request.endpoint == "agent_dashboard":
+        if "agent_id" in session:
+            return
+        return redirect("/agent_login")
+
+    # ----------------------
+    # 🌐 PUBLIC ROUTES
+    # ----------------------
     if request.endpoint:
         if request.endpoint.startswith("static") or request.endpoint in allowed:
             return
 
+    # ----------------------
+    # 🔐 ADMIN ROUTES
+    # ----------------------
     if not current_user.is_authenticated:
-        return redirect("/login")
-
-    if request.endpoint not in allowed and not current_user.is_authenticated:
         return redirect("/login")
 
 # ======================
