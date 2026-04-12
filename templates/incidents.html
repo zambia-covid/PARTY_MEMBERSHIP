@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Incident Reports</title>
+    <style>
+        body { font-family: Arial; background: #1a1a1a; color: white; }
+        table { width: 100%; border-collapse: collapse; background: white; color: black; }
+        th, td { padding: 10px; border: 1px solid #ccc; }
+        th { background: #b30000; color: white; }
+        h2 { text-align: center; }
+    </style>
+</head>
+<body>
+
+<h2>🚨 Incident Reports</h2>
+
+<table>
+    <tr>
+        <th>Agent ID</th>
+        <th>Province</th>
+        <th>Constituency</th>
+        <th>Polling Station</th>
+        <th>Message</th>
+    </tr>
+
+    {% for i in incidents %}
+    <tr>
+        <td>{{ i[0] }}</td>
+        <td>{{ i[1] }}</td>
+        <td>{{ i[2] }}</td>
+        <td>{{ i[3] }}</td>
+        <td>{{ i[4] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+</body>
+</html>

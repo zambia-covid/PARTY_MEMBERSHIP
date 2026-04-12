@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Agent Results</title>
+    <style>
+        body { font-family: Arial; background: #0b5d1e; color: white; }
+        table { width: 100%; border-collapse: collapse; background: white; color: black; }
+        th, td { padding: 10px; border: 1px solid #ccc; text-align: center; }
+        th { background: #083d14; color: white; }
+        h2 { text-align: center; }
+    </style>
+</head>
+<body>
+
+<h2>📊 Polling Station Results</h2>
+
+<table>
+    <tr>
+        <th>Agent ID</th>
+        <th>Province</th>
+        <th>Constituency</th>
+        <th>Polling Station</th>
+        <th>PF Votes</th>
+        <th>UPND Votes</th>
+        <th>Other</th>
+    </tr>
+
+    {% for r in results %}
+    <tr>
+        <td>{{ r[0] }}</td>
+        <td>{{ r[1] }}</td>
+        <td>{{ r[2] }}</td>
+        <td>{{ r[3] }}</td>
+        <td>{{ r[4] }}</td>
+        <td>{{ r[5] }}</td>
+        <td>{{ r[6] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+</body>
+</html>
