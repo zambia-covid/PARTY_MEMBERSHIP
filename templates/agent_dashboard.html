@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Agent Dashboard</title>
+
+    <!-- MOBILE FIRST -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- AUTO REFRESH -->
+    <meta http-equiv="refresh" content="10">
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #0b5d1e;
+            color: white;
+            margin: 0;
+            padding: 10px;
+        }
+
+        h2 {
+            text-align: center;
+            font-size: 20px;
+        }
+
+        .card {
+            background: white;
+            color: black;
+            padding: 14px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+        }
+
+        .title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 6px;
+        }
+
+        .meta {
+            font-size: 14px;
+            margin: 3px 0;
+        }
+
+        .votes {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .pf { color: green; }
+        .upnd { color: red; }
+        .other { color: #555; }
+
+        .status {
+            margin-top: 8px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .win { color: green; }
+        .lose { color: red; }
+        .tie { color: orange; }
+
+        .incident {
+            border-left: 5px solid red;
+            padding-left: 8px;
+            margin-top: 6px;
+            font-size: 14px;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .btn-result { background: green; color: white; }
+        .btn-help { background: orange; color: white; }
+        .btn-alert { background: red; color: white; }
+    </style>
+</head>
+
+<body>
+
+<h2>📍 Agent Dashboard</h2>
+
+<!-- AGENT INFO -->
+<div class="card">
+    <div class="title">Station Info</div>
+    <div class="meta"><b>Name:</b> {{ agent[0] }}</div>
+    <div class="meta"><b>Province:</b> {{ agent[1] }}</div>
+    <div class="meta"><b>Constituency:</b> {{ agent[2] }}</div>
+    <div class="meta"><b>Polling Station:</b> {{ agent[3] }}</div>
+</div>
+
+<!-- RESULTS -->
+<div class="card">
+    <div class="title">Latest Results</div>
+
+    {% if result %}
+        <div class="votes">
+            <span class="pf">PF: {{ result[0] }}</span>
+            <span class="upnd">UPND: {{ result[1] }}</span>
+            <span class="other">Other: {{ result[2] }}</span>
+        </div>
+
+        {% if result[0] > result[1] %}
+            <div class="status win">Winning</div>
+        {% elif result[0] < result[1] %}
+            <div class="status lose">Losing</div>
+        {% else %}
+            <div class="status tie">Tied</div>
+        {% endif %}
+    {% else %}
+        <p>No results submitted yet</p>
+    {% endif %}
+
+    <!-- ACTION BUTTON -->
+    <button class="btn btn-result">Submit Results</button>
+</div>
+
+<!-- INCIDENTS -->
+<div class="card">
+    <div class="title">Recent Incidents</div>
+
+    {% for i in incidents %}
+        <div class="incident">{{ i[0] }}</div>
+    {% else %}
+        <p>No incidents reported</p>
+    {% endfor %}
+
+    <!-- ACTION BUTTONS -->
+    <button class="btn btn-help">Request Help</button>
+    <button class="btn btn-alert">Report Incident</button>
+</div>
+
+</body>
+</html>
