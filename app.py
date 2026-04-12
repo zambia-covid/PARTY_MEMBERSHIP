@@ -1169,12 +1169,16 @@ def live_stats():
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT 
-            COALESCE(SUM(pf_votes),0),
-            COALESCE(SUM(upnd_votes),0)
-        FROM polling_station_results
-    """)
+cur.execute("""
+    SELECT 
+        m.constituency,
+        COUNT(DISTINCT m.membership_id) AS members,
+        COALESCE(SUM(r.pf_votes), 0) AS pf_votes
+    FROM members m
+    LEFT JOIN polling_station_results r
+        ON m.polling_station = r.polling_station
+    GROUP BY m.constituency
+""")
 
     pf, upnd = cur.fetchone()
 
