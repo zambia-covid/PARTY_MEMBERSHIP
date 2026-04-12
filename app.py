@@ -373,6 +373,32 @@ def generate_assets_async(name, province, constituency, member_id):
         print(f"[ASYNC ERROR] {e}")
 
 # ==============================
+# VOTER SCORE
+# ==============================
+
+def calculate_voter_score(member):
+    score = 0
+
+    if member["province"] in ["Lusaka", "Copperbelt"]:
+        score += 2  # strategic regions
+
+    if member.get("chat_id"):
+        score += 2  # reachable via Telegram
+
+    if member.get("phone"):
+        score += 2  # reachable via WhatsApp
+
+    return score
+
+def categorize_voter(score):
+    if score >= 5:
+        return "STRONG"
+    elif score >= 3:
+        return "LEANING"
+    else:
+        return "WEAK"
+
+# ==============================
 # INPUT VALIDATION
 # ==============================
 
@@ -868,12 +894,17 @@ def agent_vote_send():
     incoming_msg = request.form.get("Body")
     sender = request.form.get("From")
 
+    if not incoming_msg:
+        return jsonify({"reply": "No message received"})
+
     msg = incoming_msg.strip().upper()
 
     conn = get_db()
     cur = conn.cursor()
 
-    # Verify agent
+    # ==============================
+    # VERIFY AGENT
+    # ==============================
     cur.execute("""
         SELECT agent_id, province, constituency, polling_station
         FROM agents
@@ -886,7 +917,11 @@ def agent_vote_send():
 
     agent_id, province, constituency, polling_station = agent
 
-    # 🔴 RESULT SUBMISSION COMMAND
+    # ==============================
+    # COMMAND HANDLER
+    # ==============================
+
+    # 🔹 RESULT
     if msg.startswith("RESULT"):
         try:
             parts = msg.split()
@@ -895,7 +930,6 @@ def agent_vote_send():
             upnd_votes = int(parts[2])
             other_votes = int(parts[3]) if len(parts) > 3 else 0
 
-            # Save results
             cur.execute("""
                 INSERT INTO polling_station_results
                 (agent_id, province, constituency, polling_station, pf_votes, upnd_votes, other_votes)
@@ -909,13 +943,97 @@ def agent_vote_send():
         except:
             reply = "Invalid format. Use: RESULT PF UPND OTHER"
 
-    # 🔴 EXISTING BROADCAST COMMAND
+    # 🔹 TURNOUT
+    elif msg == "TURNOUT":
+
+        cur.execute("""
+            SELECT COUNT(*) FROM members
+            WHERE polling_station=%s
+        """, (polling_station,))
+        total_members = cur.fetchone()[0]
+
+        cur.execute("""
+            SELECT COALESCE(SUM(pf_votes + upnd_votes + other_votes),0)
+            FROM polling_station_results
+            WHERE polling_station=%s
+        """, (polling_station,))
+        total_votes = cur.fetchone()[0]
+
+        gap = total_members - total_votes
+
+        reply = (
+            f"📊 TURNOUT\n"
+            f"Station: {polling_station}\n"
+            f"Members: {total_members}\n"
+            f"Votes: {total_votes}\n"
+            f"Gap: {gap}"
+        )
+
+    # 🔹 HELP (REINFORCEMENT)
+    elif msg == "HELP":
+
+        admin_phone = os.getenv("ADMIN_PHONE")
+
+        # Alert HQ
+        send_whatsapp_message(
+            admin_phone,
+            f"🚨 HELP REQUEST\nStation: {polling_station}\nConstituency: {constituency}"
+        )
+
+        # Notify supporters at same station
+        cur.execute("""
+            SELECT phone FROM members
+            WHERE polling_station=%s AND status='Active'
+        """, (polling_station,))
+
+        supporters = cur.fetchall()
+
+        count = 0
+        for s in supporters:
+            try:
+                send_whatsapp_message(
+                    s[0],
+                    f"⚠️ URGENT: Go vote now at {polling_station}"
+                )
+                count += 1
+            except:
+                pass
+
+        reply = f"Reinforcement sent to {count} supporters."
+
+    # 🔹 ALERT (INCIDENT)
+    elif msg.startswith("ALERT"):
+
+        incident_msg = incoming_msg.replace("ALERT", "").strip()
+
+        if not incident_msg:
+            reply = "Use: ALERT <message>"
+        else:
+            cur.execute("""
+                INSERT INTO incidents
+                (agent_id, province, constituency, polling_station, message)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (agent_id, province, constituency, polling_station, incident_msg))
+
+            conn.commit()
+
+            admin_phone = os.getenv("ADMIN_PHONE")
+
+            send_whatsapp_message(
+                admin_phone,
+                f"🚨 INCIDENT\n{polling_station}\n{incident_msg}"
+            )
+
+            reply = "Incident reported."
+
+    # 🔹 SEND VOTES (existing)
     elif msg == "SEND VOTES":
         recipients = send_votes_for_constituency(constituency)
         reply = f"Broadcast sent to {recipients} members."
 
+    # 🔹 UNKNOWN
     else:
-        reply = "Unknown command. Use RESULT or SEND VOTES."
+        reply = "Use: RESULT, TURNOUT, HELP, ALERT"
 
     cur.close()
     conn.close()
