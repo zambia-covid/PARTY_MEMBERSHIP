@@ -43,6 +43,16 @@ def block_anonymous():
         "agent_login"
     }
 
+    if request.endpoint:
+        if request.endpoint.startswith("static") or request.endpoint in allowed:
+            return
+
+    # 🔴 Allow agents through Flask-Login
+    if current_user.is_authenticated:
+        return
+
+    return redirect("/login")
+
     # ----------------------
     # 🔐 AGENT ROUTES
     # ----------------------
@@ -1269,14 +1279,15 @@ def agent_login():
         """, (phone,))
 
         agent = cur.fetchone()
+
         cur.close()
         conn.close()
 
-        if agent and check_password_hash(agent[1], password):
+        # 🔴 CRITICAL FIX: handle NULL password safely
+        if agent and agent[1] and check_password_hash(agent[1], password):
+
             user = User(f"agent_{agent[0]}")
             login_user(user)
-
-            session["agent_id"] = agent[0]
 
             return redirect("/agent_dashboard")
 
@@ -1288,15 +1299,16 @@ def agent_login():
 @login_required
 def agent_dashboard():
 
-    agent_id = session.get("agent_id")
+    # Extract agent_id from logged-in user
+    if not current_user.id.startswith("agent_"):
+        return "Unauthorized", 403
 
-    if not session.get("agent_id"):
-        return redirect("/agent_login")
+    agent_id = current_user.id.replace("agent_", "")
 
     conn = get_db()
     cur = conn.cursor()
 
-    # Get agent info
+    # Agent info
     cur.execute("""
         SELECT name, province, constituency, polling_station
         FROM agents
@@ -1304,7 +1316,7 @@ def agent_dashboard():
     """, (agent_id,))
     agent = cur.fetchone()
 
-    # Get results submitted
+    # Latest result
     cur.execute("""
         SELECT pf_votes, upnd_votes, other_votes
         FROM polling_station_results
@@ -1314,7 +1326,7 @@ def agent_dashboard():
     """, (agent_id,))
     result = cur.fetchone()
 
-    # Get incidents
+    # Incidents
     cur.execute("""
         SELECT message
         FROM incidents
