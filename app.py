@@ -833,7 +833,6 @@ def approve(id):
 
     return '', 204
 
-
 @app.route("/reject/<int:id>", methods=['POST'])
 @login_required
 @admin_required
@@ -870,6 +869,48 @@ def login():
 def logout():
     logout_user()
     return redirect("/login")
+    
+# ==============================
+# AGENT VOTE SEND
+# ==============================
+@app.route("/agent_results")
+@login_required
+def agent_results():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT agent_id, province, constituency, polling_station,
+               pf_votes, upnd_votes, other_votes
+        FROM polling_station_results
+        ORDER BY polling_station
+    """)
+
+    results = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template("agent_results.html", results=results)
+
+@app.route("/incidents_view")
+@login_required
+def incidents_view():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT agent_id, province, constituency, polling_station, message
+        FROM incidents
+        ORDER BY id DESC
+    """)
+
+    incidents = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template("incidents.html", incidents=incidents)
 
 # ==============================
 # AGENT VOTE SEND
