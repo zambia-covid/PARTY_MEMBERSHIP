@@ -1271,7 +1271,7 @@ def agent_dashboard():
 
     agent_id = session.get("agent_id")
 
-    if not agent_id:
+    if not session.get("agent_id"):
         return redirect("/agent_login")
 
     conn = get_db()
