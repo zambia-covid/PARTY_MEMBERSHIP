@@ -10,6 +10,7 @@ from flask import Flask, request, jsonify, render_template, redirect, Response, 
 from twilio.rest import Client
 from PIL import Image, ImageDraw, ImageFont
 from datetime import date
+from flask_login import login_user
 from functools import wraps
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -1227,6 +1228,92 @@ def live_stats():
     conn.close()
 
     return jsonify(results)
+
+# ==============================
+# AGENT LOGIN
+# ==============================
+
+@app.route("/agent_login", methods=["GET", "POST"])
+def agent_login():
+
+    if request.method == "POST":
+        phone = request.form["phone"]
+        password = request.form["password"]
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT agent_id, password
+            FROM agents
+            WHERE phone=%s AND active=TRUE
+        """, (phone,))
+
+        agent = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        if agent and check_password_hash(agent[1], password):
+            user = User(f"agent_{agent[0]}")
+            login_user(user)
+
+            session["agent_id"] = agent[0]
+
+            return redirect("/agent_dashboard")
+
+        return render_template("agent_login.html", error="Invalid credentials")
+
+    return render_template("agent_login.html")
+
+@app.route("/agent_dashboard")
+@login_required
+def agent_dashboard():
+
+    agent_id = session.get("agent_id")
+
+    if not agent_id:
+        return redirect("/agent_login")
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Get agent info
+    cur.execute("""
+        SELECT name, province, constituency, polling_station
+        FROM agents
+        WHERE agent_id=%s
+    """, (agent_id,))
+    agent = cur.fetchone()
+
+    # Get results submitted
+    cur.execute("""
+        SELECT pf_votes, upnd_votes, other_votes
+        FROM polling_station_results
+        WHERE agent_id=%s
+        ORDER BY id DESC
+        LIMIT 1
+    """, (agent_id,))
+    result = cur.fetchone()
+
+    # Get incidents
+    cur.execute("""
+        SELECT message
+        FROM incidents
+        WHERE agent_id=%s
+        ORDER BY id DESC
+        LIMIT 5
+    """, (agent_id,))
+    incidents = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template(
+        "agent_dashboard.html",
+        agent=agent,
+        result=result,
+        incidents=incidents
+    )
 
 # ==============================
 # MAP DATA
