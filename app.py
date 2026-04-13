@@ -891,6 +891,33 @@ def favicon():
     return send_file('static/favicon.ico')
 
 # ==============================
+# AGENT REPORT
+# ==============================
+
+@app.route('/submit_results', methods=['GET', 'POST'])
+def submit_results():
+    if request.method == 'POST':
+        # TODO: save results to DB
+        return redirect(url_for('agent_dashboard'))
+    return render_template('submit_results.html')
+
+
+@app.route('/request_help', methods=['GET', 'POST'])
+def request_help():
+    if request.method == 'POST':
+        # TODO: save help request
+        return redirect(url_for('agent_dashboard'))
+    return render_template('request_help.html')
+
+
+@app.route('/report_incident', methods=['GET', 'POST'])
+def report_incident():
+    if request.method == 'POST':
+        # TODO: save incident
+        return redirect(url_for('agent_dashboard'))
+    return render_template('report_incident.html')
+
+# ==============================
 # AGENT VOTE SEND
 # ==============================
 @app.route("/agent_results")
