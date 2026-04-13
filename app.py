@@ -19,7 +19,12 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # CREATE APP FIRST
 # ======================
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY is required")
+
+app.secret_key = SECRET_KEY
+
 app.config["SESSION_COOKIE_SECURE"] = False
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -34,28 +39,47 @@ login_manager.login_view = "login"
 # ======================
 # ADMIN
 # ======================
-def admin_required(func):
-    @wraps(func)
+def admin_required(f):
+    @wraps(f)
     def wrapper(*args, **kwargs):
-        if current_user.id != "admin":
+        if not current_user.is_authenticated or current_user.role != "admin":
             return "Forbidden", 403
-        return func(*args, **kwargs)
+        return f(*args, **kwargs)
+    return wrapper
+
+# ======================
+# AGENT
+# ======================
+def agent_required(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role != "agent":
+            return "Forbidden", 403
+        return f(*args, **kwargs)
     return wrapper
 
 # ======================
 # USER CLASS
 # ======================
 class User(UserMixin):
-    def __init__(self, id):
+    def __init__(self, id, role):
         self.id = id
+        self.role = role
 
 # ======================
 # USER LOADER 
 # ======================
 @login_manager.user_loader
 def load_user(user_id):
-    if user_id in users:
-        return User(user_id)
+
+    # Admin
+    if user_id == "admin":
+        return User("admin", "admin")
+
+    # Agent (numeric IDs)
+    if str(user_id).isdigit():
+        return User(user_id, "agent")
+
     return None
 
 # ==============================
@@ -844,7 +868,7 @@ def login():
         password = request.form["password"]
 
         if username in users and check_password_hash(users[username], password):
-            user = User(username)
+            user = User(username, "admin")
             login_user(user)
             return redirect(url_for("dashboard"))
 
@@ -1245,7 +1269,7 @@ def agent_login():
         # 🔴 CRITICAL FIX: handle NULL password safely
         if agent and agent[1] and check_password_hash(agent[1], password):
 
-            user = User(f"agent_{agent[0]}")
+            user = User(str(agent[0]), "agent")
             login_user(user)
 
             return redirect("/agent_dashboard")
