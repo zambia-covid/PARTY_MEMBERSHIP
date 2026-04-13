@@ -20,6 +20,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # ======================
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
+app.config["SESSION_COOKIE_SECURE"] = True
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 # ======================
 # LOGIN MANAGER
