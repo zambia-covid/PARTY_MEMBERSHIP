@@ -882,7 +882,14 @@ def login():
 def logout():
     logout_user()
     return redirect("/login")
-    
+
+# ==============================
+# FAVICON
+# ==============================
+@app.route('/favicon.ico')
+def favicon():
+    return send_file('static/favicon.ico')
+
 # ==============================
 # AGENT VOTE SEND
 # ==============================
