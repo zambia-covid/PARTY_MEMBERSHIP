@@ -81,6 +81,7 @@
             border-radius: 8px;
             font-weight: bold;
             font-size: 14px;
+            cursor: pointer;
         }
 
         .btn-result { background: green; color: white; }
@@ -124,8 +125,10 @@
         <p>No results submitted yet</p>
     {% endif %}
 
-    <!-- ACTION BUTTON -->
-    <button class="btn btn-result">Submit Results</button>
+    <!-- SUBMIT RESULTS -->
+    <form action="{{ url_for('submit_results') }}" method="GET">
+        <button class="btn btn-result">Submit Results</button>
+    </form>
 </div>
 
 <!-- INCIDENTS -->
@@ -138,9 +141,15 @@
         <p>No incidents reported</p>
     {% endfor %}
 
-    <!-- ACTION BUTTONS -->
-    <button class="btn btn-help">Request Help</button>
-    <button class="btn btn-alert">Report Incident</button>
+    <!-- REQUEST HELP -->
+    <form action="{{ url_for('request_help') }}" method="GET">
+        <button class="btn btn-help">Request Help</button>
+    </form>
+
+    <!-- REPORT INCIDENT -->
+    <form action="{{ url_for('report_incident') }}" method="GET">
+        <button class="btn btn-alert">Report Incident</button>
+    </form>
 </div>
 
 </body>
