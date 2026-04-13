@@ -1282,10 +1282,6 @@ def agent_login():
 @login_required    
 def agent_dashboard():
 
-    # Extract agent_id from logged-in user
-    if not current_user.id.startswith("agent_"):
-        return "Unauthorized", 403
-
     agent_id = current_user.id.replace("agent_", "")
 
     conn = get_db()
