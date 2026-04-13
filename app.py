@@ -951,6 +951,7 @@ def send_votes_for_constituency(constituency):
 
 @app.route("/agent_vote_send", methods=["POST"])
 @login_required
+@agent_required
 def agent_vote_send():
     incoming_msg = request.form.get("Body")
     sender = request.form.get("From")
@@ -1286,7 +1287,8 @@ def agent_login():
     return render_template("agent_login.html")
 
 @app.route("/agent_dashboard")
-@login_required    
+@login_required
+@agent_required
 def agent_dashboard():
 
     agent_id = current_user.id.replace("agent_", "")
@@ -1410,6 +1412,7 @@ def alerts():
 
 @app.route("/")
 @login_required
+@admin_required
 def dashboard():
 
     conn = get_db()
@@ -1517,6 +1520,7 @@ def analytics():
 
 @app.route("/agents", methods=["GET", "POST"])
 @login_required
+@admin_required
 def agents():
     conn = get_db()
     cur = conn.cursor()
