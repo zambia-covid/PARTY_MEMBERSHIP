@@ -32,31 +32,6 @@ login_manager.init_app(app)
 login_manager.login_view = "login"
 
 # ======================
-# GLOBAL ACCESS CONTROL
-# ======================
-@app.before_request
-def block_anonymous():
-
-    allowed = {
-        "login",
-        "register",
-        "telegram_webhook",
-        "whatsapp_webhook",
-        "static",
-        "agent_login"
-    }
-
-    if request.endpoint:
-        if request.endpoint.startswith("static") or request.endpoint in allowed:
-            return
-
-    # 🔴 Allow agents through Flask-Login
-    if current_user.is_authenticated:
-        return
-
-    return redirect("/login")
-
-# ======================
 # ADMIN
 # ======================
 def admin_required(func):
