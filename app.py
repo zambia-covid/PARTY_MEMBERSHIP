@@ -20,7 +20,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 # ======================
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "supersecretkey")
-app.config["SESSION_COOKIE_SECURE"] = True
+app.config["SESSION_COOKIE_SECURE"] = False
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
@@ -63,6 +63,8 @@ def load_user(user_id):
 # ==============================
 
 ENV = os.getenv("ENV", "development")
+
+app.config["SESSION_COOKIE_SECURE"] = ENV == "production"
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not BOT_TOKEN:
