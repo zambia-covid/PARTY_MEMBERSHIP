@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Submit Results</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #0b5d1e;
+            color: white;
+            margin: 0;
+            padding: 15px;
+        }
+
+        h2 {
+            text-align: center;
+        }
+
+        .card {
+            background: white;
+            color: black;
+            padding: 15px;
+            border-radius: 12px;
+        }
+
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 10px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            margin-top: 5px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            margin-top: 15px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            background: green;
+            color: white;
+            font-weight: bold;
+        }
+
+        a {
+            display: block;
+            text-align: center;
+            margin-top: 15px;
+            color: white;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>Submit Results</h2>
+
+<div class="card">
+    <form method="POST">
+        <label>PF Votes</label>
+        <input type="number" name="pf" required>
+
+        <label>UPND Votes</label>
+        <input type="number" name="upnd" required>
+
+        <label>Other Votes</label>
+        <input type="number" name="other" required>
+
+        <button type="submit">Submit Results</button>
+    </form>
+</div>
+
+<a href="{{ url_for('agent_dashboard') }}">⬅ Back to Dashboard</a>
+
+</body>
+</html>
