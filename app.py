@@ -53,27 +53,6 @@ def block_anonymous():
 
     return redirect("/login")
 
-    # ----------------------
-    # 🔐 AGENT ROUTES
-    # ----------------------
-    if request.endpoint == "agent_dashboard":
-        if "agent_id" in session:
-            return
-        return redirect("/agent_login")
-
-    # ----------------------
-    # 🌐 PUBLIC ROUTES
-    # ----------------------
-    if request.endpoint:
-        if request.endpoint.startswith("static") or request.endpoint in allowed:
-            return
-
-    # ----------------------
-    # 🔐 ADMIN ROUTES
-    # ----------------------
-    if not current_user.is_authenticated:
-        return redirect("/login")
-
 # ======================
 # ADMIN
 # ======================
@@ -1296,6 +1275,7 @@ def agent_login():
     return render_template("agent_login.html")
 
 @app.route("/agent_dashboard")
+@login_required    
 def agent_dashboard():
 
     # Extract agent_id from logged-in user
