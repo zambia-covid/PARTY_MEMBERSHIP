@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>War Room</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta http-equiv="refresh" content="5">
+
+    <style>
+        body {
+            font-family: Arial;
+            background: black;
+            color: white;
+            padding: 10px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #00ff88;
+        }
+
+        .card {
+            background: #111;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-radius: 10px;
+        }
+
+        .win { color: #00ff88; }
+        .lose { color: red; }
+        .tie { color: orange; }
+
+        .danger {
+            background: #330000;
+        }
+
+        .silent {
+            background: #222;
+            font-size: 14px;
+        }
+
+    </style>
+</head>
+
+<body>
+
+<h2>⚔️ WAR ROOM</h2>
+
+<!-- DANGER ZONES -->
+<div class="card danger">
+    <h3>🚨 Danger Zones</h3>
+
+    {% for d in danger_zones %}
+        <div>{{ d[0] }} → Losing by {{ d[1] }}</div>
+    {% else %}
+        <div>No danger zones</div>
+    {% endfor %}
+</div>
+
+<!-- BATTLEGROUND -->
+<div class="card">
+    <h3>🗺 Constituency Status</h3>
+
+    {% for b in battleground %}
+        <div class="
+            {% if b[3]=='WIN' %}win
+            {% elif b[3]=='LOSE' %}lose
+            {% else %}tie
+            {% endif %}
+        ">
+            {{ b[0] }} → PF {{ b[1] }} vs UPND {{ b[2] }} ({{ b[3] }})
+        </div>
+    {% endfor %}
+</div>
+
+<!-- SILENT STATIONS -->
+<div class="card silent">
+    <h3>⚠️ No Reporting Stations</h3>
+
+    {% for s in silent_stations %}
+        <div>{{ s }}</div>
+    {% else %}
+        <div>All stations reporting</div>
+    {% endfor %}
+</div>
+
+</body>
+</html>
