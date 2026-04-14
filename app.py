@@ -1519,6 +1519,78 @@ def agent_dashboard():
     )
 
 # ==============================
+# WAR ROOM
+# ==============================
+@app.route("/war_room")
+@login_required
+@admin_required
+def war_room():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # ==============================
+    # CONSTITUENCY STATUS
+    # ==============================
+    cur.execute("""
+        SELECT constituency,
+               SUM(pf_votes) as pf,
+               SUM(upnd_votes) as upnd
+        FROM polling_station_results
+        GROUP BY constituency
+    """)
+
+    battleground = []
+    for c, pf, upnd in cur.fetchall():
+
+        if pf > upnd:
+            status = "WIN"
+        elif pf < upnd:
+            status = "LOSE"
+        else:
+            status = "TIE"
+
+        battleground.append((c, pf, upnd, status))
+
+    # ==============================
+    # SILENT STATIONS
+    # ==============================
+    cur.execute("""
+        SELECT a.polling_station
+        FROM agents a
+        LEFT JOIN polling_station_results r
+        ON a.polling_station = r.polling_station
+        WHERE r.id IS NULL
+    """)
+
+    silent_stations = [row[0] for row in cur.fetchall()]
+
+    # ==============================
+    # TOP ALERT ZONES (LOSING BADLY)
+    # ==============================
+    cur.execute("""
+        SELECT constituency,
+               SUM(upnd_votes - pf_votes) as gap
+        FROM polling_station_results
+        GROUP BY constituency
+        HAVING SUM(upnd_votes) > SUM(pf_votes)
+        ORDER BY gap DESC
+        LIMIT 5
+    """)
+
+    danger_zones = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template(
+        "war_room.html",
+        battleground=battleground,
+        silent_stations=silent_stations,
+        danger_zones=danger_zones
+    )
+
+# ==============================
 # MAP DATA
 # ==============================
 
