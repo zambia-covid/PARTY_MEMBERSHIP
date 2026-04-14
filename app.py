@@ -1023,6 +1023,51 @@ def report_incident():
     return render_template('report_incident.html')
 
 # ==============================
+# VOTE TABULATION
+# ==============================
+
+@app.route("/voter_tabulation")
+@login_required
+def voter_tabulation():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # 🔢 Aggregate totals per polling station
+    cur.execute("""
+        SELECT 
+            polling_station,
+            SUM(pf_votes) as pf,
+            SUM(upnd_votes) as upnd,
+            SUM(other_votes) as other
+        FROM polling_station_results
+        GROUP BY polling_station
+        ORDER BY polling_station
+    """)
+
+    results = cur.fetchall()
+
+    # 🔢 National totals
+    cur.execute("""
+        SELECT 
+            COALESCE(SUM(pf_votes),0),
+            COALESCE(SUM(upnd_votes),0),
+            COALESCE(SUM(other_votes),0)
+        FROM polling_station_results
+    """)
+
+    totals = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    return render_template(
+        "voter_tabulation.html",
+        results=results,
+        totals=totals
+    )
+
+# ==============================
 # AGENT VOTE SEND
 # ==============================
 @app.route("/agent_results")
