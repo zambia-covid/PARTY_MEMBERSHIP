@@ -895,26 +895,131 @@ def favicon():
 # ==============================
 
 @app.route('/submit_results', methods=['GET', 'POST'])
+@login_required
+@agent_required
 def submit_results():
+
     if request.method == 'POST':
-        # TODO: save results to DB
+
+        pf = int(request.form.get("pf", 0))
+        upnd = int(request.form.get("upnd", 0))
+        other = int(request.form.get("other", 0))
+
+        agent_id = current_user.id.replace("agent_", "")
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        # Get agent details
+        cur.execute("""
+            SELECT province, constituency, polling_station
+            FROM agents
+            WHERE agent_id=%s
+        """, (agent_id,))
+        agent = cur.fetchone()
+
+        if not agent:
+            return "Agent not found", 404
+
+        province, constituency, polling_station = agent
+
+        # 🔴 INSERT INTO REAL TABULATION TABLE
+        cur.execute("""
+            INSERT INTO polling_station_results
+            (agent_id, province, constituency, polling_station, pf_votes, upnd_votes, other_votes)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (agent_id, province, constituency, polling_station, pf, upnd, other))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
         return redirect(url_for('agent_dashboard'))
+
     return render_template('submit_results.html')
 
-
 @app.route('/request_help', methods=['GET', 'POST'])
+@login_required
+@agent_required
 def request_help():
+
     if request.method == 'POST':
-        # TODO: save help request
+
+        message = request.form.get("message")
+        agent_id = current_user.id.replace("agent_", "")
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT province, constituency, polling_station
+            FROM agents
+            WHERE agent_id=%s
+        """, (agent_id,))
+        agent = cur.fetchone()
+
+        province, constituency, polling_station = agent
+
+        # Save request
+        cur.execute("""
+            INSERT INTO incidents
+            (agent_id, province, constituency, polling_station, message)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (agent_id, province, constituency, polling_station, f"HELP: {message}"))
+
+        conn.commit()
+
+        # 🔥 OPTIONAL: Alert admin instantly
+        send_whatsapp_message(
+            os.getenv("ADMIN_PHONE"),
+            f"🚨 HELP REQUEST\nStation: {polling_station}\n{message}"
+        )
+
+        cur.close()
+        conn.close()
+
         return redirect(url_for('agent_dashboard'))
+
     return render_template('request_help.html')
 
-
 @app.route('/report_incident', methods=['GET', 'POST'])
+@login_required
+@agent_required
 def report_incident():
+
     if request.method == 'POST':
-        # TODO: save incident
+
+        message = request.form.get("incident")
+
+        agent_id = current_user.id.replace("agent_", "")
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT province, constituency, polling_station
+            FROM agents
+            WHERE agent_id=%s
+        """, (agent_id,))
+        agent = cur.fetchone()
+
+        if not agent:
+            return "Agent not found", 404
+
+        province, constituency, polling_station = agent
+
+        cur.execute("""
+            INSERT INTO incidents
+            (agent_id, province, constituency, polling_station, message)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (agent_id, province, constituency, polling_station, message))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
         return redirect(url_for('agent_dashboard'))
+
     return render_template('report_incident.html')
 
 # ==============================
