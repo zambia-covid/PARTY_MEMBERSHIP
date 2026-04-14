@@ -1602,17 +1602,26 @@ def dashboard():
     conn = get_db()
     cur = conn.cursor()
 
+    # ==============================
+    # TOTAL MEMBERS
+    # ==============================
     cur.execute("SELECT COUNT(*) FROM members")
     total = cur.fetchone()[0]
 
+    # ==============================
+    # MEMBERS BY PROVINCE
+    # ==============================
     cur.execute("""
-    SELECT province, COUNT(*)
-    FROM members
-    GROUP BY province
+        SELECT province, COUNT(*)
+        FROM members
+        GROUP BY province
+        ORDER BY COUNT(*) DESC
     """)
-
     provinces = cur.fetchall()
 
+    # ==============================
+    # VOTE TOTALS
+    # ==============================
     cur.execute("""
         SELECT 
             COALESCE(SUM(pf_votes),0),
@@ -1622,15 +1631,56 @@ def dashboard():
     """)
     pf_total, upnd_total, other_total = cur.fetchone()
 
+    # ==============================
+    # STATUS + MARGIN
+    # ==============================
     margin = pf_total - upnd_total
-    status = "Winning" if pf_total > upnd_total else "Losing"
+
+    if pf_total > upnd_total:
+        status = "Winning"
+    elif pf_total < upnd_total:
+        status = "Losing"
+    else:
+        status = "Tied"
+
+    # ==============================
+    # COVERAGE (CRITICAL ADD)
+    # ==============================
+    cur.execute("""
+        SELECT COUNT(DISTINCT polling_station)
+        FROM polling_station_results
+    """)
+    reporting_stations = cur.fetchone()[0]
+
+    cur.execute("""
+        SELECT COUNT(DISTINCT polling_station)
+        FROM agents
+    """)
+    total_stations = cur.fetchone()[0]
+
+    coverage = 0
+    if total_stations > 0:
+        coverage = round((reporting_stations / total_stations) * 100, 1)
+
+    # ==============================
+    # RECENT RESULTS (LIVE FEED)
+    # ==============================
+    cur.execute("""
+        SELECT polling_station, pf_votes, upnd_votes, other_votes
+        FROM polling_station_results
+        ORDER BY id DESC
+        LIMIT 5
+    """)
+    recent_results = cur.fetchall()
 
     cur.close()
     conn.close()
 
+    # ==============================
+    # SYSTEM STATUS
+    # ==============================
     system_status = {
         "telegram": "OK",
-        "qr": "",
         "database": "Connected",
         "server": "Running"
     }
@@ -1639,7 +1689,16 @@ def dashboard():
         "index.html",
         total_members=total,
         provinces=provinces,
-        status=system_status
+        pf_total=pf_total,
+        upnd_total=upnd_total,
+        other_total=other_total,
+        margin=margin,
+        status=status,
+        coverage=coverage,
+        reporting_stations=reporting_stations,
+        total_stations=total_stations,
+        recent_results=recent_results,
+        system_status=system_status
     )
 
 # ==============================
