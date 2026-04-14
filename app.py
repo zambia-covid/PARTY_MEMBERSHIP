@@ -14,6 +14,7 @@ from flask_login import login_user
 from functools import wraps
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from openai import OpenAI
 
 # ======================
 # CREATE APP FIRST
@@ -24,6 +25,8 @@ if not SECRET_KEY:
     raise ValueError("SECRET_KEY is required")
 
 app.secret_key = SECRET_KEY
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app.config["SESSION_COOKIE_SECURE"] = False
 app.config["SESSION_COOKIE_HTTPONLY"] = True
@@ -46,6 +49,35 @@ def admin_required(f):
             return "Forbidden", 403
         return f(*args, **kwargs)
     return wrapper
+    
+# ======================
+# AI
+# ======================
+def ai_classify_voter(member):
+    try:
+        prompt = f"""
+        Classify this voter:
+
+        Name: {member.get("full_name")}
+        Province: {member.get("province")}
+        Constituency: {member.get("constituency")}
+        Ward: {member.get("ward")}
+
+        Return ONLY one word:
+        STRONG, LEANING, WEAK
+        """
+
+        res = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=5
+        )
+
+        return res.choices[0].message.content.strip().upper()
+
+    except Exception as e:
+        print("AI classification error:", e)
+        return "UNKNOWN"
 
 # ======================
 # AGENT
@@ -384,6 +416,36 @@ def generate_assets_async(name, province, constituency, member_id):
         print(f"[ASYNC] Generated assets for {member_id}")
     except Exception as e:
         print(f"[ASYNC ERROR] {e}")
+# ==============================
+# AI GENERATED MSG
+# ==============================
+
+def ai_generate_message(context):
+    try:
+        prompt = f"""
+        You are a political campaign strategist.
+
+        Create a short, powerful message for voters in:
+        Province: {context.get("province")}
+        Constituency: {context.get("constituency")}
+        Ward: {context.get("ward")}
+
+        Tone: persuasive, urgent, pro-development.
+
+        Keep under 40 words.
+        """
+
+        res = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=80
+        )
+
+        return res.choices[0].message.content.strip()
+
+    except Exception as e:
+        print("AI message error:", e)
+        return "Stay engaged. Your vote matters."
 
 # ==============================
 # VOTER SCORE
@@ -461,6 +523,34 @@ def download_card(member_id):
 
     return send_file(path, as_attachment=True)
 
+# ==============================
+# AI INSIGHTS
+# ==============================
+@app.route("/ai_insights")
+@login_required
+@admin_required
+def ai_insights():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT ai_support, COUNT(*)
+        FROM members
+        GROUP BY ai_support
+    """)
+
+    data = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template("ai_insights.html", data=data)
+
+# ==============================
+# REGISTER
+# ==============================
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
 
@@ -528,12 +618,22 @@ def register():
         })
 
         # =========================
+        # AI CLASSIFICATION
+        # =========================
+        ai_score = ai_classify_voter({
+            "full_name": full_name,
+            "province": province,
+            "constituency": constituency,
+            "ward": ward
+        })
+
+        # =========================
         # INSERT MEMBER
         # =========================
         cur.execute("""
             INSERT INTO members
-            (membership_id, full_name, province, district, constituency, ward, phone, polling_station, status)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'Active')
+            (membership_id, full_name, province, district, constituency, ward, phone, polling_station, status, ai_support)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'Active',%s)
         """, (
             member_id,
             full_name,
@@ -542,7 +642,8 @@ def register():
             constituency,
             ward,
             phone,
-            polling_station
+            polling_station,
+            ai_score
         ))
 
         conn.commit()
@@ -1287,7 +1388,7 @@ def agent_vote_send():
     return jsonify({"reply": reply})
 
 # ==============================
-# BROADCAAST
+# BROADCAST
 # ==============================
 
 @app.route('/broadcast', methods=['POST'])
@@ -1312,6 +1413,19 @@ def broadcast():
     constituency = data.get("constituency")
     ward = data.get("ward")
 
+    # ==============================
+    # 🤖 AI MESSAGE OVERRIDE
+    # ==============================
+    if data.get("use_ai") == "true":
+        message = ai_generate_message({
+            "province": province,
+            "constituency": constituency,
+            "ward": ward
+        })
+
+    # ==============================
+    # VALIDATION
+    # ==============================
     if not message:
         return jsonify({"error": "Message is required"}), 400
 
@@ -1344,7 +1458,8 @@ def broadcast():
             "whatsapp_sent": whatsapp_sent,
             "telegram_sent": telegram_sent,
             "chat_id": chat_id,
-            "phone": phone
+            "phone": phone,
+            "message_used": message   # 👈 IMPORTANT (debug visibility)
         }), 200
 
     # ==========================================
@@ -1377,7 +1492,6 @@ def broadcast():
 
     for phone, chat_id in rows:
 
-        # WhatsApp
         if phone:
             try:
                 send_whatsapp_message(phone, message)
@@ -1385,7 +1499,6 @@ def broadcast():
             except Exception as e:
                 print(f"WA failed {phone}: {e}")
 
-        # Telegram
         if chat_id:
             try:
                 send_telegram_message(chat_id, message)
@@ -1393,7 +1506,7 @@ def broadcast():
             except Exception as e:
                 print(f"TG failed {chat_id}: {e}")
 
-        time.sleep(0.1)  # ⚠️ Reduced delay (1s is too slow at scale)
+        time.sleep(0.1)
 
     cur.close()
     conn.close()
@@ -1402,7 +1515,8 @@ def broadcast():
         "status": "broadcast_sent",
         "whatsapp_sent": whatsapp_sent,
         "telegram_sent": telegram_sent,
-        "total_targeted": len(rows)
+        "total_targeted": len(rows),
+        "message_used": message   # 👈 CRITICAL for verifying AI output
     }), 200
     
 # ==============================
