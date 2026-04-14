@@ -20,17 +20,15 @@ body{
     display:flex;
     justify-content:space-between;
     align-items:center;
-    flex-wrap:wrap;
+    position:relative;
 }
 
 .navbar h2{ margin:0; font-size:18px; }
 
-/* NAV LINKS */
 .nav-links{
     display:flex;
-    gap:15px;
     align-items:center;
-    flex-wrap:wrap;
+    gap:18px;
 }
 
 .nav-links a{
@@ -45,7 +43,7 @@ body{
     display: inline-block;
 }
 
-.dropdown button{
+.dropdown-btn{
     background:none;
     border:none;
     color:white;
@@ -54,37 +52,46 @@ body{
     font-size:14px;
 }
 
-.dropdown-content {
+.dropdown-content{
     display:none;
     position:absolute;
     background:white;
     min-width:180px;
-    box-shadow:0 4px 10px rgba(0,0,0,0.2);
-    z-index:10;
+    right:0;
+    top:30px;
     border-radius:6px;
+    overflow:hidden;
+    box-shadow:0 4px 10px rgba(0,0,0,0.2);
+    z-index:999;
 }
 
 .dropdown-content a{
-    color:black;
+    color:#0b6623;
     padding:10px;
     display:block;
     text-decoration:none;
+    font-weight:bold;
 }
 
 .dropdown-content a:hover{
-    background:#f0f0f0;
+    background:#eef5ee;
 }
 
 .dropdown:hover .dropdown-content{
     display:block;
 }
 
-/* CONTAINER */
-.container{
-    padding:30px;
+/* MOBILE */
+@media(max-width:768px){
+    .nav-links{
+        flex-wrap:wrap;
+        gap:10px;
+    }
 }
 
-/* GRID */
+/* CONTAINER */
+.container{ padding:30px; }
+
 .grid{
     display:grid;
     grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
@@ -92,7 +99,6 @@ body{
     margin-bottom:25px;
 }
 
-/* CARD */
 .card{
     background:white;
     padding:20px;
@@ -100,19 +106,25 @@ body{
     box-shadow:0 4px 10px rgba(0,0,0,0.08);
 }
 
-.card h3{
-    margin-top:0;
-    color:#0b6623;
-}
+.card h3{ color:#0b6623; margin-top:0; }
 
-/* STATS */
 .stat{
     font-size:40px;
     font-weight:bold;
     color:#0b6623;
 }
 
-/* BUTTON */
+.flex{
+    display:flex;
+    flex-wrap:wrap;
+    gap:20px;
+}
+
+.metric span{
+    font-size:22px;
+    font-weight:bold;
+}
+
 button{
     padding:10px 20px;
     background:#0b6623;
@@ -125,6 +137,10 @@ button{
 
 button:hover{ background:#084d1a; }
 
+.broadcast textarea{
+    width:100%;
+    height:100px;
+}
 </style>
 </head>
 
@@ -135,25 +151,21 @@ button:hover{ background:#084d1a; }
     <h2>Campaign Operations Dashboard</h2>
 
     <div class="nav-links">
-
         <a href="/">Dashboard</a>
         <a href="/members">Members</a>
         <a href="/agents">Agents</a>
         <a href="/analytics">Analytics</a>
-        <a href="/polling_intelligence">Polling Intelligence</a>
-        <a href="/application">Application</a>
 
         <!-- DROPDOWN MENU -->
         <div class="dropdown">
-            <button>Command ▾</button>
+            <button class="dropdown-btn">War Room ▾</button>
             <div class="dropdown-content">
-                <a href="/war_room">⚔ War Room</a>
-                <a href="/incidents_view">🚨 Incidents</a>
-                <a href="/voter_tabulation">📊 Tabulation</a>
-                <a href="/alerts">📡 Alerts API</a>
+                <a href="/agent_dashboard">Agent Dashboard</a>
+                <a href="/voter_tabulation">Live Tabulation</a>
+                <a href="/war_room">War Room</a>
+                <a href="/incidents_view">Incidents</a>
             </div>
         </div>
-
     </div>
 </div>
 
@@ -169,27 +181,82 @@ button:hover{ background:#084d1a; }
 
     <div class="card">
         <h3>System Status</h3>
-        <ul>
-            <li>Telegram: <b>{{ status.telegram }}</b></li>
-            <li>Database: <b>{{ status.database }}</b></li>
-            <li>Server: <b>{{ status.server }}</b></li>
-        </ul>
+        <p>Telegram: <b>{{ status.telegram }}</b></p>
+        <p>Database: <b>{{ status.database }}</b></p>
+        <p>Server: <b>{{ status.server }}</b></p>
+    </div>
+
+</div>
+
+<!-- LIVE TABULATION -->
+<div class="grid">
+
+    <div class="card">
+        <h3>Live Vote Command</h3>
+
+        <div class="flex">
+            <div class="metric">PF<br><span id="pf_votes">{{ pf_total }}</span></div>
+            <div class="metric">UPND<br><span id="upnd_votes">{{ upnd_total }}</span></div>
+            <div class="metric">Margin<br><span id="margin">{{ margin }}</span></div>
+        </div>
+
+        <a href="/voter_tabulation"><button>Full Tabulation</button></a>
     </div>
 
     <div class="card">
-        <h3>Quick Actions</h3>
-        <a href="/members"><button>Open Members</button></a>
+        <h3>Reporting Coverage</h3>
+        <p>Total Stations: <b>{{ total_stations }}</b></p>
+        <p>Reported: <b>{{ reported }}</b></p>
+        <p>Coverage: <b>{{ coverage }}%</b></p>
+    </div>
+
+    <div class="card">
+        <h3>Danger Zones</h3>
+        <ul id="alerts"></ul>
     </div>
 
 </div>
 
-<!-- LIVE COMMAND -->
+<!-- PROVINCES -->
 <div class="card">
-    <h3>Live Vote Command</h3>
-    <p>PF: {{ pf_total }} | UPND: {{ upnd_total }} | Margin: {{ margin }}</p>
+    <h3>Members by Province</h3>
+    {% for p in provinces %}
+        <p><b>{{ p[0] }}</b> — {{ p[1] }}</p>
+    {% endfor %}
 </div>
 
 </div>
+
+<script>
+// ALERTS
+setInterval(async ()=>{
+    let res = await fetch("/alerts")
+    let data = await res.json()
+
+    let html = ""
+
+    if(data.length === 0){
+        html = "<li style='color:green;'>All stable</li>"
+    } else {
+        data.forEach(a=>{
+            html += `<li style="color:red;">${a.constituency} losing by ${a.margin}</li>`
+        })
+    }
+
+    document.getElementById("alerts").innerHTML = html
+}, 5000);
+
+// LIVE STATS (FIXED)
+setInterval(async ()=>{
+    let res = await fetch("/live_stats")
+    let data = await res.json()
+
+    if(data.length > 0){
+        document.getElementById("pf_votes").innerText = data[0][1]
+        document.getElementById("upnd_votes").innerText = data[0][2]
+    }
+}, 5000);
+</script>
 
 </body>
 </html>
