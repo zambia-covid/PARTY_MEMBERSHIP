@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<title>Campaign Command Dashboard</title>
+
+<style>
+body{
+    margin:0;
+    font-family:Arial, Helvetica;
+    background:#eef5ee;
+}
+
+/* NAVBAR */
+.navbar{
+    background:#0b6623;
+    color:white;
+    padding:15px 25px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+}
+
+.navbar h2{ margin:0; }
+
+.nav-links a{
+    color:white;
+    text-decoration:none;
+    margin-left:20px;
+    font-weight:bold;
+}
+
+.nav-links a:hover{ text-decoration:underline; }
+
+/* CONTAINER */
+.container{
+    padding:30px;
+}
+
+/* GRID */
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:20px;
+    margin-bottom:25px;
+}
+
+/* CARD */
+.card{
+    background:white;
+    padding:20px;
+    border-radius:10px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.08);
+}
+
+.card h3{
+    margin-top:0;
+    color:#0b6623;
+}
+
+/* STATS */
+.stat{
+    font-size:40px;
+    font-weight:bold;
+    color:#0b6623;
+}
+
+/* LISTS */
+.status-list li,
+.province-list li{
+    margin-bottom:6px;
+}
+
+/* BROADCAST */
+.broadcast textarea{
+    width:100%;
+    height:100px;
+    padding:10px;
+    border-radius:5px;
+    border:1px solid #ccc;
+}
+
+/* INPUT */
+input{
+    padding:8px;
+    margin-top:5px;
+    width:100%;
+    border-radius:5px;
+    border:1px solid #ccc;
+}
+
+/* BUTTON */
+button{
+    padding:10px 20px;
+    background:#0b6623;
+    color:white;
+    border:none;
+    margin-top:10px;
+    cursor:pointer;
+    border-radius:5px;
+}
+
+button:hover{ background:#084d1a; }
+
+/* FLEX BLOCK */
+.flex{
+    display:flex;
+    flex-wrap:wrap;
+    gap:20px;
+}
+
+.metric{
+    min-width:120px;
+}
+
+.metric span{
+    font-size:22px;
+    font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+<div class="navbar">
+    <h2>Campaign Operations Dashboard</h2>
+    <div class="nav-links">
+        <a href="/">Dashboard</a>
+        <a href="/members">Members</a>
+        <a href="/agents">Agents</a>
+        <a href="/analytics">Analytics</a>
+        <a href="/polling_intelligence">Polling Intelligence</a>
+	<a href="/application">Application</a>
+    </div>
+</div>
+
+<div class="container">
+
+<!-- TOP GRID -->
+<div class="grid">
+
+    <div class="card">
+        <h3>Total Members</h3>
+        <div class="stat">{{ total_members }}</div>
+    </div>
+
+    <div class="card">
+        <h3>System Status</h3>
+        <ul class="status-list">
+            <li>Telegram: <b>{{ status.telegram }}</b></li>
+            <li>QR Cards: <b>{{ status.qr }}</b></li>
+            <li>Database: <b>{{ status.database }}</b></li>
+            <li>Server: <b>{{ status.server }}</b></li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>Quick Actions</h3>
+        <p>Manage campaign membership records.</p>
+        <a href="/members"><button>Open Members</button></a>
+    </div>
+
+</div>
+
+<!-- TABULATION + COVERAGE -->
+<div class="grid">
+
+    <!-- VOTER TABULATION -->
+    <div class="card">
+        <h3>Live Vote Command</h3>
+
+        <div class="flex">
+
+            <div class="metric">
+                PF<br>
+                <span id="pf_votes" style="color:green;">{{ pf_total }}</span>
+            </div>
+
+            <div class="metric">
+                UPND<br>
+                <span id="upnd_votes" style="color:red;">{{ upnd_total }}</span>
+            </div>
+
+            <div class="metric">
+                Other<br>
+                <span>{{ other_total }}</span>
+            </div>
+
+            <div class="metric">
+                Margin<br>
+                <span id="margin">{{ margin }}</span>
+            </div>
+
+            <div class="metric">
+                Status<br>
+                <span id="status"
+                style="{% if tabulation_status=='Winning' %}color:green;{% else %}color:red;{% endif %}">
+                {{ tabulation_status }}
+                </span>
+            </div>
+
+        </div>
+
+        <br>
+        <a href="/voter_tabulation"><button>Full Tabulation</button></a>
+    </div>
+
+    <!-- COVERAGE -->
+    <div class="card">
+        <h3>Reporting Coverage</h3>
+        <p>Total Stations: <b>{{ total_stations }}</b></p>
+        <p>Reported: <b>{{ reported }}</b></p>
+        <p>Coverage: <b>{{ coverage }}%</b></p>
+    </div>
+
+    <!-- DANGER ZONES -->
+    <div class="card">
+        <h3>Danger Zones</h3>
+        <ul id="alerts"></ul>
+    </div>
+
+<!-- PROVINCE -->
+<div class="card">
+    <h3>Members by Province</h3>
+    <ul class="province-list">
+        {% for p in provinces %}
+        <li><b>{{ p[0] }}</b> — {{ p[1] }}</li>
+        {% endfor %}
+    </ul>
+</div>
+
+<div class="card broadcast">
+    <h3>Command Broadcast</h3>
+
+    <form id="broadcastForm">
+
+        <textarea id="message" placeholder="Enter command message..." required></textarea>
+
+        <!-- NEW: DIRECT TARGET -->
+        <input type="text" id="chat_id" placeholder="Direct chat_id (overrides filters)">
+
+        <hr>
+
+        <!-- FILTER TARGETING -->
+        <input type="text" id="province" placeholder="Province (optional)">
+        <input type="text" id="district" placeholder="District (optional)">
+        <input type="text" id="constituency" placeholder="Constituency (optional)">
+        <input type="text" id="ward" placeholder="Ward (optional)">
+
+        <button type="submit">Send Broadcast</button>
+
+    </form>
+
+    <p id="result" style="margin-top:10px;color:#0b6623;"></p>
+</div>
+
+<script id="w9j2xp">
+// BROADCAST
+document.addEventListener("DOMContentLoaded", function(){
+
+    document.getElementById("broadcastForm").addEventListener("submit", async function(e){
+        e.preventDefault();
+
+        let payload = {
+            message: document.getElementById("message").value,
+            chat_id: document.getElementById("chat_id").value,
+            province: document.getElementById("province").value,
+            district: document.getElementById("district").value,
+            constituency: document.getElementById("constituency").value,
+            ward: document.getElementById("ward").value
+        };
+
+        // REMOVE EMPTY VALUES
+        Object.keys(payload).forEach(key => {
+            if(!payload[key]) delete payload[key];
+        });
+
+        let res = await fetch("/broadcast", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        let data = await res.json();
+
+        document.getElementById("result").innerText =
+            data.chat_id
+            ? "Message sent to chat_id " + data.chat_id
+            : "Broadcast sent to " + (data.sent || 0) + " members";
+    });
+
+});
+</script>
+
+<script>
+// ALERTS
+setInterval(async ()=>{
+    let res = await fetch("/alerts")
+    let data = await res.json()
+
+    let html = ""
+
+    if(data.length === 0){
+        html = "<li style='color:green;'>All stable</li>"
+    } else {
+        data.forEach(a=>{
+            html += `<li style="color:red;">${a.constituency} losing by ${a.margin}</li>`
+        })
+    }
+
+    document.getElementById("alerts").innerHTML = html
+}, 5000)
+
+// LIVE STATS
+setInterval(async ()=>{
+    let res = await fetch("/live_stats")
+    let data = await res.json()
+
+    document.getElementById("pf_votes").innerText = data.pf
+    document.getElementById("upnd_votes").innerText = data.upnd
+    document.getElementById("margin").innerText = data.margin
+    document.getElementById("status").innerText = data.status
+}, 5000)
+
+<script>
+
+var map = L.map('map').setView([-13.1339, 27.8493], 6);
+
+// Base map
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: 'Zambia Election Command'
+}).addTo(map);
+
+// Color logic
+function getColor(status){
+    if(status === "PF") return "green";
+    if(status === "UPND") return "red";
+    if(status === "TIED") return "orange";
+    return "grey";
+}
+
+let geoLayer;
+
+// Load map
+fetch("/static/zambia.geojson")
+.then(res => res.json())
+.then(geojson => {
+
+    geoLayer = L.geoJSON(geojson, {
+        style: {
+            color: "#333",
+            weight: 1,
+            fillOpacity: 0.7,
+            fillColor: "grey"
+        },
+        onEachFeature: function(feature, layer){
+            layer.bindPopup(feature.properties.name);
+        }
+    }).addTo(map);
+
+    updateMap();
+});
+
+// 🔴 LIVE UPDATE
+async function updateMap(){
+    let res = await fetch("/map_data");
+    let data = await res.json();
+
+    geoLayer.eachLayer(layer=>{
+        let name = layer.feature.properties.name;
+
+        let info = data[name];
+
+        let color = "grey";
+
+        if(info){
+            color = getColor(info.status);
+
+            layer.bindPopup(
+                `<b>${name}</b><br>
+                PF: ${info.pf}<br>
+                UPND: ${info.upnd}`
+            );
+        }
+
+        layer.setStyle({ fillColor: color });
+    });
+}
+
+// Refresh every 5 sec
+setInterval(updateMap, 5000);
+
+</script>
+
+</body>
+</html>
