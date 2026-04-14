@@ -9,3 +9,4 @@ validators==0.22.0
 twilio==9.0.0
 openpyxl
 Flask-Login==0.6.3
+openai>=1.0.0
