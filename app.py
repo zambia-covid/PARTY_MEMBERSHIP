@@ -991,6 +991,9 @@ def report_incident():
 
         message = request.form.get("incident")
 
+        if not message:
+            return "Incident message required", 400
+
         agent_id = current_user.id.replace("agent_", "")
 
         conn = get_db()
@@ -1001,9 +1004,12 @@ def report_incident():
             FROM agents
             WHERE agent_id=%s
         """, (agent_id,))
+
         agent = cur.fetchone()
 
         if not agent:
+            cur.close()
+            conn.close()
             return "Agent not found", 404
 
         province, constituency, polling_station = agent
@@ -1015,6 +1021,7 @@ def report_incident():
         """, (agent_id, province, constituency, polling_station, message))
 
         conn.commit()
+
         cur.close()
         conn.close()
 
