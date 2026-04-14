@@ -1769,6 +1769,7 @@ def dashboard():
         coverage=coverage,
         reporting_stations=reporting_stations,
         total_stations=total_stations,
+        reported=reporting_stations,
         recent_results=recent_results,
         system_status=system_status
     )
