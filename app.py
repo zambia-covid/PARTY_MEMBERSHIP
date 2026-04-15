@@ -1391,7 +1391,9 @@ def agent_vote_send():
 @login_required
 def broadcast():
 
-    # Accept both JSON and form data
+    # ==============================
+    # INPUT HANDLING
+    # ==============================
     if request.is_json:
         data = request.get_json()
     else:
@@ -1412,7 +1414,9 @@ def broadcast():
     # ==============================
     # 🤖 AI MESSAGE OVERRIDE
     # ==============================
-    if data.get("use_ai") == "true":
+    use_ai = str(data.get("use_ai")).lower() == "true"
+
+    if use_ai:
         message = ai_generate_message({
             "province": province,
             "constituency": constituency,
@@ -1420,27 +1424,33 @@ def broadcast():
         })
 
     # ==============================
-    # VALIDATION
+    # VALIDATION (OUTSIDE AI BLOCK)
     # ==============================
     if not message:
         return jsonify({"error": "Message is required"}), 400
 
+    # ==============================
+    # COUNTERS
+    # ==============================
     whatsapp_sent = 0
     telegram_sent = 0
+    sms_sent = 0
 
     import time
 
     # ==========================================
-    # 🎯 DIRECT MESSAGE MODE (OVERRIDES FILTERS)
+    # 🎯 DIRECT MESSAGE MODE
     # ==========================================
     if chat_id or phone:
 
         if phone:
             try:
                 send_whatsapp_message(phone, message)
+                send_sms(phone, message)  # SMS added
                 whatsapp_sent += 1
+                sms_sent += 1
             except Exception as e:
-                print(f"WA failed {phone}: {e}")
+                print(f"WA/SMS failed {phone}: {e}")
 
         if chat_id:
             try:
@@ -1453,13 +1463,14 @@ def broadcast():
             "status": "direct_sent",
             "whatsapp_sent": whatsapp_sent,
             "telegram_sent": telegram_sent,
+            "sms_sent": sms_sent,
             "chat_id": chat_id,
             "phone": phone,
-            "message_used": message   # 👈 IMPORTANT (debug visibility)
+            "message_used": message
         }), 200
 
     # ==========================================
-    # 📡 BROADCAST MODE (FILTERS)
+    # 📡 BROADCAST MODE
     # ==========================================
     conn = get_db()
     cur = conn.cursor()
@@ -1491,9 +1502,11 @@ def broadcast():
         if phone:
             try:
                 send_whatsapp_message(phone, message)
+                send_sms(phone, message)
                 whatsapp_sent += 1
+                sms_sent += 1
             except Exception as e:
-                print(f"WA failed {phone}: {e}")
+                print(f"WA/SMS failed {phone}: {e}")
 
         if chat_id:
             try:
@@ -1511,8 +1524,9 @@ def broadcast():
         "status": "broadcast_sent",
         "whatsapp_sent": whatsapp_sent,
         "telegram_sent": telegram_sent,
+        "sms_sent": sms_sent,
         "total_targeted": len(rows),
-        "message_used": message   # 👈 CRITICAL for verifying AI output
+        "message_used": message
     }), 200
     
 # ==============================
