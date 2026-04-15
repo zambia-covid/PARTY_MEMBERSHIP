@@ -89,6 +89,32 @@ def agent_required(f):
         return f(*args, **kwargs)
     return wrapper
 
+# ==============================
+# SMS (TALKING AFRICA)
+# ==============================
+
+def send_sms(phone, message):
+    url = "https://api.talkingafrica.com/v1/send_sms"
+
+    payload = {
+        "api_key": os.getenv("TA_API_KEY"),
+        "username": os.getenv("TA_USERNAME"),
+        "to": phone,
+        "message": message,
+        "sender_id": os.getenv("TA_SENDER_ID")  # e.g. "PF2026"
+    }
+
+    try:
+        res = requests.post(url, json=payload, timeout=10)
+
+        print(f"[SMS RESPONSE] {res.status_code} -> {res.text}")
+
+        if not res.ok:
+            print(f"[SMS ERROR] Failed for {phone}")
+
+    except Exception as e:
+        print(f"[SMS EXCEPTION] {phone}: {e}")
+
 # ======================
 # USER CLASS
 # ======================
@@ -443,6 +469,35 @@ Under 40 words.
         print("AI message error:", e)
         return "Stay engaged. Your vote matters."
 
+# ==============================
+# SEND MULTI CHANNELS
+# ==============================
+
+def send_multi_channel(phone, chat_id, message):
+    whatsapp = 0
+    telegram = 0
+    sms = 0
+
+    # WhatsApp + SMS
+    if phone:
+        try:
+            send_whatsapp_message(phone, message)
+            send_sms(phone, message)
+            whatsapp += 1
+            sms += 1
+        except Exception as e:
+            print(f"[WA/SMS ERROR] {phone}: {e}")
+
+    # Telegram
+    if chat_id:
+        try:
+            send_telegram_message(chat_id, message)
+            telegram += 1
+        except Exception as e:
+            print(f"[TG ERROR] {chat_id}: {e}")
+
+    return whatsapp, telegram, sms
+    
 # ==============================
 # VOTER SCORE
 # ==============================
@@ -1424,7 +1479,7 @@ def broadcast():
         })
 
     # ==============================
-    # VALIDATION (OUTSIDE AI BLOCK)
+    # VALIDATION
     # ==============================
     if not message:
         return jsonify({"error": "Message is required"}), 400
@@ -1443,21 +1498,11 @@ def broadcast():
     # ==========================================
     if chat_id or phone:
 
-        if phone:
-            try:
-                send_whatsapp_message(phone, message)
-                send_sms(phone, message)  # SMS added
-                whatsapp_sent += 1
-                sms_sent += 1
-            except Exception as e:
-                print(f"WA/SMS failed {phone}: {e}")
+        wa, tg, sms = send_multi_channel(phone, chat_id, message)
 
-        if chat_id:
-            try:
-                send_telegram_message(chat_id, message)
-                telegram_sent += 1
-            except Exception as e:
-                print(f"TG failed {chat_id}: {e}")
+        whatsapp_sent += wa
+        telegram_sent += tg
+        sms_sent += sms
 
         return jsonify({
             "status": "direct_sent",
@@ -1499,21 +1544,11 @@ def broadcast():
 
     for phone, chat_id in rows:
 
-        if phone:
-            try:
-                send_whatsapp_message(phone, message)
-                send_sms(phone, message)
-                whatsapp_sent += 1
-                sms_sent += 1
-            except Exception as e:
-                print(f"WA/SMS failed {phone}: {e}")
+        wa, tg, sms = send_multi_channel(phone, chat_id, message)
 
-        if chat_id:
-            try:
-                send_telegram_message(chat_id, message)
-                telegram_sent += 1
-            except Exception as e:
-                print(f"TG failed {chat_id}: {e}")
+        whatsapp_sent += wa
+        telegram_sent += tg
+        sms_sent += sms
 
         time.sleep(0.1)
 
