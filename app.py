@@ -1042,6 +1042,11 @@ def logout():
 def favicon():
     return send_file('static/favicon.ico')
 
+@app.route("/ai")
+@login_required
+def ai_page():
+    return render_template("ai.html")
+
 # ==============================
 # AGENT REPORT
 # ==============================
