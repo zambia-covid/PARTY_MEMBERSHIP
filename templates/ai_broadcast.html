@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Campaign Messaging</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f4f7f6;
+}
+
+.navbar {
+    background: #0b6623;
+    color: white;
+    padding: 15px 25px;
+    font-size: 18px;
+}
+
+.container {
+    max-width: 700px;
+    margin: 30px auto;
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+h2 {
+    margin-bottom: 20px;
+}
+
+input, select, textarea {
+    width: 100%;
+    padding: 10px;
+    margin: 8px 0 15px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+textarea {
+    height: 100px;
+}
+
+button {
+    background: #0b6623;
+    color: white;
+    padding: 12px;
+    border: none;
+    width: 100%;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #094d1a;
+}
+
+.result {
+    margin-top: 20px;
+    padding: 15px;
+    background: #eef5ee;
+    border-left: 5px solid #0b6623;
+}
+
+.toggle {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.toggle input {
+    width: auto;
+    margin-right: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="navbar">
+    🤖 AI Campaign Messaging
+</div>
+
+<div class="container">
+
+<h2>Send Broadcast</h2>
+
+<form id="broadcastForm">
+
+    <label>Province</label>
+    <input type="text" name="province">
+
+    <label>District</label>
+    <input type="text" name="district">
+
+    <label>Constituency</label>
+    <input type="text" name="constituency">
+
+    <label>Ward</label>
+    <input type="text" name="ward">
+
+    <div class="toggle">
+        <input type="checkbox" id="use_ai" name="use_ai" value="true">
+        <label for="use_ai">Use AI to generate message</label>
+    </div>
+
+    <label>Manual Message (optional)</label>
+    <textarea name="message" placeholder="Type message or leave blank if using AI"></textarea>
+
+    <button type="submit">Send Broadcast</button>
+
+</form>
+
+<div id="result" class="result" style="display:none;"></div>
+
+</div>
+
+<script>
+document.getElementById("broadcastForm").addEventListener("submit", async function(e){
+    e.preventDefault();
+
+    const form = e.target;
+    const formData = new FormData(form);
+
+    // Convert to JSON
+    const data = {};
+    formData.forEach((value, key) => {
+        data[key] = value;
+    });
+
+    // Handle checkbox
+    data["use_ai"] = document.getElementById("use_ai").checked ? "true" : "false";
+
+    try {
+        const res = await fetch("/broadcast", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await res.json();
+
+        const resultDiv = document.getElementById("result");
+        resultDiv.style.display = "block";
+
+        if(result.error){
+            resultDiv.innerHTML = `<b>Error:</b> ${result.error}`;
+        } else {
+            resultDiv.innerHTML = `
+                <b>Status:</b> ${result.status}<br>
+                <b>WhatsApp Sent:</b> ${result.whatsapp_sent}<br>
+		<b>SMS Sent:</b> ${result.sms_sent}<br>
+                <b>Telegram Sent:</b> ${result.telegram_sent}<br>
+                <b>Total Targeted:</b> ${result.total_targeted || 1}<br><br>
+
+                <b>Message Used:</b><br>
+                "${result.message_used}"
+            `;
+        }
+
+    } catch (err) {
+        document.getElementById("result").innerHTML = "Request failed";
+    }
+});
+</script>
+
+</body>
+</html>

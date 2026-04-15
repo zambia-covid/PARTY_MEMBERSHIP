@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Voter Insights</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #f4f6f8;
+            margin: 0;
+        }
+
+        .header {
+            background: #0b6623;
+            color: white;
+            padding: 15px 20px;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        .strong { border-left: 6px solid green; }
+        .leaning { border-left: 6px solid orange; }
+        .weak { border-left: 6px solid red; }
+
+        h2 { margin: 0 0 10px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>🧠 AI Voter Intelligence</h2>
+</div>
+
+<div class="container">
+
+    {% for row in data %}
+        {% set label = row[0] %}
+        {% set count = row[1] %}
+
+        <div class="card 
+            {% if label == 'STRONG' %}strong{% endif %}
+            {% if label == 'LEANING' %}leaning{% endif %}
+            {% if label == 'WEAK' %}weak{% endif %}
+        ">
+            <h2>{{ label }}</h2>
+            <p>Total Voters: <strong>{{ count }}</strong></p>
+        </div>
+    {% endfor %}
+
+</div>
+
+</body>
+</html>
