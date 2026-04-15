@@ -1663,14 +1663,10 @@ def live_stats():
         cs.constituency,
         cs.province,
 
-        -- MEMBERS
         COUNT(DISTINCT m.membership_id) AS members,
-
-        -- NATIONAL BASELINE
         cs.total_voters,
         cs.total_polling_stations,
 
-        -- REAL VOTES
         COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
         COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
 
@@ -1684,9 +1680,41 @@ def live_stats():
         ON r.constituency = cs.constituency
 
     GROUP BY cs.constituency, cs.province, cs.total_voters, cs.total_polling_stations
-""")
+    """)
 
-    results = cur.fetchall()
+    rows = cur.fetchall()
+
+    results = []
+
+    for r in rows:
+        constituency, province, members, voters, stations, pf, upnd = r
+
+        # 🔴 CORE INTELLIGENCE
+        penetration = (members / voters * 100) if voters > 0 else 0
+        expected_votes = int(members * 0.65)
+        margin = pf - upnd
+
+        # 🔴 FINAL STATUS (REALITY-BASED)
+        if pf > upnd and penetration >= 40:
+            status = "WIN"
+        elif pf < upnd and penetration < 30:
+            status = "LOSE"
+        else:
+            status = "TOSS-UP"
+
+        results.append({
+            "constituency": constituency,
+            "province": province,
+            "members": members,
+            "voters": voters,
+            "stations": stations,
+            "pf_votes": pf,
+            "upnd_votes": upnd,
+            "expected_votes": expected_votes,
+            "penetration": round(penetration, 2),
+            "margin": margin,
+            "status": status
+        })
 
     cur.close()
     conn.close()
@@ -2046,11 +2074,32 @@ def polling_intelligence():
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT polling_station, COUNT(*)
-        FROM members
-        GROUP BY polling_station
-        ORDER BY COUNT(*) DESC
-    """)
+    SELECT 
+        cs.constituency,
+        cs.province,
+
+        -- MEMBERS
+        COUNT(DISTINCT m.membership_id) AS members,
+
+        -- NATIONAL BASELINE
+        cs.total_voters,
+        cs.total_polling_stations,
+
+        -- REAL VOTES
+        COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+        COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+
+    FROM constituency_stats cs
+
+    LEFT JOIN members m
+        ON m.constituency = cs.constituency
+        AND m.status = 'Active'
+
+    LEFT JOIN polling_station_results r
+        ON r.constituency = cs.constituency
+
+    GROUP BY cs.constituency, cs.province, cs.total_voters, cs.total_polling_stations
+""")
 
     stations = cur.fetchall()
 
