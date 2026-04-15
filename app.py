@@ -1659,15 +1659,32 @@ def live_stats():
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT 
-            m.constituency,
-            COUNT(DISTINCT m.membership_id) AS members,
-            COALESCE(SUM(r.pf_votes), 0) AS pf_votes
-        FROM members m
-        LEFT JOIN polling_station_results r
-            ON m.polling_station = r.polling_station
-        GROUP BY m.constituency
-    """)
+    SELECT 
+        cs.constituency,
+        cs.province,
+
+        -- MEMBERS
+        COUNT(DISTINCT m.membership_id) AS members,
+
+        -- NATIONAL BASELINE
+        cs.total_voters,
+        cs.total_polling_stations,
+
+        -- REAL VOTES
+        COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+        COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+
+    FROM constituency_stats cs
+
+    LEFT JOIN members m
+        ON m.constituency = cs.constituency
+        AND m.status = 'Active'
+
+    LEFT JOIN polling_station_results r
+        ON r.constituency = cs.constituency
+
+    GROUP BY cs.constituency, cs.province, cs.total_voters, cs.total_polling_stations
+""")
 
     results = cur.fetchall()
 
