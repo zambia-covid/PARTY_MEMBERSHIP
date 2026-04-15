@@ -1090,7 +1090,8 @@ def constituency_intelligence():
 
     for r in rows:
         constituency, province, members, voters, stations, penetration = r
-
+        expected_votes = int(members * 0.65)
+        
         if penetration >= 50:
             status = "WIN"
         elif penetration >= 30:
