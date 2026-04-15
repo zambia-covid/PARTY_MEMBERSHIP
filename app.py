@@ -56,24 +56,23 @@ def admin_required(f):
 def ai_classify_voter(member):
     try:
         prompt = f"""
-        Classify this voter:
+Classify this voter:
 
-        Name: {member.get("full_name")}
-        Province: {member.get("province")}
-        Constituency: {member.get("constituency")}
-        Ward: {member.get("ward")}
+Name: {member.get("full_name")}
+Province: {member.get("province")}
+Constituency: {member.get("constituency")}
+Ward: {member.get("ward")}
 
-        Return ONLY one word:
-        STRONG, LEANING, WEAK
-        """
+Return ONLY one word:
+STRONG, LEANING, WEAK
+"""
 
-        res = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=5
+        res = client.responses.create(
+            model="gpt-4.1-mini",
+            input=prompt
         )
 
-        return res.choices[0].message.content.strip().upper()
+        return res.output_text.strip().upper()
 
     except Exception as e:
         print("AI classification error:", e)
@@ -423,25 +422,22 @@ def generate_assets_async(name, province, constituency, member_id):
 def ai_generate_message(context):
     try:
         prompt = f"""
-        You are a political campaign strategist.
+Create a short, powerful political campaign message.
 
-        Create a short, powerful message for voters in:
-        Province: {context.get("province")}
-        Constituency: {context.get("constituency")}
-        Ward: {context.get("ward")}
+Province: {context.get("province")}
+Constituency: {context.get("constituency")}
+Ward: {context.get("ward")}
 
-        Tone: persuasive, urgent, pro-development.
+Tone: persuasive, urgent, pro-development.
+Under 40 words.
+"""
 
-        Keep under 40 words.
-        """
-
-        res = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=80
+        res = client.responses.create(
+            model="gpt-4.1-mini",
+            input=prompt
         )
 
-        return res.choices[0].message.content.strip()
+        return res.output_text.strip()
 
     except Exception as e:
         print("AI message error:", e)
