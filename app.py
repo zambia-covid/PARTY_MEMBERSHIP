@@ -180,6 +180,18 @@ def get_db():
     )
 
 # ==============================
+# CONSTITUENCY PENETRATION
+# ==============================
+
+def classify_constituency(penetration):
+    if penetration >= 50:
+        return "WIN"
+    elif penetration >= 30:
+        return "TOSS-UP"
+    else:
+        return "LOSE"
+
+# ==============================
 # TELEGRAM FUNCTIONS
 # ==============================
 
@@ -1034,6 +1046,72 @@ def login():
 def logout():
     logout_user()
     return redirect("/login")
+    
+# ==============================
+# CONSTITUENCY INTELIGENCE
+# ==============================
+@app.route("/constituency_intelligence")
+@login_required
+def constituency_intelligence():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT 
+            cs.constituency,
+            cs.province,
+            COUNT(m.membership_id) AS members,
+            cs.total_voters,
+            cs.total_polling_stations,
+
+            CASE 
+                WHEN cs.total_voters > 0 
+                THEN ROUND((COUNT(m.membership_id)::decimal / cs.total_voters) * 100, 2)
+                ELSE 0
+            END AS penetration
+
+        FROM constituency_stats cs
+
+        LEFT JOIN members m
+            ON m.constituency = cs.constituency
+            AND m.status = 'Active'
+
+        GROUP BY cs.constituency, cs.province, cs.total_voters, cs.total_polling_stations
+        ORDER BY penetration DESC
+    """)
+
+    rows = cur.fetchall()
+
+    # ==============================
+    # 🔴 CLASSIFICATION LOGIC
+    # ==============================
+    results = []
+
+    for r in rows:
+        constituency, province, members, voters, stations, penetration = r
+
+        if penetration >= 50:
+            status = "WIN"
+        elif penetration >= 30:
+            status = "TOSS-UP"
+        else:
+            status = "LOSE"
+
+        results.append({
+            "constituency": constituency,
+            "province": province,
+            "members": members,
+            "voters": voters,
+            "stations": stations,
+            "penetration": float(penetration),
+            "status": status
+        })
+
+    cur.close()
+    conn.close()
+
+    return render_template("constituency_intelligence.html", results=results)
 
 # ==============================
 # FAVICON
