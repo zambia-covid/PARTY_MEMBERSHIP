@@ -1061,15 +1061,13 @@ def constituency_intelligence():
         SELECT 
             cs.constituency,
             cs.province,
-            COUNT(m.membership_id) AS members,
+
+            COUNT(DISTINCT m.membership_id) AS members,
             cs.total_voters,
             cs.total_polling_stations,
 
-            CASE 
-                WHEN cs.total_voters > 0 
-                THEN ROUND((COUNT(m.membership_id)::decimal / cs.total_voters) * 100, 2)
-                ELSE 0
-            END AS penetration
+            COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+            COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
 
         FROM constituency_stats cs
 
@@ -1077,8 +1075,16 @@ def constituency_intelligence():
             ON m.constituency = cs.constituency
             AND m.status = 'Active'
 
-        GROUP BY cs.constituency, cs.province, cs.total_voters, cs.total_polling_stations
-        ORDER BY penetration DESC
+        LEFT JOIN polling_station_results r
+            ON r.constituency = cs.constituency
+
+        GROUP BY 
+            cs.constituency, 
+            cs.province, 
+            cs.total_voters, 
+            cs.total_polling_stations
+
+        ORDER BY members DESC
     """)
 
     rows = cur.fetchall()
@@ -1821,12 +1827,32 @@ def war_room():
     # CONSTITUENCY STATUS
     # ==============================
     cur.execute("""
-        SELECT constituency,
-               SUM(pf_votes) as pf,
-               SUM(upnd_votes) as upnd
-        FROM polling_station_results
-        GROUP BY constituency
-    """)
+    SELECT 
+        cs.constituency,
+        cs.province,
+
+        -- MEMBERS
+        COUNT(DISTINCT m.membership_id) AS members,
+
+        -- NATIONAL BASELINE
+        cs.total_voters,
+        cs.total_polling_stations,
+
+        -- REAL VOTES
+        COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+        COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+
+    FROM constituency_stats cs
+
+    LEFT JOIN members m
+        ON m.constituency = cs.constituency
+        AND m.status = 'Active'
+
+    LEFT JOIN polling_station_results r
+        ON r.constituency = cs.constituency
+
+    GROUP BY cs.constituency, cs.province, cs.total_voters, cs.total_polling_stations
+""")
 
     battleground = []
     for c, pf, upnd in cur.fetchall():
@@ -1965,8 +1991,8 @@ def dashboard():
     # ==============================
     # TOTAL MEMBERS
     # ==============================
-    cur.execute("SELECT COUNT(*) FROM members")
-    total = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM members WHERE status='Active'")
+    total_members = cur.fetchone()[0]
 
     # ==============================
     # MEMBERS BY PROVINCE
@@ -1974,13 +2000,25 @@ def dashboard():
     cur.execute("""
         SELECT province, COUNT(*)
         FROM members
+        WHERE status='Active'
         GROUP BY province
         ORDER BY COUNT(*) DESC
     """)
     provinces = cur.fetchall()
 
     # ==============================
-    # VOTE TOTALS
+    # NATIONAL BASELINE (CRITICAL)
+    # ==============================
+    cur.execute("""
+        SELECT 
+            COALESCE(SUM(total_voters),0),
+            COALESCE(SUM(total_polling_stations),0)
+        FROM constituency_stats
+    """)
+    total_voters, national_stations = cur.fetchone()
+
+    # ==============================
+    # REAL VOTES (LIVE DATA)
     # ==============================
     cur.execute("""
         SELECT 
@@ -1997,14 +2035,14 @@ def dashboard():
     margin = pf_total - upnd_total
 
     if pf_total > upnd_total:
-        status = "Winning"
+        status = "WINNING"
     elif pf_total < upnd_total:
-        status = "Losing"
+        status = "LOSING"
     else:
-        status = "Tied"
+        status = "TIED"
 
     # ==============================
-    # COVERAGE (CRITICAL ADD)
+    # COVERAGE (FIELD CONTROL)
     # ==============================
     cur.execute("""
         SELECT COUNT(DISTINCT polling_station)
@@ -2023,6 +2061,29 @@ def dashboard():
         coverage = round((reporting_stations / total_stations) * 100, 1)
 
     # ==============================
+    # EXPECTED TURNOUT MODEL
+    # ==============================
+    expected_votes = int(total_members * 0.65)
+
+    # ==============================
+    # TURNOUT GAP (CRITICAL SIGNAL)
+    # ==============================
+    vote_gap = expected_votes - pf_total
+
+    # ==============================
+    # WIN THRESHOLD (REAL POWER)
+    # ==============================
+    votes_needed_to_win = int((total_voters * 0.5) + 1)
+    distance_to_majority = votes_needed_to_win - pf_total
+
+    # ==============================
+    # TURNOUT EFFICIENCY
+    # ==============================
+    turnout_efficiency = 0
+    if expected_votes > 0:
+        turnout_efficiency = round((pf_total / expected_votes) * 100, 1)
+
+    # ==============================
     # RECENT RESULTS (LIVE FEED)
     # ==============================
     cur.execute("""
@@ -2032,6 +2093,34 @@ def dashboard():
         LIMIT 5
     """)
     recent_results = cur.fetchall()
+
+    # ==============================
+    # 🔥 TOP LOSING CONSTITUENCIES
+    # ==============================
+    cur.execute("""
+        SELECT constituency,
+               SUM(upnd_votes - pf_votes) AS gap
+        FROM polling_station_results
+        GROUP BY constituency
+        HAVING SUM(upnd_votes) > SUM(pf_votes)
+        ORDER BY gap DESC
+        LIMIT 5
+    """)
+    danger_zones = cur.fetchall()
+
+    # ==============================
+    # 🔥 STRONGHOLDS
+    # ==============================
+    cur.execute("""
+        SELECT constituency,
+               SUM(pf_votes - upnd_votes) AS lead
+        FROM polling_station_results
+        GROUP BY constituency
+        HAVING SUM(pf_votes) > SUM(upnd_votes)
+        ORDER BY lead DESC
+        LIMIT 5
+    """)
+    strongholds = cur.fetchall()
 
     cur.close()
     conn.close()
@@ -2047,18 +2136,38 @@ def dashboard():
 
     return render_template(
         "index.html",
-        total_members=total,
+
+        # BASIC
+        total_members=total_members,
         provinces=provinces,
+
+        # VOTES
         pf_total=pf_total,
         upnd_total=upnd_total,
         other_total=other_total,
         margin=margin,
         status=status,
+
+        # FIELD CONTROL
         coverage=coverage,
         reporting_stations=reporting_stations,
         total_stations=total_stations,
-        reported=reporting_stations,
+
+        # NATIONAL POWER METRICS
+        total_voters=total_voters,
+        national_stations=national_stations,
+        expected_votes=expected_votes,
+        vote_gap=vote_gap,
+        votes_needed_to_win=votes_needed_to_win,
+        distance_to_majority=distance_to_majority,
+        turnout_efficiency=turnout_efficiency,
+
+        # INTELLIGENCE
         recent_results=recent_results,
+        danger_zones=danger_zones,
+        strongholds=strongholds,
+
+        # SYSTEM
         system_status=system_status
     )
 
@@ -2074,34 +2183,84 @@ def polling_intelligence():
     cur = conn.cursor()
 
     cur.execute("""
-    SELECT 
-        cs.constituency,
-        cs.province,
+        SELECT 
+            cs.constituency,
+            cs.province,
 
-        -- MEMBERS
-        COUNT(DISTINCT m.membership_id) AS members,
+            COUNT(DISTINCT m.membership_id) AS members,
+            cs.total_voters,
+            cs.total_polling_stations,
 
-        -- NATIONAL BASELINE
-        cs.total_voters,
-        cs.total_polling_stations,
+            COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+            COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
 
-        -- REAL VOTES
-        COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
-        COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+        FROM constituency_stats cs
 
-    FROM constituency_stats cs
+        LEFT JOIN members m
+            ON m.constituency = cs.constituency
+            AND m.status = 'Active'
 
-    LEFT JOIN members m
-        ON m.constituency = cs.constituency
-        AND m.status = 'Active'
+        LEFT JOIN polling_station_results r
+            ON r.constituency = cs.constituency
 
-    LEFT JOIN polling_station_results r
-        ON r.constituency = cs.constituency
+        GROUP BY cs.constituency, cs.province, cs.total_voters, cs.total_polling_stations
+        ORDER BY cs.province, cs.constituency
+    """)
 
-    GROUP BY cs.constituency, cs.province, cs.total_voters, cs.total_polling_stations
-""")
+    rows = cur.fetchall()
 
-    stations = cur.fetchall()
+    stations = []
+
+    for r in rows:
+        constituency, province, members, voters, total_stations, pf_votes, upnd_votes = r
+
+        # ==============================
+        # 📊 CORE METRICS
+        # ==============================
+        penetration = round((members / voters) * 100, 2) if voters > 0 else 0
+        expected_votes = int(members * 0.65)
+        total_votes = pf_votes + upnd_votes
+        turnout = total_votes
+
+        margin = pf_votes - upnd_votes
+        turnout_gap = expected_votes - pf_votes
+
+        # ==============================
+        # 🧠 STATUS CLASSIFICATION
+        # ==============================
+        if margin > 0 and penetration >= 40:
+            status = "STRONG"
+        elif margin < 0 and penetration < 30:
+            status = "WEAK"
+        else:
+            status = "BATTLEGROUND"
+
+        # ==============================
+        # 🚨 ACTION SIGNALS
+        # ==============================
+        if turnout_gap > 500:
+            action = "MOBILIZE"
+        elif margin < 0:
+            action = "RECOVER"
+        else:
+            action = "HOLD"
+
+        stations.append({
+            "constituency": constituency,
+            "province": province,
+            "members": members,
+            "voters": voters,
+            "stations": total_stations,
+            "pf_votes": pf_votes,
+            "upnd_votes": upnd_votes,
+            "penetration": penetration,
+            "expected_votes": expected_votes,
+            "turnout": turnout,
+            "margin": margin,
+            "turnout_gap": turnout_gap,
+            "status": status,
+            "action": action
+        })
 
     cur.close()
     conn.close()
@@ -2112,7 +2271,7 @@ def polling_intelligence():
     )
 
 # ==============================
-# ANALYTICS DASHBOARD
+# ANALYTICS ROUTE
 # ==============================
 
 @app.route("/analytics")
@@ -2122,21 +2281,82 @@ def analytics():
     conn = get_db()
     cur = conn.cursor()
 
+    # ==============================
+    # MEMBERS BY PROVINCE
+    # ==============================
     cur.execute("""
         SELECT province, COUNT(*)
         FROM members
+        WHERE status='Active'
         GROUP BY province
         ORDER BY COUNT(*) DESC
     """)
-
     provinces = cur.fetchall()
+
+    # ==============================
+    # NATIONAL BASELINE
+    # ==============================
+    cur.execute("""
+        SELECT province, SUM(total_voters)
+        FROM constituency_stats
+        GROUP BY province
+    """)
+    voters_data = dict(cur.fetchall())
+
+    # ==============================
+    # REAL VOTES BY PROVINCE
+    # ==============================
+    cur.execute("""
+        SELECT province,
+               COALESCE(SUM(pf_votes),0),
+               COALESCE(SUM(upnd_votes),0)
+        FROM polling_station_results
+        GROUP BY province
+    """)
+    votes_data = {row[0]: (row[1], row[2]) for row in cur.fetchall()}
+
+    # ==============================
+    # BUILD INTELLIGENCE
+    # ==============================
+    analytics = []
+
+    for province, members in provinces:
+
+        voters = voters_data.get(province, 0)
+        pf_votes, upnd_votes = votes_data.get(province, (0, 0))
+
+        penetration = round((members / voters) * 100, 2) if voters > 0 else 0
+        expected_votes = int(members * 0.65)
+        margin = pf_votes - upnd_votes
+
+        # ==============================
+        # STATUS CLASSIFICATION
+        # ==============================
+        if margin > 0 and penetration >= 40:
+            status = "STRONGHOLD"
+        elif margin < 0 and penetration < 30:
+            status = "WEAK"
+        else:
+            status = "BATTLEGROUND"
+
+        analytics.append({
+            "province": province,
+            "members": members,
+            "voters": voters,
+            "pf_votes": pf_votes,
+            "upnd_votes": upnd_votes,
+            "penetration": penetration,
+            "expected_votes": expected_votes,
+            "margin": margin,
+            "status": status
+        })
 
     cur.close()
     conn.close()
 
     return render_template(
         "analytics.html",
-        provinces=provinces
+        analytics=analytics
     )
 
 # ==============================
