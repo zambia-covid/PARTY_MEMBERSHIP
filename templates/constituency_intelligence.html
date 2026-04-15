@@ -1,0 +1,25 @@
+<h2>Constituency Intelligence</h2>
+
+<table>
+    <tr>
+        <th>Province</th>
+        <th>Constituency</th>
+        <th>Members</th>
+        <th>Total Voters</th>
+        <th>Stations</th>
+        <th>Penetration</th>
+        <th>Status</th>
+    </tr>
+
+    {% for r in results %}
+    <tr class="{{ r.status }}">
+        <td>{{ r.province }}</td>
+        <td>{{ r.constituency }}</td>
+        <td>{{ r.members }}</td>
+        <td>{{ r.voters }}</td>
+        <td>{{ r.stations }}</td>
+        <td>{{ r.penetration }}%</td>
+        <td><strong>{{ r.status }}</strong></td>
+    </tr>
+    {% endfor %}
+</table>
