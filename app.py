@@ -1510,7 +1510,7 @@ def api_incidents():
 
     cur.execute("""
         SELECT 
-            COALESCE(agent_id, 'N/A'),
+            id,
             COALESCE(province, 'N/A'),
             COALESCE(constituency, 'N/A'),
             COALESCE(polling_station, 'N/A'),
@@ -1526,7 +1526,7 @@ def api_incidents():
     incidents = []
     for r in rows:
         incidents.append({
-            "agent_id": r[0],
+            "id": r[0],
             "province": r[1],
             "constituency": r[2],
             "polling_station": r[3],
