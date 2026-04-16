@@ -1377,6 +1377,12 @@ def request_help():
 
     return render_template('request_help.html')
 
+
+@app.route("/incidents")
+@login_required
+def incidents_page():
+    return render_template("incidents.html")
+
 @app.route('/report_incident', methods=['GET', 'POST'])
 @login_required
 @agent_required
@@ -1493,7 +1499,7 @@ def agent_results():
     return render_template("agent_results.html", results=results)
 
 # ==============================
-# AGENT VOTE SEND
+# API ACCIDENTS
 # ==============================
 @app.route("/api/incidents")
 @login_required
