@@ -1,77 +1,165 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Constituency Intelligence</title>
+<title>Constituency Intelligence LIVE</title>
 
-    <style>
-        body {
-            font-family: Arial;
-            background: #f4f4f4;
-            padding: 20px;
-        }
+<style>
+body {
+    font-family: Arial;
+    background: #f4f4f4;
+    padding: 20px;
+}
 
-        h2 {
-            color: #0b6623;
-        }
+/* TABLE */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-        }
+th, td {
+    padding: 10px;
+    border: 1px solid #ddd;
+    text-align: center;
+}
 
-        th, td {
-            padding: 10px;
-            border: 1px solid #ddd;
-            text-align: center;
-        }
+th {
+    background: #0b6623;
+    color: white;
+}
 
-        th {
-            background: #0b6623;
-            color: white;
-        }
+/* STATUS COLORS */
+.WIN { background: #2e7d32; color: white; }
+.TOSS-UP { background: #f9a825; color: black; }
+.LOSE { background: #c62828; color: white; }
 
-        /* STATUS COLORS */
-        .STRONGHOLD { background: #1b5e20; color: white; }
-        .LEAN\ WIN { background: #4caf50; color: white; }
-        .SWING { background: #fbc02d; color: black; }
-        .COLLAPSE { background: #b71c1c; color: white; }
-        .CONTESTED { background: #90a4ae; color: black; }
+/* CLICKABLE ROW */
+.clickable {
+    cursor: pointer;
+}
 
-    </style>
+/* MODAL */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.6);
+}
+
+.modal-content {
+    background: white;
+    margin: 5% auto;
+    padding: 20px;
+    width: 60%;
+    border-radius: 10px;
+}
+</style>
 </head>
 
 <body>
 
-<h2>Constituency Intelligence</h2>
+<h2>Constituency Intelligence (LIVE)</h2>
 
-<table>
-    <tr>
-        <th>Province</th>
-        <th>Constituency</th>
-        <th>Members</th>
-        <th>Voters</th>
-        <th>Stations</th>
-        <th>Penetration %</th>
-        <th>Margin</th>
-        <th>Expected Votes</th>
-        <th>Status</th>
-    </tr>
+<table id="intelTable">
+    <thead>
+        <tr>
+            <th>Province</th>
+            <th>Constituency</th>
+            <th>Members</th>
+            <th>Voters</th>
+            <th>Stations</th>
+            <th>Penetration</th>
+            <th>Status</th>
+        </tr>
+    </thead>
 
-    {% for r in results %}
-    <tr class="{{ r.status|replace(' ', '\\ ') }}">
-        <td>{{ r.province }}</td>
-        <td>{{ r.constituency }}</td>
-        <td>{{ r.members }}</td>
-        <td>{{ r.voters }}</td>
-        <td>{{ r.stations }}</td>
-        <td>{{ r.penetration }}</td>
-        <td>{{ r.margin }}</td>
-        <td>{{ r.expected_votes }}</td>
-        <td><strong>{{ r.status }}</strong></td>
-    </tr>
-    {% endfor %}
+    <tbody></tbody>
 </table>
+
+<!-- DRILLDOWN MODAL -->
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalTitle"></h3>
+        <table style="width:100%">
+            <thead>
+                <tr>
+                    <th>Polling Station</th>
+                    <th>PF</th>
+                    <th>UPND</th>
+                </tr>
+            </thead>
+            <tbody id="stationBody"></tbody>
+        </table>
+
+        <br>
+        <button onclick="closeModal()">Close</button>
+    </div>
+</div>
+
+<script>
+
+async function loadTable() {
+    let res = await fetch("/api/constituency_intelligence");
+    let data = await res.json();
+
+    let tbody = document.querySelector("#intelTable tbody");
+    tbody.innerHTML = "";
+
+    data.forEach(r => {
+
+        let row = document.createElement("tr");
+        row.className = r.status + " clickable";
+
+        row.innerHTML = `
+            <td>${r.province}</td>
+            <td>${r.constituency}</td>
+            <td>${r.members}</td>
+            <td>${r.voters}</td>
+            <td>${r.stations}</td>
+            <td>${r.penetration}%</td>
+            <td>${r.status}</td>
+        `;
+
+        row.onclick = () => loadDetail(r.constituency);
+
+        tbody.appendChild(row);
+    });
+}
+
+async function loadDetail(constituency) {
+
+    let res = await fetch(`/constituency_detail/${constituency}`);
+    let data = await res.json();
+
+    document.getElementById("modalTitle").innerText = constituency;
+
+    let body = document.getElementById("stationBody");
+    body.innerHTML = "";
+
+    data.forEach(s => {
+        body.innerHTML += `
+            <tr>
+                <td>${s.station}</td>
+                <td>${s.pf}</td>
+                <td>${s.upnd}</td>
+            </tr>
+        `;
+    });
+
+    document.getElementById("modal").style.display = "block";
+}
+
+function closeModal() {
+    document.getElementById("modal").style.display = "none";
+}
+
+// AUTO REFRESH EVERY 5 SECONDS
+setInterval(loadTable, 5000);
+loadTable();
+
+</script>
 
 </body>
 </html>
