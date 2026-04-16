@@ -118,10 +118,10 @@ th {
 
 <!-- SAFE DATA INJECTION -->
 <script>
-const provinces = JSON.parse('{{ provinces | tojson | safe }}' || "[]");
+const analytics = {{ analytics | tojson | safe }};
 
-const labels = provinces.map(p => p[0]);
-const data = provinces.map(p => p[1]);
+const labels = analytics.map(p => p.province);
+const data = analytics.map(p => p.members);
 
 const ctx = document.getElementById("provinceChart").getContext("2d");
 
