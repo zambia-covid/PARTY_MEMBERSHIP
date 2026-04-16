@@ -1492,16 +1492,24 @@ def agent_results():
 
     return render_template("agent_results.html", results=results)
 
-@app.route("/incidents_view")
+@app.route("/incidents")
 @login_required
-def incidents_view():
+def incidents():
+
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT agent_id, province, constituency, polling_station, message
+        SELECT 
+            constituency,
+            province,
+            type,
+            description,
+            severity,
+            created_at
         FROM incidents
-        ORDER BY id DESC
+        ORDER BY created_at DESC
+        LIMIT 100
     """)
 
     incidents = cur.fetchall()
