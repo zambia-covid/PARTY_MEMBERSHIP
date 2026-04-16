@@ -1492,32 +1492,46 @@ def agent_results():
 
     return render_template("agent_results.html", results=results)
 
-@app.route("/incidents")
+# ==============================
+# AGENT VOTE SEND
+# ==============================
+@app.route("/api/incidents")
 @login_required
-def incidents():
+def api_incidents():
 
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute("""
         SELECT 
-            constituency,
-            province,
-            type,
-            description,
-            severity,
-            created_at
+            COALESCE(agent_id, 'N/A'),
+            COALESCE(province, 'N/A'),
+            COALESCE(constituency, 'N/A'),
+            COALESCE(polling_station, 'N/A'),
+            COALESCE(message, 'No message'),
+            COALESCE(created_at, NOW())
         FROM incidents
-        ORDER BY created_at DESC
+        ORDER BY id DESC
         LIMIT 100
     """)
 
-    incidents = cur.fetchall()
+    rows = cur.fetchall()
+
+    incidents = []
+    for r in rows:
+        incidents.append({
+            "agent_id": r[0],
+            "province": r[1],
+            "constituency": r[2],
+            "polling_station": r[3],
+            "message": r[4],
+            "time": str(r[5])
+        })
 
     cur.close()
     conn.close()
 
-    return render_template("incidents.html", incidents=incidents)
+    return jsonify(incidents)
 
 # ==============================
 # AGENT VOTE SEND
