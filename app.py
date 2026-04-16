@@ -995,6 +995,113 @@ def whatsapp_webhook():
 
         return str(resp)
 
+# ==============================
+# CONSTITUENCY DETAIL
+# ==============================
+
+@app.route("/constituency_detail/<constituency>")
+@login_required
+def constituency_detail(constituency):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT polling_station,
+               pf_votes,
+               upnd_votes
+        FROM polling_station_results
+        WHERE constituency = %s
+    """, (constituency,))
+
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return jsonify([
+        {
+            "station": r[0],
+            "pf": r[1],
+            "upnd": r[2]
+        } for r in rows
+    ])
+
+@app.route("/api/constituency_intelligence")
+@login_required
+def api_constituency_intelligence():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT 
+            cs.constituency,
+            cs.province,
+            COUNT(DISTINCT m.membership_id) AS members,
+            cs.total_voters,
+            cs.total_polling_stations,
+            COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+            COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+        FROM constituency_stats cs
+
+        LEFT JOIN members m
+            ON m.constituency = cs.constituency
+            AND m.status = 'Active'
+
+        LEFT JOIN polling_station_results r
+            ON r.constituency = cs.constituency
+
+        GROUP BY 
+            cs.constituency,
+            cs.province,
+            cs.total_voters,
+            cs.total_polling_stations
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    results = []
+
+    for r in rows:
+
+        constituency, province, members, voters, stations, pf_votes, upnd_votes = r
+
+        # avoid division crash
+        penetration = (members / voters * 100) if voters else 0
+
+        # strategic projection
+        expected_votes = int(members * 0.65)
+
+        # real margin
+        margin = pf_votes - upnd_votes
+
+        # 🔴 CLASSIFICATION ENGINE (CORE LOGIC)
+        if margin > 0 and penetration >= 40:
+            status = "WIN"
+        elif margin < 0 and penetration < 30:
+            status = "LOSE"
+        else:
+            status = "TOSS-UP"
+
+        results.append({
+            "constituency": constituency,
+            "province": province,
+            "members": members,
+            "voters": voters,
+            "stations": stations,
+            "pf_votes": pf_votes,
+            "upnd_votes": upnd_votes,
+            "penetration": round(penetration, 2),
+            "expected_votes": expected_votes,
+            "margin": margin,
+            "status": status
+        })
+
+    return jsonify(results)
+
 @app.route("/approve/<int:id>", methods=['POST'])
 @login_required
 @admin_required
