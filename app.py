@@ -1511,27 +1511,30 @@ def api_incidents():
     cur.execute("""
         SELECT 
             id,
-            COALESCE(province, 'N/A'),
-            COALESCE(constituency, 'N/A'),
-            COALESCE(polling_station, 'N/A'),
-            COALESCE(message, 'No message'),
-            COALESCE(created_at, NOW())
+            agent_id,
+            province,
+            constituency,
+            polling_station,
+            message,
+            created_at
         FROM incidents
-        ORDER BY id DESC
+        ORDER BY created_at DESC
         LIMIT 100
     """)
 
     rows = cur.fetchall()
 
     incidents = []
+
     for r in rows:
         incidents.append({
             "id": r[0],
-            "province": r[1],
-            "constituency": r[2],
-            "polling_station": r[3],
-            "message": r[4],
-            "time": str(r[5])
+            "agent_id": r[1],
+            "province": r[2],
+            "constituency": r[3],
+            "polling_station": r[4],
+            "message": r[5],
+            "created_at": str(r[6]) if r[6] else None
         })
 
     cur.close()
