@@ -10,6 +10,10 @@
             padding: 20px;
         }
 
+        h2 {
+            color: #0b6623;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -27,12 +31,13 @@
             color: white;
         }
 
-
         /* STATUS COLORS */
-    <style>
-        .WIN { background: #2e7d32; color: white; }       /* green */
-        .TOSS-UP { background: #f9a825; color: black; }  /* yellow */
-        .LOSE { background: #c62828; color: white; }     /* red */
+        .STRONGHOLD { background: #1b5e20; color: white; }
+        .LEAN\ WIN { background: #4caf50; color: white; }
+        .SWING { background: #fbc02d; color: black; }
+        .COLLAPSE { background: #b71c1c; color: white; }
+        .CONTESTED { background: #90a4ae; color: black; }
+
     </style>
 </head>
 
@@ -45,20 +50,24 @@
         <th>Province</th>
         <th>Constituency</th>
         <th>Members</th>
-        <th>Total Voters</th>
+        <th>Voters</th>
         <th>Stations</th>
-        <th>Penetration</th>
+        <th>Penetration %</th>
+        <th>Margin</th>
+        <th>Expected Votes</th>
         <th>Status</th>
     </tr>
 
     {% for r in results %}
-    <tr class="{{ r.status }}">
+    <tr class="{{ r.status|replace(' ', '\\ ') }}">
         <td>{{ r.province }}</td>
         <td>{{ r.constituency }}</td>
         <td>{{ r.members }}</td>
         <td>{{ r.voters }}</td>
         <td>{{ r.stations }}</td>
-        <td>{{ r.penetration }}%</td>
+        <td>{{ r.penetration }}</td>
+        <td>{{ r.margin }}</td>
+        <td>{{ r.expected_votes }}</td>
         <td><strong>{{ r.status }}</strong></td>
     </tr>
     {% endfor %}
