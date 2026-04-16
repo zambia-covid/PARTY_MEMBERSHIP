@@ -39,7 +39,7 @@ body {
     padding: 30px;
 }
 
-/* CARDS */
+/* CARD */
 .card {
     background: #065f46;
     padding: 20px;
@@ -55,8 +55,7 @@ table {
     border-collapse: collapse;
 }
 
-th,
-td {
+th, td {
     padding: 10px;
     border-bottom: 1px solid #10b981;
     text-align: left;
@@ -67,17 +66,16 @@ th {
     background: #047857;
 }
 
-/* STAT */
-.stat {
-    font-size: 32px;
-    font-weight: bold;
-    color: #34d399;
+/* CHART WRAPPER */
+.chart-box {
+    height: 400px;
 }
 </style>
 </head>
 
 <body>
 
+<!-- NAVBAR -->
 <div class="navbar">
     <h2>Campaign Analytics</h2>
     <div class="nav-links">
@@ -89,37 +87,45 @@ th {
 
 <div class="container">
 
-    <!-- PROVINCE CHART -->
-    <div class="card">
-        <h3>Province Membership Chart</h3>
+<!-- CHART -->
+<div class="card">
+    <h3>Province Membership Chart</h3>
+    <div class="chart-box">
         <canvas id="provinceChart"></canvas>
     </div>
+</div>
 
-    <!-- MEMBERS TABLE -->
-    <div class="card">
-        <h3>Members by Province</h3>
-        <table>
-            <tr>
-                <th>Province</th>
-                <th>Total Members</th>
-            </tr>
-            {% for p in provinces %}
-            <tr>
-                <td>{{ p[0] }}</td>
-                <td>{{ p[1] }}</td>
-            </tr>
-            {% endfor %}
-        </table>
-    </div>
+<!-- TABLE -->
+<div class="card">
+    <h3>Members by Province</h3>
+
+    <table>
+        <tr>
+            <th>Province</th>
+            <th>Total Members</th>
+        </tr>
+
+        {% for p in provinces %}
+        <tr>
+            <td>{{ p[0] }}</td>
+            <td>{{ p[1] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
 
 </div>
 
+<!-- SAFE DATA INJECTION -->
 <script>
-const provinces = {{ provinces | tojson }};
+const provinces = JSON.parse('{{ provinces | tojson | safe }}' || "[]");
+
 const labels = provinces.map(p => p[0]);
 const data = provinces.map(p => p[1]);
 
-new Chart(document.getElementById("provinceChart"), {
+const ctx = document.getElementById("provinceChart").getContext("2d");
+
+new Chart(ctx, {
     type: "bar",
     data: {
         labels: labels,
@@ -131,13 +137,25 @@ new Chart(document.getElementById("provinceChart"), {
     },
     options: {
         responsive: true,
+        maintainAspectRatio: false,
         plugins: {
             legend: { display: false },
-            title: { display: true, text: "Members per Province", color: "white", font: { size: 18 } }
+            title: {
+                display: true,
+                text: "Members per Province",
+                color: "white",
+                font: { size: 16 }
+            }
         },
         scales: {
-            x: { ticks: { color: "white" }, grid: { color: "#065f46" } },
-            y: { ticks: { color: "white" }, grid: { color: "#065f46" } }
+            x: {
+                ticks: { color: "white" },
+                grid: { color: "#064e3b" }
+            },
+            y: {
+                ticks: { color: "white" },
+                grid: { color: "#064e3b" }
+            }
         }
     }
 });
