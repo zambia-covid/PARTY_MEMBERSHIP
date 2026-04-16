@@ -2345,7 +2345,9 @@ def polling_intelligence():
             cs.total_polling_stations,
 
             COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
-            COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+            COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes,
+
+            COUNT(DISTINCT r.polling_station) AS reporting_stations
 
         FROM constituency_stats cs
 
@@ -2356,8 +2358,15 @@ def polling_intelligence():
         LEFT JOIN polling_station_results r
             ON r.constituency = cs.constituency
 
-        GROUP BY cs.constituency, cs.province, cs.total_voters, cs.total_polling_stations
-        ORDER BY cs.province, cs.constituency
+        GROUP BY 
+            cs.constituency,
+            cs.province,
+            cs.total_voters,
+            cs.total_polling_stations
+
+        ORDER BY 
+            cs.province ASC,
+            cs.constituency ASC
     """)
 
     rows = cur.fetchall()
@@ -2365,22 +2374,34 @@ def polling_intelligence():
     stations = []
 
     for r in rows:
-        constituency, province, members, voters, total_stations, pf_votes, upnd_votes = r
+        (
+            constituency,
+            province,
+            members,
+            voters,
+            total_stations,
+            pf_votes,
+            upnd_votes,
+            reporting_stations
+        ) = r
 
-        # ==============================
-        # 📊 CORE METRICS
-        # ==============================
-        penetration = round((members / voters) * 100, 2) if voters > 0 else 0
-        expected_votes = int(members * 0.65)
-        total_votes = pf_votes + upnd_votes
-        turnout = total_votes
+        # =========================
+        # CORE METRICS
+        # =========================
 
+        penetration = round((members / voters) * 100, 2) if voters else 0
         margin = pf_votes - upnd_votes
-        turnout_gap = expected_votes - pf_votes
+        turnout = pf_votes + upnd_votes
 
-        # ==============================
-        # 🧠 STATUS CLASSIFICATION
-        # ==============================
+        coverage = round(
+            (reporting_stations / total_stations) * 100,
+            2
+        ) if total_stations else 0
+
+        # =========================
+        # STRATEGIC CLASSIFICATION
+        # =========================
+
         if margin > 0 and penetration >= 40:
             status = "STRONG"
         elif margin < 0 and penetration < 30:
@@ -2388,29 +2409,36 @@ def polling_intelligence():
         else:
             status = "BATTLEGROUND"
 
-        # ==============================
-        # 🚨 ACTION SIGNALS
-        # ==============================
-        if turnout_gap > 500:
-            action = "MOBILIZE"
+        # =========================
+        # ACTION ENGINE
+        # =========================
+
+        if coverage < 50:
+            action = "DEPLOY REPORTING TEAMS"
         elif margin < 0:
-            action = "RECOVER"
+            action = "RECOVER SUPPORT"
         else:
-            action = "HOLD"
+            action = "MAINTAIN CONTROL"
+
+        # =========================
+        # FINAL STRUCTURE
+        # =========================
 
         stations.append({
             "constituency": constituency,
             "province": province,
             "members": members,
             "voters": voters,
-            "stations": total_stations,
+            "total_stations": total_stations,
+            "reporting_stations": reporting_stations,
+            "coverage": coverage,
+
             "pf_votes": pf_votes,
             "upnd_votes": upnd_votes,
-            "penetration": penetration,
-            "expected_votes": expected_votes,
-            "turnout": turnout,
             "margin": margin,
-            "turnout_gap": turnout_gap,
+            "turnout": turnout,
+
+            "penetration": penetration,
             "status": status,
             "action": action
         })
