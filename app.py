@@ -1095,7 +1095,7 @@ def constituency_intelligence():
     results = []
 
     for r in rows:
-        constituency, province, members, voters, stations, penetration = r
+        constituency, province, members, voters, stations, pf_votes, upnd_votes = r
         expected_votes = int(members * 0.65)
         
         if penetration >= 50:
