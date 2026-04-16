@@ -1,19 +1,24 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Incident Reports</title>
+    <title>Incident Dashboard</title>
 
     <style>
         body {
             font-family: Arial;
-            background: #1a1a1a;
+            background: #111;
             color: white;
             margin: 0;
-            padding: 20px;
         }
 
-        h2 {
-            text-align: center;
+        .header {
+            background: #b30000;
+            padding: 15px;
+            font-size: 20px;
+        }
+
+        .container {
+            padding: 20px;
         }
 
         table {
@@ -23,80 +28,16 @@
             color: black;
         }
 
-        th, td {
-            padding: 10px;
-            border: 1px solid #ccc;
-            text-align: left;
-        }
-
         th {
             background: #b30000;
             color: white;
+            padding: 10px;
         }
 
-        .timestamp {
-            font-size: 12px;
-            color: gray;
+        td {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
         }
-    </style>
-</head>
-<body>
 
-<h2>🚨 Incident Reports (Live)</h2>
-
-<table>
-    <thead>
-        <tr>
-            <th>Agent ID</th>
-            <th>Province</th>
-            <th>Constituency</th>
-            <th>Polling Station</th>
-            <th>Message</th>
-            <th>Time</th>
-        </tr>
-    </thead>
-
-    <tbody id="incidentTable">
-        <tr><td colspan="6">Loading...</td></tr>
-    </tbody>
-</table>
-
-<script>
-
-async function loadIncidents(){
-
-    let res = await fetch("/api/incidents");
-    let data = await res.json();
-
-    let html = "";
-
-    if(data.length === 0){
-        html = "<tr><td colspan='6'>No incidents reported</td></tr>";
-    } else {
-        data.forEach(i => {
-            html += `
-                <tr>
-                    <td>${i.agent_id}</td>
-                    <td>${i.province}</td>
-                    <td>${i.constituency}</td>
-                    <td>${i.polling_station}</td>
-                    <td>${i.message}</td>
-                    <td class="timestamp">${i.time}</td>
-                </tr>
-            `;
-        });
-    }
-
-    document.getElementById("incidentTable").innerHTML = html;
-}
-
-// initial load
-loadIncidents();
-
-// auto refresh every 5 seconds
-setInterval(loadIncidents, 5000);
-
-</script>
-
-</body>
-</html>
+        .badge {
+            padding: 4
