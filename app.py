@@ -1096,14 +1096,17 @@ def constituency_intelligence():
 
     for r in rows:
         constituency, province, members, voters, stations, pf_votes, upnd_votes = r
+
+        penetration = (members / voters * 100) if voters > 0 else 0
         expected_votes = int(members * 0.65)
-        
-        if penetration >= 50:
+        margin = pf_votes - upnd_votes
+
+        if margin > 0 and penetration >= 40:
             status = "WIN"
-        elif penetration >= 30:
-            status = "TOSS-UP"
-        else:
+        elif margin < 0 and penetration < 30:
             status = "LOSE"
+        else:
+            status = "TOSS-UP"
 
         results.append({
             "constituency": constituency,
@@ -1111,7 +1114,11 @@ def constituency_intelligence():
             "members": members,
             "voters": voters,
             "stations": stations,
-            "penetration": float(penetration),
+            "pf_votes": pf_votes,
+            "upnd_votes": upnd_votes,
+            "penetration": round(penetration, 2),
+            "expected_votes": expected_votes,
+            "margin": margin,
             "status": status
         })
 
