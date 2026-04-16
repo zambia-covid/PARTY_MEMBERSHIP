@@ -71,38 +71,7 @@ body{
     margin-bottom:6px;
 }
 
-/* BROADCAST */
-.broadcast textarea{
-    width:100%;
-    height:100px;
-    padding:10px;
-    border-radius:5px;
-    border:1px solid #ccc;
-}
-
-/* INPUT */
-input{
-    padding:8px;
-    margin-top:5px;
-    width:100%;
-    border-radius:5px;
-    border:1px solid #ccc;
-}
-
-/* BUTTON */
-button{
-    padding:10px 20px;
-    background:#0b6623;
-    color:white;
-    border:none;
-    margin-top:10px;
-    cursor:pointer;
-    border-radius:5px;
-}
-
-button:hover{ background:#084d1a; }
-
-/* FLEX BLOCK */
+/* FLEX */
 .flex{
     display:flex;
     flex-wrap:wrap;
@@ -117,7 +86,15 @@ button:hover{ background:#084d1a; }
     font-size:22px;
     font-weight:bold;
 }
+
+/* MAP */
+#map{
+    height:400px;
+    border-radius:10px;
+    margin-top:15px;
+}
 </style>
+
 </head>
 
 <body>
@@ -131,7 +108,7 @@ button:hover{ background:#084d1a; }
         <a href="/agents">Agents</a>
         <a href="/analytics">Analytics</a>
         <a href="/polling_intelligence">Polling Intelligence</a>
-	<a href="/application">Application</a>
+        <a href="/application">Application</a>
     </div>
 </div>
 
@@ -148,10 +125,9 @@ button:hover{ background:#084d1a; }
     <div class="card">
         <h3>System Status</h3>
         <ul class="status-list">
-            <li>Telegram: <b>{{ status.telegram }}</b></li>
-            <li>QR Cards: <b>{{ status.qr }}</b></li>
-            <li>Database: <b>{{ status.database }}</b></li>
-            <li>Server: <b>{{ status.server }}</b></li>
+            <li>Telegram: <b>OK</b></li>
+            <li>Database: <b>{{ system_status.database }}</b></li>
+            <li>Server: <b>{{ system_status.server }}</b></li>
         </ul>
     </div>
 
@@ -163,10 +139,9 @@ button:hover{ background:#084d1a; }
 
 </div>
 
-<!-- TABULATION + COVERAGE -->
+<!-- VOTE + COVERAGE -->
 <div class="grid">
 
-    <!-- VOTER TABULATION -->
     <div class="card">
         <h3>Live Vote Command</h3>
 
@@ -194,9 +169,8 @@ button:hover{ background:#084d1a; }
 
             <div class="metric">
                 Status<br>
-                <span id="status"
-                style="{% if tabulation_status=='Winning' %}color:green;{% else %}color:red;{% endif %}">
-                {{ tabulation_status }}
+                <span id="status" style="color:green;">
+                    {{ status }}
                 </span>
             </div>
 
@@ -206,155 +180,136 @@ button:hover{ background:#084d1a; }
         <a href="/voter_tabulation"><button>Full Tabulation</button></a>
     </div>
 
-    <!-- COVERAGE -->
     <div class="card">
         <h3>Reporting Coverage</h3>
         <p>Total Stations: <b>{{ total_stations }}</b></p>
-        <p>Reported: <b>{{ reported }}</b></p>
+        <p>Reported: <b>{{ reporting_stations }}</b></p>
         <p>Coverage: <b>{{ coverage }}%</b></p>
     </div>
 
-    <!-- DANGER ZONES -->
+</div>
+
+<!-- PROVINCES -->
+<div class="grid">
+
+    <div class="card">
+        <h3>Members by Province</h3>
+        <ul class="province-list">
+            {% for p in provinces %}
+            <li><b>{{ p[0] }}</b> — {{ p[1] }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
     <div class="card">
         <h3>Danger Zones</h3>
         <ul id="alerts"></ul>
     </div>
 
-<!-- PROVINCE -->
+</div>
+
+<!-- MAP -->
 <div class="card">
-    <h3>Members by Province</h3>
-    <ul class="province-list">
-        {% for p in provinces %}
-        <li><b>{{ p[0] }}</b> — {{ p[1] }}</li>
-        {% endfor %}
-    </ul>
+    <h3>Constituency Map Intelligence</h3>
+    <div id="map"></div>
 </div>
 
-<div class="card broadcast">
-    <h3>Command Broadcast</h3>
-
-    <form id="broadcastForm">
-
-        <textarea id="message" placeholder="Enter command message..." required></textarea>
-
-        <!-- NEW: DIRECT TARGET -->
-        <input type="text" id="chat_id" placeholder="Direct chat_id (overrides filters)">
-
-        <hr>
-
-        <!-- FILTER TARGETING -->
-        <input type="text" id="province" placeholder="Province (optional)">
-        <input type="text" id="district" placeholder="District (optional)">
-        <input type="text" id="constituency" placeholder="Constituency (optional)">
-        <input type="text" id="ward" placeholder="Ward (optional)">
-
-        <button type="submit">Send Broadcast</button>
-
-    </form>
-
-    <p id="result" style="margin-top:10px;color:#0b6623;"></p>
 </div>
 
-<script id="w9j2xp">
-// BROADCAST
-document.addEventListener("DOMContentLoaded", function(){
+<!-- BROADCAST -->
+<script>
+document.getElementById("broadcastForm")?.addEventListener("submit", async function(e){
+    e.preventDefault();
 
-    document.getElementById("broadcastForm").addEventListener("submit", async function(e){
-        e.preventDefault();
+    let payload = {
+        message: document.getElementById("message").value,
+        chat_id: document.getElementById("chat_id").value,
+        province: document.getElementById("province").value,
+        district: document.getElementById("district").value,
+        constituency: document.getElementById("constituency").value,
+        ward: document.getElementById("ward").value
+    };
 
-        let payload = {
-            message: document.getElementById("message").value,
-            chat_id: document.getElementById("chat_id").value,
-            province: document.getElementById("province").value,
-            district: document.getElementById("district").value,
-            constituency: document.getElementById("constituency").value,
-            ward: document.getElementById("ward").value
-        };
-
-        // REMOVE EMPTY VALUES
-        Object.keys(payload).forEach(key => {
-            if(!payload[key]) delete payload[key];
-        });
-
-        let res = await fetch("/broadcast", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
-
-        let data = await res.json();
-
-        document.getElementById("result").innerText =
-            data.chat_id
-            ? "Message sent to chat_id " + data.chat_id
-            : "Broadcast sent to " + (data.sent || 0) + " members";
+    Object.keys(payload).forEach(k => {
+        if(!payload[k]) delete payload[k];
     });
 
+    let res = await fetch("/broadcast", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(payload)
+    });
+
+    let data = await res.json();
+    document.getElementById("result").innerText = "Broadcast sent";
 });
 </script>
 
+<!-- ALERTS -->
 <script>
-// ALERTS
 setInterval(async ()=>{
-    let res = await fetch("/alerts")
-    let data = await res.json()
+    let res = await fetch("/alerts");
+    let data = await res.json();
 
-    let html = ""
+    let html = "";
 
     if(data.length === 0){
-        html = "<li style='color:green;'>All stable</li>"
+        html = "<li style='color:green;'>All stable</li>";
     } else {
         data.forEach(a=>{
-            html += `<li style="color:red;">${a.constituency} losing by ${a.margin}</li>`
-        })
+            html += `<li style="color:red;">${a.constituency} losing by ${a.margin}</li>`;
+        });
     }
 
-    document.getElementById("alerts").innerHTML = html
-}, 5000)
+    document.getElementById("alerts").innerHTML = html;
+}, 5000);
+</script>
 
-// LIVE STATS
+<!-- LIVE STATS -->
+<script>
 setInterval(async ()=>{
-    let res = await fetch("/live_stats")
-    let data = await res.json()
+    let res = await fetch("/live_stats");
+    let data = await res.json();
 
-    document.getElementById("pf_votes").innerText = data.pf
-    document.getElementById("upnd_votes").innerText = data.upnd
-    document.getElementById("margin").innerText = data.margin
-    document.getElementById("status").innerText = data.status
-}, 5000)
+    document.getElementById("pf_votes").innerText = data.pf_votes;
+    document.getElementById("upnd_votes").innerText = data.upnd_votes;
+    document.getElementById("margin").innerText = data.margin;
+    document.getElementById("status").innerText = data.status;
+}, 5000);
+</script>
+
+<!-- MAP -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 
 <script>
-
 var map = L.map('map').setView([-13.1339, 27.8493], 6);
 
-// Base map
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: 'Zambia Election Command'
+    attribution: 'Campaign Intelligence'
 }).addTo(map);
 
-// Color logic
 function getColor(status){
     if(status === "PF") return "green";
     if(status === "UPND") return "red";
     if(status === "TIED") return "orange";
-    return "grey";
+    return "gray";
 }
 
 let geoLayer;
 
-// Load map
 fetch("/static/zambia.geojson")
-.then(res => res.json())
-.then(geojson => {
+.then(r => r.json())
+.then(data => {
 
-    geoLayer = L.geoJSON(geojson, {
+    geoLayer = L.geoJSON(data, {
         style: {
-            color: "#333",
-            weight: 1,
-            fillOpacity: 0.7,
-            fillColor: "grey"
+            color:"#333",
+            weight:1,
+            fillOpacity:0.7,
+            fillColor:"gray"
         },
-        onEachFeature: function(feature, layer){
+        onEachFeature:function(feature, layer){
             layer.bindPopup(feature.properties.name);
         }
     }).addTo(map);
@@ -362,20 +317,16 @@ fetch("/static/zambia.geojson")
     updateMap();
 });
 
-// 🔴 LIVE UPDATE
 async function updateMap(){
     let res = await fetch("/map_data");
     let data = await res.json();
 
     geoLayer.eachLayer(layer=>{
         let name = layer.feature.properties.name;
-
         let info = data[name];
 
-        let color = "grey";
-
         if(info){
-            color = getColor(info.status);
+            layer.setStyle({ fillColor: getColor(info.status) });
 
             layer.bindPopup(
                 `<b>${name}</b><br>
@@ -383,14 +334,10 @@ async function updateMap(){
                 UPND: ${info.upnd}`
             );
         }
-
-        layer.setStyle({ fillColor: color });
     });
 }
 
-// Refresh every 5 sec
 setInterval(updateMap, 5000);
-
 </script>
 
 </body>
