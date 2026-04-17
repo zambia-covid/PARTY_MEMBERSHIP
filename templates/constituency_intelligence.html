@@ -2,76 +2,113 @@
 <html>
 <head>
     <title>Constituency Intelligence</title>
-
     <style>
         body {
             font-family: Arial;
-            background: #f4f4f4;
-            padding: 20px;
+            background: #0b1f0b;
+            color: white;
+            margin: 0;
         }
 
-        h2 {
-            color: #0b6623;
+        .header {
+            background: #145214;
+            padding: 15px 25px;
+            font-size: 20px;
+            font-weight: bold;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            background: white;
         }
 
         th, td {
             padding: 10px;
-            border: 1px solid #ddd;
-            text-align: center;
+            text-align: left;
+            border-bottom: 1px solid #333;
         }
 
         th {
-            background: #0b6623;
-            color: white;
+            background: #1f3d1f;
         }
 
-        /* STATUS COLORS */
-        .STRONGHOLD { background: #1b5e20; color: white; }
-        .LEAN\ WIN { background: #4caf50; color: white; }
-        .SWING { background: #fbc02d; color: black; }
-        .COLLAPSE { background: #b71c1c; color: white; }
-        .CONTESTED { background: #90a4ae; color: black; }
+        tr:hover {
+            background: #1a2e1a;
+        }
 
+        .WIN { color: #00ff88; font-weight: bold; }
+        .LOSE { color: #ff4d4d; font-weight: bold; }
+        .TOSS-UP { color: #ffcc00; font-weight: bold; }
+
+        .card {
+            display: inline-block;
+            margin: 10px;
+            padding: 15px;
+            background: #132913;
+            border-radius: 10px;
+            min-width: 150px;
+        }
     </style>
 </head>
-
 <body>
 
-<h2>Constituency Intelligence</h2>
+<div class="header">📊 Constituency Intelligence Dashboard</div>
+
+<div id="summary"></div>
 
 <table>
-    <tr>
-        <th>Province</th>
-        <th>Constituency</th>
-        <th>Members</th>
-        <th>Voters</th>
-        <th>Stations</th>
-        <th>Penetration %</th>
-        <th>Margin</th>
-        <th>Expected Votes</th>
-        <th>Status</th>
-    </tr>
-
-    {% for r in results %}
-    <tr class="{{ r.status|replace(' ', '\\ ') }}">
-        <td>{{ r.province }}</td>
-        <td>{{ r.constituency }}</td>
-        <td>{{ r.members }}</td>
-        <td>{{ r.voters }}</td>
-        <td>{{ r.stations }}</td>
-        <td>{{ r.penetration }}</td>
-        <td>{{ r.margin }}</td>
-        <td>{{ r.expected_votes }}</td>
-        <td><strong>{{ r.status }}</strong></td>
-    </tr>
-    {% endfor %}
+    <thead>
+        <tr>
+            <th>Constituency</th>
+            <th>Province</th>
+            <th>Members</th>
+            <th>Voters</th>
+            <th>Penetration %</th>
+            <th>Margin</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody id="table-body"></tbody>
 </table>
+
+<script>
+fetch("/api/constituency_intelligence")
+.then(res => res.json())
+.then(data => {
+
+    let tbody = document.getElementById("table-body");
+    let summary = document.getElementById("summary");
+
+    let win = 0, lose = 0, toss = 0;
+
+    data.forEach(c => {
+
+        if (c.status === "WIN") win++;
+        else if (c.status === "LOSE") lose++;
+        else toss++;
+
+        let row = `
+            <tr>
+                <td>${c.constituency}</td>
+                <td>${c.province}</td>
+                <td>${c.members}</td>
+                <td>${c.voters}</td>
+                <td>${c.penetration}%</td>
+                <td>${c.margin}</td>
+                <td class="${c.status}">${c.status}</td>
+            </tr>
+        `;
+
+        tbody.innerHTML += row;
+    });
+
+    summary.innerHTML = `
+        <div class="card">WIN: ${win}</div>
+        <div class="card">TOSS-UP: ${toss}</div>
+        <div class="card">LOSE: ${lose}</div>
+    `;
+});
+</script>
 
 </body>
 </html>
