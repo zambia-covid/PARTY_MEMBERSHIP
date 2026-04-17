@@ -1082,6 +1082,7 @@ def logout():
 # CONSTITUENCY INTELLIGENCE
 # ==============================
 @app.route("/api/constituency_intelligence")
+@app.route("/constituency_intelligence")
 @login_required
 def api_constituency_intelligence():
 
