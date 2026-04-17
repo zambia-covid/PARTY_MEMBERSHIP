@@ -1059,65 +1059,30 @@ def api_constituency_intelligence():
             c.province,
             c.total_voters,
             c.total_polling_stations
+
+        ORDER BY members DESC
     """)
 
     rows = cur.fetchall()
 
-    results = []
-
-    for r in rows:
-
-        constituency, province, members, voters, stations, pf, upnd = r
-
-        penetration = (members / voters * 100) if voters else 0
-        margin = pf - upnd
-
-        if margin > 0 and penetration >= 40:
-            status = "WIN"
-        elif margin < 0 and penetration < 30:
-            status = "LOSE"
-        else:
-            status = "TOSS-UP"
-
-        results.append({
-            "constituency": constituency,
-            "province": province,
-            "members": members,
-            "voters": voters,
-            "stations": stations,
-            "pf_votes": pf,
-            "upnd_votes": upnd,
-            "penetration": round(penetration, 2),
-            "margin": margin,
-            "status": status
-        })
-
-    cur.close()
-    conn.close()
-
-    return jsonify(results)
-
-    rows = cur.fetchall()
-
     cur.close()
     conn.close()
 
     results = []
 
     for r in rows:
-
         constituency, province, members, voters, stations, pf_votes, upnd_votes = r
 
-        # avoid division crash
+        # Avoid division crash
         penetration = (members / voters * 100) if voters else 0
 
-        # strategic projection
-        expected_votes = int(members * 0.65)
-
-        # real margin
+        # Real margin
         margin = pf_votes - upnd_votes
 
-        # 🔴 CLASSIFICATION ENGINE (CORE LOGIC)
+        # Grounded projection (not fantasy)
+        expected_votes = int(members * 0.65)
+
+        # Classification engine
         if margin > 0 and penetration >= 40:
             status = "WIN"
         elif margin < 0 and penetration < 30:
