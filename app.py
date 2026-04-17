@@ -1171,7 +1171,7 @@ def constituency_intelligence():
     cur.execute("""
         SELECT 
             cs.constituency,
-            COALESCE(c.province, 'Unknown') AS province,
+            cs.province,
 
             COUNT(DISTINCT m.membership_id) AS members,
             cs.total_voters,
@@ -1182,10 +1182,6 @@ def constituency_intelligence():
 
         FROM constituency_stats cs
 
-        -- Proper province source
-        LEFT JOIN constituencies c
-            ON cs.constituency = c.constituency
-
         LEFT JOIN members m
             ON m.constituency = cs.constituency
             AND m.status = 'Active'
@@ -1195,61 +1191,12 @@ def constituency_intelligence():
 
         GROUP BY 
             cs.constituency, 
-            c.province, 
+            cs.province, 
             cs.total_voters, 
             cs.total_polling_stations
 
         ORDER BY members DESC
     """)
-
-    rows = cur.fetchall()
-
-    # Convert to JSON-friendly format
-    columns = [desc[0] for desc in cur.description]
-    data = [dict(zip(columns, row)) for row in rows]
-
-    cur.close()
-    conn.close()
-
-    return jsonify(data)
-
-    # ==============================
-    # 🔴 CLASSIFICATION LOGIC
-    # ==============================
-    results = []
-
-    for r in rows:
-        constituency, province, members, voters, stations, pf_votes, upnd_votes = r
-
-        penetration = (members / voters * 100) if voters > 0 else 0
-        expected_votes = int(members * 0.65)
-        margin = pf_votes - upnd_votes
-
-        if margin > 0 and penetration >= 40:
-            status = "WIN"
-        elif margin < 0 and penetration < 30:
-            status = "LOSE"
-        else:
-            status = "TOSS-UP"
-
-        results.append({
-            "constituency": constituency,
-            "province": province,
-            "members": members,
-            "voters": voters,
-            "stations": stations,
-            "pf_votes": pf_votes,
-            "upnd_votes": upnd_votes,
-            "penetration": round(penetration, 2),
-            "expected_votes": expected_votes,
-            "margin": margin,
-            "status": status
-        })
-
-    cur.close()
-    conn.close()
-
-    return render_template("constituency_intelligence.html", results=results)
 
 # ==============================
 # FAVICON
