@@ -2,108 +2,76 @@
 <html>
 <head>
     <title>Constituency Intelligence</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <style>
-        body{
-            margin:0;
-            font-family:Arial;
-            background:#f4f6f8;
+        body {
+            font-family: Arial;
+            background: #f4f4f4;
+            padding: 20px;
         }
 
-        .header{
-            background:#0b6623;
-            color:white;
-            padding:20px;
-            font-size:22px;
-            font-weight:bold;
+        h2 {
+            color: #0b6623;
         }
 
-        .container{
-            padding:20px;
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
         }
 
-        table{
-            width:100%;
-            border-collapse:collapse;
-            background:white;
-            box-shadow:0 2px 8px rgba(0,0,0,0.1);
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
         }
 
-        th, td{
-            padding:12px;
-            text-align:left;
-            border-bottom:1px solid #ddd;
+        th {
+            background: #0b6623;
+            color: white;
         }
 
-        th{
-            background:#0b6623;
-            color:white;
-        }
-
-        tr:hover{
-            background:#f1f1f1;
-        }
-
-        .badge{
-            padding:5px 10px;
-            border-radius:5px;
-            color:white;
-            font-size:12px;
-        }
-
-        .strong{ background:green; }
-        .weak{ background:red; }
-        .neutral{ background:orange; }
+        /* STATUS COLORS */
+        .STRONGHOLD { background: #1b5e20; color: white; }
+        .LEAN\ WIN { background: #4caf50; color: white; }
+        .SWING { background: #fbc02d; color: black; }
+        .COLLAPSE { background: #b71c1c; color: white; }
+        .CONTESTED { background: #90a4ae; color: black; }
 
     </style>
 </head>
 
 <body>
 
-<div class="header">
-    Constituency Intelligence Dashboard
-</div>
-
-<div class="container">
+<h2>Constituency Intelligence</h2>
 
 <table>
     <tr>
-        <th>Constituency</th>
         <th>Province</th>
+        <th>Constituency</th>
         <th>Members</th>
         <th>Voters</th>
         <th>Stations</th>
-        <th>PF Votes</th>
-        <th>UPND Votes</th>
+        <th>Penetration %</th>
+        <th>Margin</th>
+        <th>Expected Votes</th>
         <th>Status</th>
     </tr>
 
-    {% for row in data %}
-    <tr>
-        <td>{{ row.constituency }}</td>
-        <td>{{ row.province }}</td>
-        <td>{{ row.members }}</td>
-        <td>{{ row.total_voters }}</td>
-        <td>{{ row.total_polling_stations }}</td>
-        <td>{{ row.pf_votes }}</td>
-        <td>{{ row.upnd_votes }}</td>
-
-        <td>
-            {% if row.pf_votes > row.upnd_votes %}
-                <span class="badge strong">PF Stronghold</span>
-            {% elif row.pf_votes < row.upnd_votes %}
-                <span class="badge weak">UPND Stronghold</span>
-            {% else %}
-                <span class="badge neutral">Swing</span>
-            {% endif %}
-        </td>
+    {% for r in results %}
+    <tr class="{{ r.status|replace(' ', '\\ ') }}">
+        <td>{{ r.province }}</td>
+        <td>{{ r.constituency }}</td>
+        <td>{{ r.members }}</td>
+        <td>{{ r.voters }}</td>
+        <td>{{ r.stations }}</td>
+        <td>{{ r.penetration }}</td>
+        <td>{{ r.margin }}</td>
+        <td>{{ r.expected_votes }}</td>
+        <td><strong>{{ r.status }}</strong></td>
     </tr>
     {% endfor %}
-
 </table>
-
-</div>
 
 </body>
 </html>
