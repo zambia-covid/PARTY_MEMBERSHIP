@@ -1,165 +1,109 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Constituency Intelligence LIVE</title>
+    <title>Constituency Intelligence</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<style>
-body {
-    font-family: Arial;
-    background: #f4f4f4;
-    padding: 20px;
-}
+    <style>
+        body{
+            margin:0;
+            font-family:Arial;
+            background:#f4f6f8;
+        }
 
-/* TABLE */
-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-}
+        .header{
+            background:#0b6623;
+            color:white;
+            padding:20px;
+            font-size:22px;
+            font-weight:bold;
+        }
 
-th, td {
-    padding: 10px;
-    border: 1px solid #ddd;
-    text-align: center;
-}
+        .container{
+            padding:20px;
+        }
 
-th {
-    background: #0b6623;
-    color: white;
-}
+        table{
+            width:100%;
+            border-collapse:collapse;
+            background:white;
+            box-shadow:0 2px 8px rgba(0,0,0,0.1);
+        }
 
-/* STATUS COLORS */
-.WIN { background: #2e7d32; color: white; }
-.TOSS-UP { background: #f9a825; color: black; }
-.LOSE { background: #c62828; color: white; }
+        th, td{
+            padding:12px;
+            text-align:left;
+            border-bottom:1px solid #ddd;
+        }
 
-/* CLICKABLE ROW */
-.clickable {
-    cursor: pointer;
-}
+        th{
+            background:#0b6623;
+            color:white;
+        }
 
-/* MODAL */
-.modal {
-    display: none;
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.6);
-}
+        tr:hover{
+            background:#f1f1f1;
+        }
 
-.modal-content {
-    background: white;
-    margin: 5% auto;
-    padding: 20px;
-    width: 60%;
-    border-radius: 10px;
-}
-</style>
+        .badge{
+            padding:5px 10px;
+            border-radius:5px;
+            color:white;
+            font-size:12px;
+        }
+
+        .strong{ background:green; }
+        .weak{ background:red; }
+        .neutral{ background:orange; }
+
+    </style>
 </head>
 
 <body>
 
-<h2>Constituency Intelligence (LIVE)</h2>
-
-<table id="intelTable">
-    <thead>
-        <tr>
-            <th>Province</th>
-            <th>Constituency</th>
-            <th>Members</th>
-            <th>Voters</th>
-            <th>Stations</th>
-            <th>Penetration</th>
-            <th>Status</th>
-        </tr>
-    </thead>
-
-    <tbody></tbody>
-</table>
-
-<!-- DRILLDOWN MODAL -->
-<div id="modal" class="modal">
-    <div class="modal-content">
-        <h3 id="modalTitle"></h3>
-        <table style="width:100%">
-            <thead>
-                <tr>
-                    <th>Polling Station</th>
-                    <th>PF</th>
-                    <th>UPND</th>
-                </tr>
-            </thead>
-            <tbody id="stationBody"></tbody>
-        </table>
-
-        <br>
-        <button onclick="closeModal()">Close</button>
-    </div>
+<div class="header">
+    Constituency Intelligence Dashboard
 </div>
 
-<script>
+<div class="container">
 
-async function loadTable() {
-    let res = await fetch("/api/constituency_intelligence");
-    let data = await res.json();
+<table>
+    <tr>
+        <th>Constituency</th>
+        <th>Province</th>
+        <th>Members</th>
+        <th>Voters</th>
+        <th>Stations</th>
+        <th>PF Votes</th>
+        <th>UPND Votes</th>
+        <th>Status</th>
+    </tr>
 
-    let tbody = document.querySelector("#intelTable tbody");
-    tbody.innerHTML = "";
+    {% for row in data %}
+    <tr>
+        <td>{{ row.constituency }}</td>
+        <td>{{ row.province }}</td>
+        <td>{{ row.members }}</td>
+        <td>{{ row.total_voters }}</td>
+        <td>{{ row.total_polling_stations }}</td>
+        <td>{{ row.pf_votes }}</td>
+        <td>{{ row.upnd_votes }}</td>
 
-    data.forEach(r => {
+        <td>
+            {% if row.pf_votes > row.upnd_votes %}
+                <span class="badge strong">PF Stronghold</span>
+            {% elif row.pf_votes < row.upnd_votes %}
+                <span class="badge weak">UPND Stronghold</span>
+            {% else %}
+                <span class="badge neutral">Swing</span>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
 
-        let row = document.createElement("tr");
-        row.className = r.status + " clickable";
+</table>
 
-        row.innerHTML = `
-            <td>${r.province}</td>
-            <td>${r.constituency}</td>
-            <td>${r.members}</td>
-            <td>${r.voters}</td>
-            <td>${r.stations}</td>
-            <td>${r.penetration}%</td>
-            <td>${r.status}</td>
-        `;
-
-        row.onclick = () => loadDetail(r.constituency);
-
-        tbody.appendChild(row);
-    });
-}
-
-async function loadDetail(constituency) {
-
-    let res = await fetch(`/constituency_detail/${constituency}`);
-    let data = await res.json();
-
-    document.getElementById("modalTitle").innerText = constituency;
-
-    let body = document.getElementById("stationBody");
-    body.innerHTML = "";
-
-    data.forEach(s => {
-        body.innerHTML += `
-            <tr>
-                <td>${s.station}</td>
-                <td>${s.pf}</td>
-                <td>${s.upnd}</td>
-            </tr>
-        `;
-    });
-
-    document.getElementById("modal").style.display = "block";
-}
-
-function closeModal() {
-    document.getElementById("modal").style.display = "none";
-}
-
-// AUTO REFRESH EVERY 5 SECONDS
-setInterval(loadTable, 5000);
-loadTable();
-
-</script>
+</div>
 
 </body>
 </html>
