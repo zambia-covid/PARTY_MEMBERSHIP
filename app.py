@@ -1090,50 +1090,43 @@ def api_constituency_intelligence():
 
     cur.execute("""
         SELECT 
-            cs.constituency,
-            cs.province,
+            c.constituency,
+            c.province,
+
             COUNT(DISTINCT m.membership_id) AS members,
-            cs.total_voters,
-            cs.total_polling_stations,
+            c.total_voters,
+            c.total_polling_stations,
+
             COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
             COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
-        FROM constituency_stats cs
+
+        FROM constituencies c
 
         LEFT JOIN members m
-            ON m.constituency = cs.constituency
+            ON m.constituency = c.constituency
             AND m.status = 'Active'
 
         LEFT JOIN polling_station_results r
-            ON r.constituency = cs.constituency
+            ON r.constituency = c.constituency
 
         GROUP BY 
-            cs.constituency,
-            cs.province,
-            cs.total_voters,
-            cs.total_polling_stations
+            c.constituency,
+            c.province,
+            c.total_voters,
+            c.total_polling_stations
     """)
 
     rows = cur.fetchall()
-
-    cur.close()
-    conn.close()
 
     results = []
 
     for r in rows:
 
-        constituency, province, members, voters, stations, pf_votes, upnd_votes = r
+        constituency, province, members, voters, stations, pf, upnd = r
 
-        # avoid division crash
         penetration = (members / voters * 100) if voters else 0
+        margin = pf - upnd
 
-        # strategic projection
-        expected_votes = int(members * 0.65)
-
-        # real margin
-        margin = pf_votes - upnd_votes
-
-        # 🔴 CLASSIFICATION ENGINE (CORE LOGIC)
         if margin > 0 and penetration >= 40:
             status = "WIN"
         elif margin < 0 and penetration < 30:
@@ -1147,13 +1140,15 @@ def api_constituency_intelligence():
             "members": members,
             "voters": voters,
             "stations": stations,
-            "pf_votes": pf_votes,
-            "upnd_votes": upnd_votes,
+            "pf_votes": pf,
+            "upnd_votes": upnd,
             "penetration": round(penetration, 2),
-            "expected_votes": expected_votes,
             "margin": margin,
             "status": status
         })
+
+    cur.close()
+    conn.close()
 
     return jsonify(results)
 
