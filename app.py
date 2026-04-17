@@ -1081,9 +1081,9 @@ def logout():
 # ==============================
 # CONSTITUENCY INTELLIGENCE
 # ==============================
-@app.route("/constituency_intelligence")
+@app.route("/api/constituency_intelligence")
 @login_required
-def constituency_intelligence():
+def api_constituency_intelligence():
 
     conn = get_db()
     cur = conn.cursor()
@@ -1092,14 +1092,11 @@ def constituency_intelligence():
         SELECT 
             cs.constituency,
             cs.province,
-
             COUNT(DISTINCT m.membership_id) AS members,
             cs.total_voters,
             cs.total_polling_stations,
-
             COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
             COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
-
         FROM constituency_stats cs
 
         LEFT JOIN members m
@@ -1110,28 +1107,33 @@ def constituency_intelligence():
             ON r.constituency = cs.constituency
 
         GROUP BY 
-            cs.constituency, 
-            cs.province, 
-            cs.total_voters, 
+            cs.constituency,
+            cs.province,
+            cs.total_voters,
             cs.total_polling_stations
-
-        ORDER BY members DESC
     """)
 
     rows = cur.fetchall()
 
-    # ==============================
-    # 🔴 CLASSIFICATION LOGIC
-    # ==============================
+    cur.close()
+    conn.close()
+
     results = []
 
     for r in rows:
+
         constituency, province, members, voters, stations, pf_votes, upnd_votes = r
 
-        penetration = (members / voters * 100) if voters > 0 else 0
+        # avoid division crash
+        penetration = (members / voters * 100) if voters else 0
+
+        # strategic projection
         expected_votes = int(members * 0.65)
+
+        # real margin
         margin = pf_votes - upnd_votes
 
+        # 🔴 CLASSIFICATION ENGINE (CORE LOGIC)
         if margin > 0 and penetration >= 40:
             status = "WIN"
         elif margin < 0 and penetration < 30:
@@ -1153,10 +1155,7 @@ def constituency_intelligence():
             "status": status
         })
 
-    cur.close()
-    conn.close()
-
-    return render_template("constituency_intelligence.html", results=results)
+    return jsonify(results)
 
 # ==============================
 # FAVICON
