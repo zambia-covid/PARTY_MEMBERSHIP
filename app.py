@@ -1206,7 +1206,7 @@ def constituency_intelligence():
     cur.execute("""
         SELECT 
             cs.constituency,
-            cs.province,
+            COALESCE(c.province, 'Unknown') AS province,
 
             COUNT(DISTINCT m.membership_id) AS members,
             cs.total_voters,
@@ -1217,6 +1217,10 @@ def constituency_intelligence():
 
         FROM constituency_stats cs
 
+        -- Proper province source
+        LEFT JOIN constituencies c
+            ON cs.constituency = c.constituency
+
         LEFT JOIN members m
             ON m.constituency = cs.constituency
             AND m.status = 'Active'
@@ -1226,7 +1230,7 @@ def constituency_intelligence():
 
         GROUP BY 
             cs.constituency, 
-            cs.province, 
+            c.province, 
             cs.total_voters, 
             cs.total_polling_stations
 
@@ -1234,6 +1238,15 @@ def constituency_intelligence():
     """)
 
     rows = cur.fetchall()
+
+    # Convert to JSON-friendly format
+    columns = [desc[0] for desc in cur.description]
+    data = [dict(zip(columns, row)) for row in rows]
+
+    cur.close()
+    conn.close()
+
+    return jsonify(data)
 
     # ==============================
     # 🔴 CLASSIFICATION LOGIC
