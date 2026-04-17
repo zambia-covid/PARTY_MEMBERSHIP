@@ -1026,86 +1026,6 @@ def constituency_detail(constituency):
         } for r in rows
     ])
 
-@app.route("/api/constituency_intelligence")
-@login_required
-def api_constituency_intelligence():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT 
-            c.constituency,
-            c.province,
-
-            COUNT(DISTINCT m.membership_id) AS members,
-            c.total_voters,
-            c.total_polling_stations,
-
-            COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
-            COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
-
-        FROM constituencies c
-
-        LEFT JOIN members m
-            ON m.constituency = c.constituency
-            AND m.status = 'Active'
-
-        LEFT JOIN polling_station_results r
-            ON r.constituency = c.constituency
-
-        GROUP BY 
-            c.constituency,
-            c.province,
-            c.total_voters,
-            c.total_polling_stations
-
-        ORDER BY members DESC
-    """)
-
-    rows = cur.fetchall()
-
-    cur.close()
-    conn.close()
-
-    results = []
-
-    for r in rows:
-        constituency, province, members, voters, stations, pf_votes, upnd_votes = r
-
-        # Avoid division crash
-        penetration = (members / voters * 100) if voters else 0
-
-        # Real margin
-        margin = pf_votes - upnd_votes
-
-        # Grounded projection (not fantasy)
-        expected_votes = int(members * 0.65)
-
-        # Classification engine
-        if margin > 0 and penetration >= 40:
-            status = "WIN"
-        elif margin < 0 and penetration < 30:
-            status = "LOSE"
-        else:
-            status = "TOSS-UP"
-
-        results.append({
-            "constituency": constituency,
-            "province": province,
-            "members": members,
-            "voters": voters,
-            "stations": stations,
-            "pf_votes": pf_votes,
-            "upnd_votes": upnd_votes,
-            "penetration": round(penetration, 2),
-            "expected_votes": expected_votes,
-            "margin": margin,
-            "status": status
-        })
-
-    return jsonify(results)
-
 @app.route("/approve/<int:id>", methods=['POST'])
 @login_required
 @admin_required
@@ -1159,7 +1079,7 @@ def logout():
     return redirect("/login")
     
 # ==============================
-# CONSTITUENCY INTELIGENCE
+# CONSTITUENCY INTELLIGENCE
 # ==============================
 @app.route("/constituency_intelligence")
 @login_required
@@ -1197,6 +1117,46 @@ def constituency_intelligence():
 
         ORDER BY members DESC
     """)
+
+    rows = cur.fetchall()
+
+    # ==============================
+    # 🔴 CLASSIFICATION LOGIC
+    # ==============================
+    results = []
+
+    for r in rows:
+        constituency, province, members, voters, stations, pf_votes, upnd_votes = r
+
+        penetration = (members / voters * 100) if voters > 0 else 0
+        expected_votes = int(members * 0.65)
+        margin = pf_votes - upnd_votes
+
+        if margin > 0 and penetration >= 40:
+            status = "WIN"
+        elif margin < 0 and penetration < 30:
+            status = "LOSE"
+        else:
+            status = "TOSS-UP"
+
+        results.append({
+            "constituency": constituency,
+            "province": province,
+            "members": members,
+            "voters": voters,
+            "stations": stations,
+            "pf_votes": pf_votes,
+            "upnd_votes": upnd_votes,
+            "penetration": round(penetration, 2),
+            "expected_votes": expected_votes,
+            "margin": margin,
+            "status": status
+        })
+
+    cur.close()
+    conn.close()
+
+    return render_template("constituency_intelligence.html", results=results)
 
 # ==============================
 # FAVICON
