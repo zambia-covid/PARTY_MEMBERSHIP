@@ -33,6 +33,44 @@ def legacy_map_data():
 def legacy_alerts():
     return turnout_targets()
 
+@analytics_bp.route("/api/map_data")
+@login_required
+def map_data():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT 
+            constituency,
+            COALESCE(SUM(pf_votes),0),
+            COALESCE(SUM(upnd_votes),0)
+        FROM polling_station_results
+        GROUP BY constituency
+    """)
+
+    data = {}
+
+    for c, pf, upnd in cur.fetchall():
+
+        if pf > upnd:
+            status = "PF"
+        elif upnd > pf:
+            status = "UPND"
+        else:
+            status = "TIED"
+
+        data[c] = {
+            "pf": pf,
+            "upnd": upnd,
+            "status": status
+        }
+
+    cur.close()
+    conn.close()
+
+    return jsonify(data)
+
 # ======================
 # LIVE DASHBOARD
 # ======================
