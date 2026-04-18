@@ -15,6 +15,7 @@
         /* NAV */
         .nav{
             display:flex;
+            align-items:center;
             background:#0b6623;
         }
 
@@ -28,6 +29,17 @@
         }
 
         .active{
+            background:#084d1a;
+        }
+
+        .nav-link{
+            padding:15px;
+            color:white;
+            text-decoration:none;
+            font-weight:bold;
+        }
+
+        .nav-link:hover{
             background:#084d1a;
         }
 
@@ -57,11 +69,11 @@
         .TOSS-UP{color:#ffaa00;}
 
         /* MAP */
-        #zambiaMap path{
+        #mapContainer svg path{
             stroke:#222;
             stroke-width:1;
-            transition:0.3s;
             cursor:pointer;
+            transition:0.3s;
         }
 
         /* AI PANEL */
@@ -71,6 +83,14 @@
             margin-top:20px;
             border-left:5px solid #0b6623;
         }
+
+        button{
+            padding:6px 10px;
+            background:gold;
+            border:none;
+            border-radius:5px;
+            cursor:pointer;
+        }
     </style>
 </head>
 
@@ -78,9 +98,19 @@
 
 <!-- NAV -->
 <div class="nav">
+
+    <!-- TABS -->
     <div onclick="showTab('war')" class="active">War Room</div>
     <div onclick="showTab('map')">Map</div>
     <div onclick="showTab('targets')">Turnout</div>
+
+    <!-- SPACER -->
+    <div style="flex:1;"></div>
+
+    <!-- QUICK LINKS -->
+    <a href="/verify" class="nav-link">Verify QR</a>
+    <a href="/members" class="nav-link">Members</a>
+
 </div>
 
 <!-- ================= WAR ROOM ================= -->
@@ -147,7 +177,7 @@ function showTab(tab){
     event.target.classList.add('active');
 }
 
-/* ================= NORMALIZER ================= */
+/* ================= NORMALIZE ================= */
 function normalize(name){
     return name.toLowerCase().replace(/\s+/g, "_");
 }
@@ -159,9 +189,9 @@ async function loadSVG(){
 
     document.getElementById("mapContainer").innerHTML = svg;
 
-    console.log("SVG Loaded");
+    console.log("SVG loaded");
 
-    loadMap(); // apply data AFTER loading
+    loadMap(); // only after SVG exists
 }
 
 /* ================= WAR ROOM ================= */
@@ -206,7 +236,7 @@ async function loadMap(){
         let el = document.getElementById(id);
 
         if(!el){
-            console.log("Missing SVG ID:", id);
+            console.log("Missing:", id);
             return;
         }
 
@@ -271,7 +301,7 @@ function mobilize(station){
     .then(alert);
 }
 
-/* ================= AI STRATEGY ================= */
+/* ================= AI ================= */
 async function loadStrategy(){
     const res = await fetch("/api/strategy");
     const data = await res.json();
