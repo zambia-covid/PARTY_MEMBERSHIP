@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>War Room Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+        body{
+            font-family: Arial;
+            margin:0;
+            background:#0b1f0b;
+            color:white;
+        }
+
+        .header{
+            padding:15px;
+            background:#0b6623;
+            font-size:20px;
+            font-weight:bold;
+        }
+
+        .container{
+            padding:20px;
+        }
+
+        table{
+            width:100%;
+            border-collapse:collapse;
+            margin-top:20px;
+        }
+
+        th, td{
+            padding:10px;
+            border-bottom:1px solid #333;
+            text-align:left;
+        }
+
+        .WIN{color:#00ff88;}
+        .LOSE{color:#ff4444;}
+        .TOSS-UP{color:#ffaa00;}
+    </style>
+</head>
+
+<body>
+
+<div class="header">🔥 Campaign War Room</div>
+
+<div class="container">
+
+    <h3>Constituency Intelligence</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Constituency</th>
+                <th>PF</th>
+                <th>UPND</th>
+                <th>Margin</th>
+                <th>Penetration</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="table"></tbody>
+    </table>
+
+    <h3>Turnout Targets</h3>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Station</th>
+                <th>Members</th>
+                <th>Votes</th>
+                <th>Gap</th>
+                <th>Priority</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="targets"></tbody>
+    </table>
+
+</div>
+
+<script>
+async function loadDashboard(){
+    const res = await fetch("/api/live_dashboard");
+    const data = await res.json();
+
+    let html = "";
+
+    data.forEach(d => {
+        html += `
+        <tr>
+            <td>${d.constituency}</td>
+            <td>${d.pf}</td>
+            <td>${d.upnd}</td>
+            <td>${d.margin}</td>
+            <td>${d.penetration}%</td>
+            <td class="${d.status}">${d.status}</td>
+        </tr>`;
+    });
+
+    document.getElementById("table").innerHTML = html;
+}
+
+async function loadTargets(){
+    const res = await fetch("/api/turnout_targets");
+    const data = await res.json();
+
+    let html = "";
+
+    data.forEach(t => {
+        html += `
+        <tr>
+            <td>${t.station}</td>
+            <td>${t.members}</td>
+            <td>${t.votes}</td>
+            <td>${t.gap}</td>
+            <td>${t.priority}</td>
+            <td>
+                <button onclick="mobilize('${t.station}')">
+                    Mobilize
+                </button>
+            </td>
+        </tr>`;
+    });
+
+    document.getElementById("targets").innerHTML = html;
+}
+
+function mobilize(station){
+    fetch(`/mobilize/${station}`)
+    .then(res => res.text())
+    .then(msg => alert(msg));
+}
+
+setInterval(loadDashboard, 5000);
+setInterval(loadTargets, 8000);
+
+loadDashboard();
+loadTargets();
+</script>
+
+</body>
+</html>
