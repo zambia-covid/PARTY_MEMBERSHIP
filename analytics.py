@@ -156,15 +156,16 @@ def turnout_targets():
     conn = get_db()
     cur = conn.cursor()
 
+    # ✅ FIXED QUERY (NO AMBIGUITY)
     cur.execute("""
         SELECT 
-            polling_station,
-            COUNT(m.membership_id),
-            COALESCE(SUM(r.pf_votes + r.upnd_votes),0)
+            m.polling_station,
+            COUNT(m.membership_id) AS members,
+            COALESCE(SUM(r.pf_votes + r.upnd_votes),0) AS votes
         FROM members m
         LEFT JOIN polling_station_results r
-        ON m.polling_station = r.polling_station
-        GROUP BY polling_station
+            ON m.polling_station = r.polling_station
+        GROUP BY m.polling_station
     """)
 
     results = []
