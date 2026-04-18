@@ -3,6 +3,27 @@ from openai import OpenAI
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+def strategic_advice(summary):
+
+    prompt = f"""
+You are a political strategist.
+
+Data:
+{summary}
+
+Give 3 clear actions to improve performance.
+Be direct. No fluff.
+"""
+
+    try:
+        res = client.responses.create(
+            model="gpt-5-mini",
+            input=prompt
+        )
+        return res.output_text.strip()
+    except:
+        return "Increase turnout. Focus battlegrounds. Deploy agents."
+
 def classify_voter(member):
     try:
         prompt = f"""
@@ -20,7 +41,6 @@ Return ONLY: STRONG, LEANING, WEAK
         return res.output_text.strip().upper()
     except:
         return "UNKNOWN"
-
 
 def generate_message(context):
     try:
