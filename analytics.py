@@ -28,6 +28,56 @@ def legacy_live_stats():
 def legacy_map_data():
     return live_dashboard()
 
+@analytics_bp.route("/api/map_intelligence")
+@login_required
+def map_intelligence():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT 
+            constituency,
+            COALESCE(SUM(pf_votes),0),
+            COALESCE(SUM(upnd_votes),0)
+        FROM polling_station_results
+        GROUP BY constituency
+    """)
+
+    results = []
+
+    for c, pf, upnd in cur.fetchall():
+
+        margin = pf - upnd
+
+        if margin > 100:
+            heat = "strong_pf"
+        elif margin > 0:
+            heat = "lean_pf"
+        elif margin < -100:
+            heat = "strong_upnd"
+        elif margin < 0:
+            heat = "lean_upnd"
+        else:
+            heat = "neutral"
+
+        results.append({
+            "constituency": c,
+            "dom_id": c.lower().replace(" ", "_"),
+            "pf": pf,
+            "upnd": upnd,
+            "margin": margin,
+            "heat": heat
+        })
+
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "map": results,
+        "alerts": []
+    })
+
 @analytics_bp.route("/api/strategy")
 @login_required
 def strategy():
