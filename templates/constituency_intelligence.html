@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Constituency Intelligence</title>
+
     <style>
         body {
             font-family: Arial;
@@ -17,6 +18,19 @@
             font-weight: bold;
         }
 
+        .controls {
+            padding: 15px;
+            background: #0f2a0f;
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            padding: 8px;
+            border-radius: 5px;
+            border: none;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -24,7 +38,6 @@
 
         th, td {
             padding: 10px;
-            text-align: left;
             border-bottom: 1px solid #333;
         }
 
@@ -34,27 +47,43 @@
 
         tr:hover {
             background: #1a2e1a;
+            cursor: pointer;
         }
 
         .WIN { color: #00ff88; font-weight: bold; }
         .LOSE { color: #ff4d4d; font-weight: bold; }
         .TOSS-UP { color: #ffcc00; font-weight: bold; }
 
+        .danger {
+            background: rgba(255,0,0,0.2);
+        }
+
+        .cards {
+            padding: 10px;
+        }
+
         .card {
             display: inline-block;
-            margin: 10px;
-            padding: 15px;
+            margin: 5px;
+            padding: 12px;
             background: #132913;
             border-radius: 10px;
-            min-width: 150px;
+            min-width: 140px;
+            text-align: center;
         }
     </style>
 </head>
+
 <body>
 
 <div class="header">📊 Constituency Intelligence Dashboard</div>
 
-<div id="summary"></div>
+<div class="controls">
+    <input type="text" id="search" placeholder="Search constituency...">
+    <input type="text" id="provinceFilter" placeholder="Filter province...">
+</div>
+
+<div class="cards" id="summary"></div>
 
 <table>
     <thead>
@@ -72,23 +101,45 @@
 </table>
 
 <script>
-fetch("/api/constituency_intelligence")
-.then(res => res.json())
-.then(data => {
 
-    let tbody = document.getElementById("table-body");
-    let summary = document.getElementById("summary");
+let allData = []
 
-    let win = 0, lose = 0, toss = 0;
+async function loadData() {
+    let res = await fetch("/api/constituency_intelligence")
+    let data = await res.json()
 
-    data.forEach(c => {
+    allData = data
+    renderTable()
+}
 
-        if (c.status === "WIN") win++;
-        else if (c.status === "LOSE") lose++;
-        else toss++;
+function renderTable() {
 
-        let row = `
-            <tr>
+    let tbody = document.getElementById("table-body")
+    let summary = document.getElementById("summary")
+
+    let search = document.getElementById("search").value.toLowerCase()
+    let provinceFilter = document.getElementById("provinceFilter").value.toLowerCase()
+
+    let win = 0, lose = 0, toss = 0
+    let html = ""
+
+    allData.forEach(c => {
+
+        if (
+            !c.constituency.toLowerCase().includes(search) &&
+            !c.province.toLowerCase().includes(search)
+        ) return
+
+        if (provinceFilter && !c.province.toLowerCase().includes(provinceFilter)) return
+
+        if (c.status === "WIN") win++
+        else if (c.status === "LOSE") lose++
+        else toss++
+
+        let danger = (c.status === "LOSE" && c.margin < -500) ? "danger" : ""
+
+        html += `
+            <tr class="${danger}" onclick="drill('${c.constituency}')">
                 <td>${c.constituency}</td>
                 <td>${c.province}</td>
                 <td>${c.members}</td>
@@ -97,17 +148,34 @@ fetch("/api/constituency_intelligence")
                 <td>${c.margin}</td>
                 <td class="${c.status}">${c.status}</td>
             </tr>
-        `;
+        `
+    })
 
-        tbody.innerHTML += row;
-    });
+    tbody.innerHTML = html
 
     summary.innerHTML = `
-        <div class="card">WIN: ${win}</div>
-        <div class="card">TOSS-UP: ${toss}</div>
-        <div class="card">LOSE: ${lose}</div>
-    `;
-});
+        <div class="card">WIN<br><b>${win}</b></div>
+        <div class="card">TOSS-UP<br><b>${toss}</b></div>
+        <div class="card">LOSE<br><b>${lose}</b></div>
+        <div class="card">TOTAL<br><b>${win + lose + toss}</b></div>
+    `
+}
+
+// 🔍 filters
+document.getElementById("search").addEventListener("input", renderTable)
+document.getElementById("provinceFilter").addEventListener("input", renderTable)
+
+// 🔁 auto refresh every 5 sec
+setInterval(loadData, 5000)
+
+// 🚀 drill down
+function drill(name){
+    window.location.href = "/polling_intelligence?constituency=" + name
+}
+
+// first load
+loadData()
+
 </script>
 
 </body>
