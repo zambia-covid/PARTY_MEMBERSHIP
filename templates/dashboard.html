@@ -1,53 +1,91 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>War Room Dashboard</title>
+    <title>War Room</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         body{
-            font-family: Arial;
             margin:0;
+            font-family:Arial;
             background:#0b1f0b;
             color:white;
         }
 
-        .header{
-            padding:15px;
+        .nav{
+            display:flex;
             background:#0b6623;
-            font-size:20px;
-            font-weight:bold;
         }
 
-        .container{
+        .nav div{
+            padding:15px;
+            cursor:pointer;
+        }
+
+        .nav div:hover{
+            background:#084d1a;
+        }
+
+        .active{
+            background:#084d1a;
+        }
+
+        .section{
+            display:none;
             padding:20px;
+        }
+
+        .show{
+            display:block;
         }
 
         table{
             width:100%;
             border-collapse:collapse;
-            margin-top:20px;
         }
 
-        th, td{
+        td, th{
             padding:10px;
             border-bottom:1px solid #333;
-            text-align:left;
         }
 
         .WIN{color:#00ff88;}
         .LOSE{color:#ff4444;}
         .TOSS-UP{color:#ffaa00;}
+
+        .map{
+            display:grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap:10px;
+        }
+
+        .cell{
+            padding:15px;
+            text-align:center;
+            border-radius:5px;
+            font-size:12px;
+        }
+
+        .PF{background:#0b6623;}
+        .UPND{background:#990000;}
+        .TIED{background:#555;}
     </style>
 </head>
 
 <body>
 
-<div class="header">🔥 Campaign War Room</div>
+<div class="nav">
+    <div onclick="showTab('war')" class="active">War Room</div>
+    <div onclick="showTab('map')">Map</div>
+    <div onclick="showTab('targets')">Turnout</div>
+</div>
 
-<div class="container">
+<!-- ================= WAR ROOM ================= -->
+<div id="war" class="section show">
 
-    <h3>Constituency Intelligence</h3>
+    <h3>Live Intelligence</h3>
 
     <table>
         <thead>
@@ -56,12 +94,25 @@
                 <th>PF</th>
                 <th>UPND</th>
                 <th>Margin</th>
-                <th>Penetration</th>
                 <th>Status</th>
             </tr>
         </thead>
-        <tbody id="table"></tbody>
+        <tbody id="warTable"></tbody>
     </table>
+
+</div>
+
+<!-- ================= MAP ================= -->
+<div id="map" class="section">
+
+    <h3>Zambia Heat Map</h3>
+
+    <div class="map" id="mapGrid"></div>
+
+</div>
+
+<!-- ================= TARGETS ================= -->
+<div id="targets" class="section">
 
     <h3>Turnout Targets</h3>
 
@@ -69,20 +120,29 @@
         <thead>
             <tr>
                 <th>Station</th>
-                <th>Members</th>
-                <th>Votes</th>
                 <th>Gap</th>
                 <th>Priority</th>
                 <th>Action</th>
             </tr>
         </thead>
-        <tbody id="targets"></tbody>
+        <tbody id="targetsTable"></tbody>
     </table>
 
 </div>
 
 <script>
-async function loadDashboard(){
+
+function showTab(tab){
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('show'));
+    document.getElementById(tab).classList.add('show');
+
+    document.querySelectorAll('.nav div').forEach(n => n.classList.remove('active'));
+    event.target.classList.add('active');
+}
+
+// ================= WAR ROOM =================
+async function loadWar(){
+
     const res = await fetch("/api/live_dashboard");
     const data = await res.json();
 
@@ -95,15 +155,38 @@ async function loadDashboard(){
             <td>${d.pf}</td>
             <td>${d.upnd}</td>
             <td>${d.margin}</td>
-            <td>${d.penetration}%</td>
             <td class="${d.status}">${d.status}</td>
         </tr>`;
     });
 
-    document.getElementById("table").innerHTML = html;
+    document.getElementById("warTable").innerHTML = html;
 }
 
+// ================= MAP =================
+async function loadMap(){
+
+    const res = await fetch("/api/map_data");
+    const data = await res.json();
+
+    let html = "";
+
+    for (let c in data){
+        let d = data[c];
+
+        html += `
+        <div class="cell ${d.status}">
+            ${c}<br>
+            PF:${d.pf}<br>
+            UPND:${d.upnd}
+        </div>`;
+    }
+
+    document.getElementById("mapGrid").innerHTML = html;
+}
+
+// ================= TARGETS =================
 async function loadTargets(){
+
     const res = await fetch("/api/turnout_targets");
     const data = await res.json();
 
@@ -113,8 +196,6 @@ async function loadTargets(){
         html += `
         <tr>
             <td>${t.station}</td>
-            <td>${t.members}</td>
-            <td>${t.votes}</td>
             <td>${t.gap}</td>
             <td>${t.priority}</td>
             <td>
@@ -125,20 +206,24 @@ async function loadTargets(){
         </tr>`;
     });
 
-    document.getElementById("targets").innerHTML = html;
+    document.getElementById("targetsTable").innerHTML = html;
 }
 
 function mobilize(station){
     fetch(`/mobilize/${station}`)
-    .then(res => res.text())
-    .then(msg => alert(msg));
+    .then(r => r.text())
+    .then(alert);
 }
 
-setInterval(loadDashboard, 5000);
+// ================= AUTO REFRESH =================
+setInterval(loadWar, 5000);
+setInterval(loadMap, 7000);
 setInterval(loadTargets, 8000);
 
-loadDashboard();
+loadWar();
+loadMap();
 loadTargets();
+
 </script>
 
 </body>
