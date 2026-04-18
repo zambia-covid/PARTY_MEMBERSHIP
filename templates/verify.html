@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Verify Member</title>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body{
+    font-family:Arial;
+    background:#0b1f0b;
+    color:white;
+    text-align:center;
+}
+
+#reader{
+    width:300px;
+    margin:auto;
+}
+
+.result{
+    margin-top:20px;
+    padding:15px;
+    border-radius:8px;
+}
+
+.valid{ background:#004d00; }
+.invalid{ background:#660000; }
+</style>
+</head>
+
+<body>
+
+<h2>Scan Membership QR</h2>
+
+<div id="reader"></div>
+
+<div id="resultBox"></div>
+
+<script>
+
+function onScanSuccess(decodedText){
+
+    fetch("/api/verify_member", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({member_id: decodedText})
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        let box = document.getElementById("resultBox");
+
+        if(data.valid){
+            box.className = "result valid";
+            box.innerHTML = `
+                <h3>VALID MEMBER</h3>
+                Name: ${data.name}<br>
+                Province: ${data.province}<br>
+                Constituency: ${data.constituency}
+            `;
+        } else {
+            box.className = "result invalid";
+            box.innerHTML = "Invalid Membership";
+        }
+    });
+}
+
+new Html5QrcodeScanner("reader", {fps:10, qrbox:250})
+.render(onScanSuccess);
+
+</script>
+
+</body>
+</html>
