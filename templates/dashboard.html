@@ -1,10 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>War Room</title>
+    <title>Campaign Command Center</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         body{
@@ -14,6 +12,7 @@
             color:white;
         }
 
+        /* NAV */
         .nav{
             display:flex;
             background:#0b6623;
@@ -32,6 +31,7 @@
             background:#084d1a;
         }
 
+        /* SECTIONS */
         .section{
             display:none;
             padding:20px;
@@ -41,6 +41,7 @@
             display:block;
         }
 
+        /* TABLE */
         table{
             width:100%;
             border-collapse:collapse;
@@ -55,27 +56,26 @@
         .LOSE{color:#ff4444;}
         .TOSS-UP{color:#ffaa00;}
 
-        .map{
-            display:grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap:10px;
+        /* MAP */
+        #zambiaMap path{
+            stroke:#222;
+            stroke-width:1;
+            transition:0.3s;
         }
 
-        .cell{
+        /* AI PANEL */
+        .ai-panel{
+            background:#111;
             padding:15px;
-            text-align:center;
-            border-radius:5px;
-            font-size:12px;
+            margin-top:20px;
+            border-left:5px solid #0b6623;
         }
-
-        .PF{background:#0b6623;}
-        .UPND{background:#990000;}
-        .TIED{background:#555;}
     </style>
 </head>
 
 <body>
 
+<!-- NAV -->
 <div class="nav">
     <div onclick="showTab('war')" class="active">War Room</div>
     <div onclick="showTab('map')">Map</div>
@@ -100,6 +100,12 @@
         <tbody id="warTable"></tbody>
     </table>
 
+    <!-- AI STRATEGY -->
+    <div class="ai-panel">
+        <h3>AI Strategic Advice</h3>
+        <div id="adviceBox">Loading...</div>
+    </div>
+
 </div>
 
 <!-- ================= MAP ================= -->
@@ -107,7 +113,15 @@
 
     <h3>Zambia Heat Map</h3>
 
-    <div class="map" id="mapGrid"></div>
+    <!-- SIMPLE SVG (replace later with real Zambia map) -->
+    <svg viewBox="0 0 500 500" id="zambiaMap">
+
+        <path id="Lusaka" d="M100,100 L150,100 L150,150 L100,150 Z"/>
+        <path id="Ndola" d="M200,100 L250,100 L250,150 L200,150 Z"/>
+        <path id="Kitwe" d="M300,100 L350,100 L350,150 L300,150 Z"/>
+        <path id="Livingstone" d="M100,250 L150,250 L150,300 L100,300 Z"/>
+
+    </svg>
 
 </div>
 
@@ -132,6 +146,7 @@
 
 <script>
 
+/* ================= TAB CONTROL ================= */
 function showTab(tab){
     document.querySelectorAll('.section').forEach(s => s.classList.remove('show'));
     document.getElementById(tab).classList.add('show');
@@ -140,7 +155,7 @@ function showTab(tab){
     event.target.classList.add('active');
 }
 
-// ================= WAR ROOM =================
+/* ================= WAR ROOM ================= */
 async function loadWar(){
 
     const res = await fetch("/api/live_dashboard");
@@ -162,29 +177,53 @@ async function loadWar(){
     document.getElementById("warTable").innerHTML = html;
 }
 
-// ================= MAP =================
+/* ================= MAP ================= */
 async function loadMap(){
 
-    const res = await fetch("/api/map_data");
+    const res = await fetch("/api/map_intelligence");
     const data = await res.json();
 
-    let html = "";
+    const colors = {
+        strong_pf: "#006400",
+        lean_pf: "#32CD32",
+        strong_upnd: "#8B0000",
+        lean_upnd: "#FF6347",
+        neutral: "#777"
+    };
 
-    for (let c in data){
-        let d = data[c];
+    data.map.forEach(c => {
 
-        html += `
-        <div class="cell ${d.status}">
-            ${c}<br>
-            PF:${d.pf}<br>
-            UPND:${d.upnd}
-        </div>`;
-    }
+        let el = document.getElementById(c.constituency);
+        if(!el) return;
 
-    document.getElementById("mapGrid").innerHTML = html;
+        el.style.fill = colors[c.heat] || "#777";
+
+        el.onclick = () => {
+            alert(
+                `${c.constituency}
+PF: ${c.pf}
+UPND: ${c.upnd}
+Margin: ${c.margin}`
+            );
+        };
+    });
+
+    /* ALERT FLASHING */
+    data.alerts.forEach(a => {
+
+        let el = document.getElementById(a.constituency);
+        if(!el) return;
+
+        el.style.stroke = "yellow";
+        el.style.strokeWidth = "3";
+
+        setInterval(() => {
+            el.style.opacity = el.style.opacity == 0.5 ? 1 : 0.5;
+        }, 500);
+    });
 }
 
-// ================= TARGETS =================
+/* ================= TARGETS ================= */
 async function loadTargets(){
 
     const res = await fetch("/api/turnout_targets");
@@ -215,14 +254,24 @@ function mobilize(station){
     .then(alert);
 }
 
-// ================= AUTO REFRESH =================
+/* ================= AI STRATEGY ================= */
+async function loadStrategy(){
+    const res = await fetch("/api/strategy");
+    const data = await res.json();
+
+    document.getElementById("adviceBox").innerText = data.advice;
+}
+
+/* ================= AUTO REFRESH ================= */
 setInterval(loadWar, 5000);
 setInterval(loadMap, 7000);
 setInterval(loadTargets, 8000);
+setInterval(loadStrategy, 15000);
 
 loadWar();
 loadMap();
 loadTargets();
+loadStrategy();
 
 </script>
 
