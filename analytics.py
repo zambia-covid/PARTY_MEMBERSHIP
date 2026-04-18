@@ -16,6 +16,22 @@ def decision_engine(members, voters, pf, upnd):
         return "LOSE"
     return "TOSS-UP"
 
+@analytics_bp.route("/live_stats")
+@login_required
+def legacy_live_stats():
+    return live_dashboard()
+
+
+@analytics_bp.route("/map_data")
+@login_required
+def legacy_map_data():
+    return live_dashboard()
+
+
+@analytics_bp.route("/alerts")
+@login_required
+def legacy_alerts():
+    return turnout_targets()
 
 # ======================
 # LIVE DASHBOARD
