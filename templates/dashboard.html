@@ -61,6 +61,7 @@
             stroke:#222;
             stroke-width:1;
             transition:0.3s;
+            cursor:pointer;
         }
 
         /* AI PANEL */
@@ -100,7 +101,6 @@
         <tbody id="warTable"></tbody>
     </table>
 
-    <!-- AI STRATEGY -->
     <div class="ai-panel">
         <h3>AI Strategic Advice</h3>
         <div id="adviceBox">Loading...</div>
@@ -113,15 +113,7 @@
 
     <h3>Zambia Heat Map</h3>
 
-    <!-- SIMPLE SVG (replace later with real Zambia map) -->
-    <svg viewBox="0 0 500 500" id="zambiaMap">
-
-        <path id="Lusaka" d="M100,100 L150,100 L150,150 L100,150 Z"/>
-        <path id="Ndola" d="M200,100 L250,100 L250,150 L200,150 Z"/>
-        <path id="Kitwe" d="M300,100 L350,100 L350,150 L300,150 Z"/>
-        <path id="Livingstone" d="M100,250 L150,250 L150,300 L100,300 Z"/>
-
-    </svg>
+    <div id="mapContainer">Loading map...</div>
 
 </div>
 
@@ -153,6 +145,23 @@ function showTab(tab){
 
     document.querySelectorAll('.nav div').forEach(n => n.classList.remove('active'));
     event.target.classList.add('active');
+}
+
+/* ================= NORMALIZER ================= */
+function normalize(name){
+    return name.toLowerCase().replace(/\s+/g, "_");
+}
+
+/* ================= LOAD SVG ================= */
+async function loadSVG(){
+    const res = await fetch("/static/zambia.svg");
+    const svg = await res.text();
+
+    document.getElementById("mapContainer").innerHTML = svg;
+
+    console.log("SVG Loaded");
+
+    loadMap(); // apply data AFTER loading
 }
 
 /* ================= WAR ROOM ================= */
@@ -193,33 +202,41 @@ async function loadMap(){
 
     data.map.forEach(c => {
 
-        let el = document.getElementById(c.constituency);
-        if(!el) return;
+        let id = c.dom_id || normalize(c.constituency);
+        let el = document.getElementById(id);
+
+        if(!el){
+            console.log("Missing SVG ID:", id);
+            return;
+        }
 
         el.style.fill = colors[c.heat] || "#777";
 
         el.onclick = () => {
-            alert(
-                `${c.constituency}
+            alert(`${c.constituency}
 PF: ${c.pf}
 UPND: ${c.upnd}
-Margin: ${c.margin}`
-            );
+Margin: ${c.margin}`);
         };
     });
 
-    /* ALERT FLASHING */
+    /* ALERT FLASH */
     data.alerts.forEach(a => {
 
-        let el = document.getElementById(a.constituency);
+        let id = normalize(a.constituency);
+        let el = document.getElementById(id);
+
         if(!el) return;
 
         el.style.stroke = "yellow";
         el.style.strokeWidth = "3";
 
+        let blink = false;
+
         setInterval(() => {
-            el.style.opacity = el.style.opacity == 0.5 ? 1 : 0.5;
-        }, 500);
+            el.style.opacity = blink ? 1 : 0.4;
+            blink = !blink;
+        }, 600);
     });
 }
 
@@ -264,12 +281,11 @@ async function loadStrategy(){
 
 /* ================= AUTO REFRESH ================= */
 setInterval(loadWar, 5000);
-setInterval(loadMap, 7000);
 setInterval(loadTargets, 8000);
 setInterval(loadStrategy, 15000);
 
+loadSVG();
 loadWar();
-loadMap();
 loadTargets();
 loadStrategy();
 
