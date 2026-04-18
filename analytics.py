@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify
 from flask_login import login_required
 from db import get_db
+from ai import strategic_advice
 
 analytics_bp = Blueprint("analytics", __name__)
 
@@ -27,6 +28,30 @@ def legacy_live_stats():
 def legacy_map_data():
     return live_dashboard()
 
+@analytics_bp.route("/api/strategy")
+@login_required
+def strategy():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT 
+            SUM(pf_votes),
+            SUM(upnd_votes)
+        FROM polling_station_results
+    """)
+
+    pf, upnd = cur.fetchone()
+
+    summary = f"PF:{pf}, UPND:{upnd}"
+
+    cur.close()
+    conn.close()
+
+    advice = strategic_advice(summary)
+
+    return jsonify({"advice": advice})
 
 @analytics_bp.route("/alerts")
 @login_required
