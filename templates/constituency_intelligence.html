@@ -4,52 +4,11 @@
 
 {% block content %}
 
-<h2 style="margin-bottom:15px;">📊 Constituency Intelligence (DEBUG MODE)</h2>
+<h2>📊 Constituency Intelligence</h2>
 
-<style>
-.controls {
-    padding: 10px;
-    background: #f0f5f0;
-    display: flex;
-    gap: 10px;
-    border-radius: 8px;
-    margin-bottom: 15px;
-}
+<div id="status" style="margin-bottom:10px;color:gray;">Loading...</div>
 
-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-}
-
-th, td {
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-}
-
-th {
-    background: #0B5D1E;
-    color: white;
-}
-
-.kpi {
-    background: white;
-    padding: 10px;
-    margin-bottom: 10px;
-}
-</style>
-
-<!-- FILTERS -->
-<div class="controls">
-    <input type="text" id="search" placeholder="Search constituency...">
-    <input type="text" id="provinceFilter" placeholder="Filter province...">
-</div>
-
-<!-- KPI -->
-<div id="kpis"></div>
-
-<!-- TABLE -->
-<table>
+<table border="1" cellpadding="8" cellspacing="0" style="width:100%;background:white;">
     <thead>
         <tr>
             <th>Constituency</th>
@@ -65,60 +24,28 @@ th {
 </table>
 
 <script>
-document.addEventListener("DOMContentLoaded", function(){
+document.addEventListener("DOMContentLoaded", async function(){
 
-console.log("🔥 SCRIPT LOADED")
+    const status = document.getElementById("status")
+    const tbody = document.getElementById("table-body")
 
-let allData = []
-
-async function loadData() {
     try {
-        console.log("🚀 FETCHING DATA...")
+        console.log("Fetching data...")
 
         let res = await fetch("/api/constituency_intelligence")
         let data = await res.json()
 
-        console.log("✅ DATA RECEIVED:", data)
+        console.log("DATA:", data)
 
-        allData = data
-        render()
+        status.innerText = "Loaded " + data.length + " constituencies"
 
-    } catch (e) {
-        console.error("❌ LOAD ERROR:", e)
-    }
-}
+        let html = ""
 
-function render() {
-
-    console.log("🧠 RENDER STARTED")
-
-    let tbody = document.getElementById("table-body")
-    let kpis = document.getElementById("kpis")
-
-    console.log("TBODY:", tbody)
-    console.log("KPIS:", kpis)
-    console.log("DATA LENGTH:", allData.length)
-
-    if (!tbody || !kpis) {
-        console.error("❌ DOM ELEMENTS MISSING")
-        return
-    }
-
-    let html = ""
-
-    allData.forEach((c, index) => {
-
-        console.log("ROW", index, c)
-
-        try {
-
-            let constituency = c.constituency || "N/A"
-            let province = c.province || "N/A"
-
+        data.forEach(c => {
             html += `
                 <tr>
-                    <td>${constituency}</td>
-                    <td>${province}</td>
+                    <td>${c.constituency}</td>
+                    <td>${c.province}</td>
                     <td>${c.members}</td>
                     <td>${c.voters}</td>
                     <td>${c.penetration}</td>
@@ -126,41 +53,14 @@ function render() {
                     <td>${c.status}</td>
                 </tr>
             `
+        })
 
-        } catch (err) {
-            console.error("❌ ROW ERROR:", err, c)
-        }
+        tbody.innerHTML = html
 
-    })
-
-    tbody.innerHTML = html
-
-    kpis.innerHTML = `
-        <div class="kpi">Loaded Rows: ${allData.length}</div>
-    `
-
-    console.log("✅ RENDER COMPLETE")
-}
-
-/* safe event binding */
-setTimeout(() => {
-    let s = document.getElementById("search")
-    let p = document.getElementById("provinceFilter")
-
-    if (s) {
-        console.log("✔ search input found")
-        s.addEventListener("input", render)
+    } catch (e) {
+        console.error(e)
+        status.innerText = "ERROR loading data"
     }
-
-    if (p) {
-        console.log("✔ province input found")
-        p.addEventListener("input", render)
-    }
-
-}, 100)
-
-/* start */
-loadData()
 
 })
 </script>
