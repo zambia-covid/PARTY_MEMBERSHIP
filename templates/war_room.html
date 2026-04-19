@@ -1,88 +1,146 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>War Room</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
 
-    <meta http-equiv="refresh" content="5">
+{% block title %}War Room{% endblock %}
 
-    <style>
-        body {
-            font-family: Arial;
-            background: black;
-            color: white;
-            padding: 10px;
-        }
+{% block content %}
 
-        h2 {
-            text-align: center;
-            color: #00ff88;
-        }
+<h2 style="text-align:center;color:#00ff88;margin-bottom:10px;">
+⚔️ WAR ROOM
+</h2>
 
-        .card {
-            background: #111;
-            padding: 12px;
-            margin-bottom: 12px;
-            border-radius: 10px;
-        }
+<style>
 
-        .win { color: #00ff88; }
-        .lose { color: red; }
-        .tie { color: orange; }
+/* override main area to dark */
+.main {
+    background: #050505;
+    color: white;
+}
 
-        .danger {
-            background: #330000;
-        }
+/* KPI BAR */
+.kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px,1fr));
+    gap: 10px;
+    margin-bottom: 15px;
+}
 
-        .silent {
-            background: #222;
-            font-size: 14px;
-        }
+.kpi {
+    background: #111;
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
+}
 
-    </style>
-</head>
+.kpi b {
+    font-size: 20px;
+}
 
-<body>
+/* GRID */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px,1fr));
+    gap: 15px;
+}
 
-<h2>⚔️ WAR ROOM</h2>
+.card {
+    background: #111;
+    padding: 12px;
+    border-radius: 10px;
+}
 
-<!-- DANGER ZONES -->
-<div class="card danger">
-    <h3>🚨 Danger Zones</h3>
+.card h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #ccc;
+}
 
-    {% for d in danger_zones %}
-        <div>{{ d[0] }} → Losing by {{ d[1] }}</div>
-    {% else %}
-        <div>No danger zones</div>
-    {% endfor %}
+/* STATUS */
+.win { color: #00ff88; }
+.lose { color: #ff4d4d; }
+.tie { color: #ffcc00; }
+
+/* DANGER */
+.danger {
+    background: rgba(255,0,0,0.2);
+}
+
+/* ROWS */
+.row {
+    padding: 6px;
+    border-bottom: 1px solid #222;
+}
+
+.row:last-child {
+    border-bottom: none;
+}
+
+/* silent */
+.silent {
+    background: #1a1a1a;
+    font-size: 13px;
+}
+
+</style>
+
+<!-- KPI BAR -->
+<div class="kpis">
+    <div class="kpi">WIN<br><b>{{ summary.win }}</b></div>
+    <div class="kpi">TOSS-UP<br><b>{{ summary.toss }}</b></div>
+    <div class="kpi">LOSE<br><b>{{ summary.lose }}</b></div>
+    <div class="kpi">DANGER<br><b>{{ danger_zones|length }}</b></div>
 </div>
 
-<!-- BATTLEGROUND -->
-<div class="card">
-    <h3>🗺 Constituency Status</h3>
+<div class="grid">
 
-    {% for b in battleground %}
-        <div class="
-            {% if b[3]=='WIN' %}win
-            {% elif b[3]=='LOSE' %}lose
-            {% else %}tie
-            {% endif %}
-        ">
-            {{ b[0] }} → PF {{ b[1] }} vs UPND {{ b[2] }} ({{ b[3] }})
-        </div>
-    {% endfor %}
+    <!-- 🚨 DANGER -->
+    <div class="card danger">
+        <h3>🚨 Danger Zones</h3>
+
+        {% for d in danger_zones %}
+            <div class="row lose">
+                {{ d[0] }} → Losing by {{ d[1] }}
+            </div>
+        {% else %}
+            <div class="row">No danger zones</div>
+        {% endfor %}
+    </div>
+
+    <!-- 🗺 BATTLEGROUND -->
+    <div class="card">
+        <h3>🗺 Constituency Status</h3>
+
+        {% for b in battleground %}
+            <div class="row 
+                {% if b[3]=='WIN' %}win
+                {% elif b[3]=='LOSE' %}lose
+                {% else %}tie
+                {% endif %}
+            ">
+                <strong>{{ b[0] }}</strong><br>
+                PF {{ b[1] }} vs UPND {{ b[2] }}
+                ({{ b[3] }})
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- ⚠️ SILENT -->
+    <div class="card silent">
+        <h3>⚠️ No Reporting Stations</h3>
+
+        {% for s in silent_stations %}
+            <div class="row">{{ s }}</div>
+        {% else %}
+            <div class="row">All stations reporting</div>
+        {% endfor %}
+    </div>
+
 </div>
 
-<!-- SILENT STATIONS -->
-<div class="card silent">
-    <h3>⚠️ No Reporting Stations</h3>
+<!-- 🔁 SOFT REFRESH -->
+<script>
+setInterval(() => {
+    location.reload()
+}, 5000)
+</script>
 
-    {% for s in silent_stations %}
-        <div>{{ s }}</div>
-    {% else %}
-        <div>All stations reporting</div>
-    {% endfor %}
-</div>
-
-</body>
-</html>
+{% endblock %}
