@@ -15,7 +15,7 @@
     display: flex;
     gap: 10px;
     border-radius: 8px;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
 }
 
 input {
@@ -24,20 +24,14 @@ input {
     border: 1px solid #ccc;
 }
 
-/* ===== SUMMARY ===== */
-.cards {
-    margin-bottom: 15px;
-}
-
-.card-mini {
+/* ===== BADGES ===== */
+.badge {
     display: inline-block;
-    margin-right: 10px;
-    padding: 12px;
-    background: white;
-    border-radius: 8px;
-    min-width: 120px;
-    text-align: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #e0e0e0;
+    margin-right: 5px;
+    font-size: 12px;
 }
 
 /* ===== TABLE ===== */
@@ -49,42 +43,54 @@ input {
     width: 100%;
     border-collapse: collapse;
     background: white;
-    table-layout: fixed; /* 🔥 locks alignment */
+    table-layout: fixed;
 }
 
 .intel-table th,
 .intel-table td {
     padding: 10px;
     border-bottom: 1px solid #eee;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
+/* header */
 .intel-table th {
     background: #0B5D1E;
     color: white;
     text-align: left;
 }
 
-/* numeric alignment */
+/* sortable */
+.sortable {
+    cursor: pointer;
+}
+.sortable:hover {
+    background: #145214;
+}
+
+/* numeric columns centered */
 .num {
     text-align: center;
 }
 
-.intel-table tr:hover {
-    background: #f3f7f3;
-    cursor: pointer;
+/* province grouping */
+.province-row {
+    background: #0B5D1E;
+    color: white;
+    font-weight: bold;
 }
 
-/* status colors */
+/* heatmap */
+.heat-win { background: rgba(0,200,0,0.15); }
+.heat-toss { background: rgba(255,200,0,0.2); }
+.heat-lose { background: rgba(255,0,0,0.15); }
+
+/* status text */
 .WIN { color: green; font-weight: bold; }
 .LOSE { color: red; font-weight: bold; }
 .TOSS-UP { color: orange; font-weight: bold; }
-
-.danger {
-    background: rgba(255,0,0,0.1);
-}
 
 </style>
 
@@ -94,8 +100,8 @@ input {
     <input type="text" id="provinceFilter" placeholder="Filter province...">
 </div>
 
-<!-- SUMMARY -->
-<div class="cards" id="summary"></div>
+<!-- ACTIVE FILTER BADGES -->
+<div id="activeFilters" style="margin-bottom:10px;"></div>
 
 <!-- TABLE -->
 <div class="table-container">
@@ -113,13 +119,13 @@ input {
 
     <thead>
         <tr>
-            <th>Constituency</th>
-            <th>Province</th>
-            <th class="num">Members</th>
-            <th class="num">Voters</th>
-            <th class="num">Penetration %</th>
-            <th class="num">Margin</th>
-            <th>Status</th>
+            <th class="sortable" onclick="sortTable('constituency')">Constituency</th>
+            <th class="sortable" onclick="sortTable('province')">Province</th>
+            <th class="sortable num" onclick="sortTable('members')">Members</th>
+            <th class="sortable num" onclick="sortTable('voters')">Voters</th>
+            <th class="sortable num" onclick="sortTable('penetration')">Penetration %</th>
+            <th class="sortable num" onclick="sortTable('margin')">Margin</th>
+            <th class="sortable" onclick="sortTable('status')">Status</th>
         </tr>
     </thead>
 
@@ -129,50 +135,95 @@ input {
 </div>
 
 <script>
+
 document.addEventListener("DOMContentLoaded", function(){
 
 let allData = []
+let sortKey = null
+let sortAsc = true
 
 async function loadData() {
     try {
         let res = await fetch("/api/constituency_intelligence")
-        let data = await res.json()
-
-        allData = data
-        renderTable()
-
+        allData = await res.json()
+        render()
     } catch (e) {
         console.error("LOAD ERROR:", e)
     }
 }
 
-function renderTable() {
+/* SORTING */
+window.sortTable = function(key) {
+    if (sortKey === key) {
+        sortAsc = !sortAsc
+    } else {
+        sortKey = key
+        sortAsc = true
+    }
+    render()
+}
+
+/* MAIN RENDER */
+function render() {
 
     let tbody = document.getElementById("table-body")
-    let summary = document.getElementById("summary")
+    let badgeBox = document.getElementById("activeFilters")
 
     let search = (document.getElementById("search").value || "").toLowerCase()
     let provinceFilter = (document.getElementById("provinceFilter").value || "").toLowerCase()
 
-    let win = 0, lose = 0, toss = 0
+    /* BADGES */
+    badgeBox.innerHTML = ""
+    if (search) badgeBox.innerHTML += `<span class="badge">Search: ${search}</span>`
+    if (provinceFilter) badgeBox.innerHTML += `<span class="badge">Province: ${provinceFilter}</span>`
+
+    /* FILTER */
+    let data = allData.filter(c => {
+        let con = (c.constituency || "").toLowerCase()
+        let prov = (c.province || "").toLowerCase()
+
+        return (
+            (!search || con.includes(search) || prov.includes(search)) &&
+            (!provinceFilter || prov.includes(provinceFilter))
+        )
+    })
+
+    /* SORT */
+    if (sortKey) {
+        data.sort((a,b) => {
+            let x = a[sortKey] || 0
+            let y = b[sortKey] || 0
+            return sortAsc ? x - y : y - x
+        })
+    }
+
+    /* GROUP BY PROVINCE */
+    let grouped = {}
+
+    data.forEach(c => {
+        if (!grouped[c.province]) grouped[c.province] = []
+        grouped[c.province].push(c)
+    })
+
     let html = ""
 
-    allData.forEach(c => {
-
-        let constituency = (c.constituency || "").toLowerCase()
-        let province = (c.province || "").toLowerCase()
-
-        if (!constituency.includes(search) && !province.includes(search)) return
-        if (provinceFilter && !province.includes(provinceFilter)) return
-
-        if (c.status === "WIN") win++
-        else if (c.status === "LOSE") lose++
-        else toss++
-
-        let danger = (c.status === "LOSE" && c.margin < -500) ? "danger" : ""
+    Object.keys(grouped).forEach(province => {
 
         html += `
-            <tr class="${danger}" onclick="drill('${c.constituency}')">
+        <tr class="province-row">
+            <td colspan="7">${province}</td>
+        </tr>
+        `
+
+        grouped[province].forEach(c => {
+
+            let heat = ""
+            if (c.status === "WIN") heat = "heat-win"
+            else if (c.status === "LOSE") heat = "heat-lose"
+            else heat = "heat-toss"
+
+            html += `
+            <tr class="${heat}">
                 <td>${c.constituency}</td>
                 <td>${c.province}</td>
                 <td class="num">${c.members}</td>
@@ -181,40 +232,27 @@ function renderTable() {
                 <td class="num">${c.margin}</td>
                 <td class="${c.status}">${c.status}</td>
             </tr>
-        `
+            `
+        })
     })
 
     tbody.innerHTML = html
-
-    summary.innerHTML = `
-        <div class="card-mini">WIN<br><b>${win}</b></div>
-        <div class="card-mini">TOSS-UP<br><b>${toss}</b></div>
-        <div class="card-mini">LOSE<br><b>${lose}</b></div>
-        <div class="card-mini">TOTAL<br><b>${win + lose + toss}</b></div>
-    `
 }
 
-/* safe event binding */
+/* listeners */
 setTimeout(() => {
-    let s = document.getElementById("search")
-    let p = document.getElementById("provinceFilter")
-
-    if (s) s.addEventListener("input", renderTable)
-    if (p) p.addEventListener("input", renderTable)
+    document.getElementById("search").addEventListener("input", render)
+    document.getElementById("provinceFilter").addEventListener("input", render)
 }, 100)
 
-/* auto refresh */
+/* refresh */
 setInterval(loadData, 5000)
 
-/* drilldown */
-function drill(name){
-    window.location.href = "/polling_intelligence?constituency=" + name
-}
-
-/* initial load */
+/* init */
 loadData()
 
 })
+
 </script>
 
 {% endblock %}
