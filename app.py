@@ -2327,7 +2327,6 @@ def polling_intelligence():
     """)
 
     rows = cur.fetchall()
-
     stations = []
 
     for r in rows:
@@ -2356,29 +2355,78 @@ def polling_intelligence():
         ) if total_stations else 0
 
         # =========================
-        # STRATEGIC CLASSIFICATION
+        # ADVANCED INTELLIGENCE
         # =========================
 
-        if margin > 0 and penetration >= 40:
-            status = "STRONG"
+        # TRUE vs FAKE WIN
+        if margin > 0 and coverage >= 70:
+            win_type = "REAL WIN"
+        elif margin > 0 and coverage < 70:
+            win_type = "FAKE WIN"
+        else:
+            win_type = "NOT WINNING"
+
+        # STRUCTURAL STRENGTH
+        if penetration >= 40:
+            structure = "STRONG BASE"
+        elif penetration < 25:
+            structure = "WEAK BASE"
+        else:
+            structure = "AVERAGE BASE"
+
+        # RISK DETECTION
+        if coverage < 40 and voters > 50000:
+            risk = "CRITICAL BLIND SPOT"
         elif margin < 0 and penetration < 30:
-            status = "WEAK"
+            risk = "LOSING GROUND"
+        elif margin > 0 and coverage < 50:
+            risk = "UNSTABLE LEAD"
+        else:
+            risk = "STABLE"
+
+        # =========================
+        # FINAL STATUS
+        # =========================
+
+        if margin > 0 and penetration >= 40 and coverage >= 70:
+            status = "SECURE"
+        elif margin < 0 and penetration < 30:
+            status = "COLLAPSE"
         else:
             status = "BATTLEGROUND"
 
         # =========================
-        # ACTION ENGINE
+        # ACTION ENGINE (SMARTER)
         # =========================
 
         if coverage < 50:
             action = "DEPLOY REPORTING TEAMS"
+        elif margin < 0 and penetration < 30:
+            action = "REBUILD STRUCTURE"
         elif margin < 0:
-            action = "RECOVER SUPPORT"
+            action = "RECOVER VOTES"
+        elif coverage < 70:
+            action = "VERIFY LEAD"
         else:
             action = "MAINTAIN CONTROL"
 
         # =========================
-        # FINAL STRUCTURE
+        # PRIORITY SCORE (WAR ROOM USE)
+        # =========================
+
+        priority = 0
+
+        if status == "COLLAPSE":
+            priority += 3
+        if risk == "CRITICAL BLIND SPOT":
+            priority += 3
+        if win_type == "FAKE WIN":
+            priority += 2
+        if coverage < 50:
+            priority += 2
+
+        # =========================
+        # FINAL OBJECT
         # =========================
 
         stations.append({
@@ -2396,12 +2444,20 @@ def polling_intelligence():
             "turnout": turnout,
 
             "penetration": penetration,
+
             "status": status,
-            "action": action
+            "win_type": win_type,
+            "structure": structure,
+            "risk": risk,
+            "action": action,
+            "priority": priority
         })
 
     cur.close()
     conn.close()
+
+    # 🔥 SORT BY PRIORITY (MOST IMPORTANT FIRST)
+    stations.sort(key=lambda x: x["priority"], reverse=True)
 
     return render_template(
         "polling_intelligence.html",
