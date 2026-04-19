@@ -49,7 +49,81 @@ def admin_required(f):
             return "Forbidden", 403
         return f(*args, **kwargs)
     return wrapper
-    
+
+# ======================
+# BUILD POLLING INTELLIGENCE
+# ======================
+def build_polling_intelligence(cur):
+
+    cur.execute("""
+        SELECT 
+            cs.constituency,
+            cs.province,
+            COUNT(DISTINCT m.membership_id) AS members,
+            cs.total_voters,
+            cs.total_polling_stations,
+            COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+            COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes,
+            COUNT(DISTINCT r.polling_station) AS reporting_stations
+        FROM constituency_stats cs
+        LEFT JOIN members m
+            ON m.constituency = cs.constituency
+            AND m.status = 'Active'
+        LEFT JOIN polling_station_results r
+            ON r.constituency = cs.constituency
+        GROUP BY 
+            cs.constituency,
+            cs.province,
+            cs.total_voters,
+            cs.total_polling_stations
+    """)
+
+    rows = cur.fetchall()
+    stations = []
+
+    for r in rows:
+        (
+            constituency,
+            province,
+            members,
+            voters,
+            total_stations,
+            pf_votes,
+            upnd_votes,
+            reporting_stations
+        ) = r
+
+        penetration = (members / voters * 100) if voters else 0
+        margin = pf_votes - upnd_votes
+        coverage = (reporting_stations / total_stations * 100) if total_stations else 0
+
+        # classification
+        if margin > 0 and penetration >= 40 and coverage >= 70:
+            status = "SECURE"
+        elif margin < 0 and penetration < 30:
+            status = "COLLAPSE"
+        else:
+            status = "BATTLEGROUND"
+
+        # fake win detection
+        fake_win = (margin > 0 and coverage < 70)
+
+        stations.append({
+            "constituency": constituency,
+            "province": province,
+            "members": members,
+            "voters": voters,
+            "pf_votes": pf_votes,
+            "upnd_votes": upnd_votes,
+            "margin": margin,
+            "penetration": round(penetration, 2),
+            "coverage": round(coverage, 2),
+            "status": status,
+            "fake_win": fake_win
+        })
+
+    return stations
+
 # ======================
 # AI
 # ======================
