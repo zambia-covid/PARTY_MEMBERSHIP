@@ -2142,7 +2142,7 @@ def war_room():
     cur = conn.cursor()
 
     # =========================
-    # CORE INTELLIGENCE (ONLY SOURCE)
+    # CORE INTELLIGENCE
     # =========================
     stations = build_polling_intelligence(cur)
 
@@ -2156,32 +2156,47 @@ def war_room():
     }
 
     # =========================
-    # DANGER ZONES
+    # BASELINE INTELLIGENCE
     # =========================
-    danger_zones = [
-        (s["constituency"], s["margin"])
-        for s in stations
-        if s["status"] == "COLLAPSE"
-    ][:5]
+
+    # ⚠️ Fake wins (limit top 5 by priority)
+    fake_wins = sorted(
+        [s for s in stations if s["fake_win"]],
+        key=lambda x: x["priority"],
+        reverse=True
+    )[:5]
+
+    # 👁️ Blind spots
+    blind_spots = sorted(
+        [s for s in stations if s["blind_zone"]],
+        key=lambda x: x["priority"],
+        reverse=True
+    )[:5]
+
+    # 🧱 Weak structures
+    weak_structures = sorted(
+        [s for s in stations if s["weak_structure"]],
+        key=lambda x: x["priority"],
+        reverse=True
+    )[:5]
+
+    # 🎯 High-value constituencies (top 5 largest voter bases)
+    high_value_targets = sorted(
+        [s for s in stations if s["voter_weight"] == "HIGH VALUE"],
+        key=lambda x: x["voters"],
+        reverse=True
+    )[:5]
 
     # =========================
-    # FAKE WINS (CRITICAL)
+    # DANGER ZONES (COLLAPSE)
     # =========================
-    fake_wins = [
-        s for s in stations
-        if s.get("fake_win")
-    ]
+    danger_zones = sorted(
+        [s for s in stations if s["status"] == "COLLAPSE"],
+        key=lambda x: x["margin"]
+    )[:5]
 
     # =========================
-    # BLIND SPOTS
-    # =========================
-    blind_spots = [
-        s for s in stations
-        if s["coverage"] < 40
-    ]
-
-    # =========================
-    # SILENT STATIONS (ONLY EXTRA QUERY)
+    # SILENT STATIONS
     # =========================
     cur.execute("""
         SELECT a.polling_station
@@ -2196,6 +2211,9 @@ def war_room():
     cur.close()
     conn.close()
 
+    # =========================
+    # RENDER
+    # =========================
     return render_template(
         "war_room.html",
         stations=stations,
@@ -2203,6 +2221,8 @@ def war_room():
         danger_zones=danger_zones,
         fake_wins=fake_wins,
         blind_spots=blind_spots,
+        weak_structures=weak_structures,
+        high_value_targets=high_value_targets,
         silent_stations=silent_stations
     )
 
