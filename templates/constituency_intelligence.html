@@ -4,27 +4,9 @@
 
 {% block content %}
 
-<h2 style="margin-bottom:15px;">📊 Constituency Intelligence</h2>
-
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<h2 style="margin-bottom:15px;">📊 Constituency Intelligence (DEBUG MODE)</h2>
 
 <style>
-.grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 15px;
-    margin-bottom: 20px;
-}
-
-.kpi {
-    background: white;
-    padding: 15px;
-    border-radius: 10px;
-    text-align: center;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
-
 .controls {
     padding: 10px;
     background: #f0f5f0;
@@ -34,18 +16,10 @@
     margin-bottom: 15px;
 }
 
-input {
-    padding: 8px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
-}
-
 table {
     width: 100%;
     border-collapse: collapse;
     background: white;
-    border-radius: 10px;
-    overflow: hidden;
 }
 
 th, td {
@@ -58,42 +32,23 @@ th {
     color: white;
 }
 
-tr:hover {
-    background: #f3f7f3;
-    cursor: pointer;
-}
-
-.WIN { color: green; font-weight: bold; }
-.LOSE { color: red; font-weight: bold; }
-.TOSS-UP { color: orange; font-weight: bold; }
-
-.danger {
-    background: rgba(255,0,0,0.1);
-}
-
-.chart-box {
+.kpi {
     background: white;
-    padding: 15px;
-    border-radius: 10px;
-    margin-bottom: 20px;
+    padding: 10px;
+    margin-bottom: 10px;
 }
 </style>
 
-<!-- KPI -->
-<div class="grid" id="kpis"></div>
-
-<!-- Chart -->
-<div class="chart-box">
-    <canvas id="statusChart"></canvas>
-</div>
-
-<!-- Filters -->
+<!-- FILTERS -->
 <div class="controls">
     <input type="text" id="search" placeholder="Search constituency...">
     <input type="text" id="provinceFilter" placeholder="Filter province...">
 </div>
 
-<!-- Table -->
+<!-- KPI -->
+<div id="kpis"></div>
+
+<!-- TABLE -->
 <table>
     <thead>
         <tr>
@@ -101,7 +56,7 @@ tr:hover {
             <th>Province</th>
             <th>Members</th>
             <th>Voters</th>
-            <th>Penetration %</th>
+            <th>Penetration</th>
             <th>Margin</th>
             <th>Status</th>
         </tr>
@@ -112,120 +67,99 @@ tr:hover {
 <script>
 document.addEventListener("DOMContentLoaded", function(){
 
+console.log("🔥 SCRIPT LOADED")
+
 let allData = []
-let chart
 
 async function loadData() {
     try {
+        console.log("🚀 FETCHING DATA...")
+
         let res = await fetch("/api/constituency_intelligence")
         let data = await res.json()
-        console.log("DATA:", data)
+
+        console.log("✅ DATA RECEIVED:", data)
+
         allData = data
         render()
+
     } catch (e) {
-        console.error("LOAD ERROR:", e)
+        console.error("❌ LOAD ERROR:", e)
     }
 }
 
 function render() {
 
+    console.log("🧠 RENDER STARTED")
+
     let tbody = document.getElementById("table-body")
     let kpis = document.getElementById("kpis")
-    let searchEl = document.getElementById("search")
-    let provinceEl = document.getElementById("provinceFilter")
 
-    if (!tbody || !kpis || !searchEl || !provinceEl) {
-        console.error("DOM NOT READY")
+    console.log("TBODY:", tbody)
+    console.log("KPIS:", kpis)
+    console.log("DATA LENGTH:", allData.length)
+
+    if (!tbody || !kpis) {
+        console.error("❌ DOM ELEMENTS MISSING")
         return
     }
 
-    let search = (searchEl.value || "").toLowerCase()
-    let provinceFilter = (provinceEl.value || "").toLowerCase()
-
-    let win = 0, lose = 0, toss = 0
-    let totalMembers = 0
     let html = ""
 
-    allData.forEach(c => {
+    allData.forEach((c, index) => {
 
-        let constituency = (c.constituency || "").toLowerCase()
-        let province = (c.province || "").toLowerCase()
+        console.log("ROW", index, c)
 
-        totalMembers += c.members || 0
+        try {
 
-        if (
-            !constituency.includes(search) &&
-            !province.includes(search)
-        ) return
+            let constituency = c.constituency || "N/A"
+            let province = c.province || "N/A"
 
-        if (provinceFilter && !province.includes(provinceFilter)) return
+            html += `
+                <tr>
+                    <td>${constituency}</td>
+                    <td>${province}</td>
+                    <td>${c.members}</td>
+                    <td>${c.voters}</td>
+                    <td>${c.penetration}</td>
+                    <td>${c.margin}</td>
+                    <td>${c.status}</td>
+                </tr>
+            `
 
-        if (c.status === "WIN") win++
-        else if (c.status === "LOSE") lose++
-        else toss++
+        } catch (err) {
+            console.error("❌ ROW ERROR:", err, c)
+        }
 
-        let danger = (c.status === "LOSE" && c.margin < -500) ? "danger" : ""
-
-        html += `
-            <tr class="${danger}" onclick="drill('${c.constituency}')">
-                <td>${c.constituency}</td>
-                <td>${c.province}</td>
-                <td>${c.members}</td>
-                <td>${c.voters}</td>
-                <td>${c.penetration}%</td>
-                <td>${c.margin}</td>
-                <td class="${c.status}">${c.status}</td>
-            </tr>
-        `
     })
 
     tbody.innerHTML = html
 
     kpis.innerHTML = `
-        <div class="kpi"><h4>WIN</h4><h2>${win}</h2></div>
-        <div class="kpi"><h4>TOSS-UP</h4><h2>${toss}</h2></div>
-        <div class="kpi"><h4>LOSE</h4><h2>${lose}</h2></div>
-        <div class="kpi"><h4>MEMBERS</h4><h2>${totalMembers}</h2></div>
+        <div class="kpi">Loaded Rows: ${allData.length}</div>
     `
 
-    let canvas = document.getElementById("statusChart")
-
-    if (!canvas || typeof Chart === "undefined") {
-        console.warn("Chart not ready")
-        return
-    }
-
-    let ctx = canvas.getContext("2d")
-
-    if (chart) chart.destroy()
-
-    chart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: ['WIN', 'TOSS-UP', 'LOSE'],
-            datasets: [{
-                data: [win, toss, lose]
-            }]
-        }
-    })
+    console.log("✅ RENDER COMPLETE")
 }
 
-/* ✅ SAFE EVENT BINDING */
+/* safe event binding */
 setTimeout(() => {
     let s = document.getElementById("search")
     let p = document.getElementById("provinceFilter")
 
-    if (s) s.addEventListener("input", render)
-    if (p) p.addEventListener("input", render)
+    if (s) {
+        console.log("✔ search input found")
+        s.addEventListener("input", render)
+    }
+
+    if (p) {
+        console.log("✔ province input found")
+        p.addEventListener("input", render)
+    }
+
 }, 100)
 
-/* refresh */
-setInterval(loadData, 5000)
-
-function drill(name){
-    window.location.href = "/polling_intelligence?constituency=" + name
-}
-
+/* start */
 loadData()
 
 })
