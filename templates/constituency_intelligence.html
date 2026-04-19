@@ -6,8 +6,33 @@
 
 <h2 style="margin-bottom:15px;">📊 Constituency Intelligence</h2>
 
+<!-- ===== CHART LIBRARY ===== -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <style>
-/* page-specific styles only */
+
+/* ===== LAYOUT ===== */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+/* KPI cards */
+.kpi {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.kpi h3 {
+    margin: 5px 0;
+}
+
+/* controls */
 .controls {
     padding: 10px;
     background: #f0f5f0;
@@ -23,6 +48,7 @@ input {
     border: 1px solid #ccc;
 }
 
+/* table */
 table {
     width: 100%;
     border-collapse: collapse;
@@ -46,6 +72,7 @@ tr:hover {
     cursor: pointer;
 }
 
+/* status colors */
 .WIN { color: green; font-weight: bold; }
 .LOSE { color: red; font-weight: bold; }
 .TOSS-UP { color: orange; font-weight: bold; }
@@ -54,32 +81,30 @@ tr:hover {
     background: rgba(255,0,0,0.1);
 }
 
-.cards {
-    margin-bottom: 15px;
+.chart-box {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
 }
 
-.card-mini {
-    display: inline-block;
-    margin-right: 10px;
-    padding: 12px;
-    background: white;
-    border-radius: 8px;
-    min-width: 120px;
-    text-align: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
 </style>
 
-<!-- FILTERS -->
+<!-- ===== KPI SUMMARY ===== -->
+<div class="grid" id="kpis"></div>
+
+<!-- ===== CHART ===== -->
+<div class="chart-box">
+    <canvas id="statusChart"></canvas>
+</div>
+
+<!-- ===== FILTERS ===== -->
 <div class="controls">
     <input type="text" id="search" placeholder="Search constituency...">
     <input type="text" id="provinceFilter" placeholder="Filter province...">
 </div>
 
-<!-- SUMMARY -->
-<div class="cards" id="summary"></div>
-
-<!-- TABLE -->
+<!-- ===== TABLE ===== -->
 <table>
     <thead>
         <tr>
@@ -98,27 +123,25 @@ tr:hover {
 <script>
 
 let allData = []
+let chart
 
 async function loadData() {
-    try {
-        let res = await fetch("/api/constituency_intelligence")
-        let data = await res.json()
-        allData = data
-        renderTable()
-    } catch (e) {
-        console.error("Failed to load data", e)
-    }
+    let res = await fetch("/api/constituency_intelligence")
+    let data = await res.json()
+    allData = data
+    render()
 }
 
-function renderTable() {
+function render() {
 
     let tbody = document.getElementById("table-body")
-    let summary = document.getElementById("summary")
+    let kpis = document.getElementById("kpis")
 
     let search = document.getElementById("search").value.toLowerCase()
     let provinceFilter = document.getElementById("provinceFilter").value.toLowerCase()
 
     let win = 0, lose = 0, toss = 0
+    let totalMembers = 0
     let html = ""
 
     allData.forEach(c => {
@@ -129,6 +152,8 @@ function renderTable() {
         ) return
 
         if (provinceFilter && !c.province.toLowerCase().includes(provinceFilter)) return
+
+        totalMembers += c.members
 
         if (c.status === "WIN") win++
         else if (c.status === "LOSE") lose++
@@ -151,27 +176,41 @@ function renderTable() {
 
     tbody.innerHTML = html
 
-    summary.innerHTML = `
-        <div class="card-mini">WIN<br><b>${win}</b></div>
-        <div class="card-mini">TOSS-UP<br><b>${toss}</b></div>
-        <div class="card-mini">LOSE<br><b>${lose}</b></div>
-        <div class="card-mini">TOTAL<br><b>${win + lose + toss}</b></div>
+    // ===== KPI CARDS =====
+    kpis.innerHTML = `
+        <div class="kpi"><h4>WIN</h4><h2>${win}</h2></div>
+        <div class="kpi"><h4>TOSS-UP</h4><h2>${toss}</h2></div>
+        <div class="kpi"><h4>LOSE</h4><h2>${lose}</h2></div>
+        <div class="kpi"><h4>MEMBERS</h4><h2>${totalMembers}</h2></div>
     `
+
+    // ===== CHART =====
+    let ctx = document.getElementById("statusChart").getContext("2d")
+
+    if (chart) chart.destroy()
+
+    chart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['WIN', 'TOSS-UP', 'LOSE'],
+            datasets: [{
+                data: [win, toss, lose]
+            }]
+        }
+    })
 }
 
 // filters
-document.getElementById("search").addEventListener("input", renderTable)
-document.getElementById("provinceFilter").addEventListener("input", renderTable)
+document.getElementById("search").addEventListener("input", render)
+document.getElementById("provinceFilter").addEventListener("input", render)
 
-// auto refresh
+// refresh
 setInterval(loadData, 5000)
 
-// drilldown
 function drill(name){
     window.location.href = "/polling_intelligence?constituency=" + name
 }
 
-// initial load
 loadData()
 
 </script>
