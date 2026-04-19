@@ -6,7 +6,7 @@
 
 <h2 style="margin-bottom:15px;">📊 Constituency Intelligence</h2>
 
-<!-- ✅ CHART.JS MUST COME FIRST -->
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
@@ -82,18 +82,18 @@ tr:hover {
 <!-- KPI -->
 <div class="grid" id="kpis"></div>
 
-<!-- CHART -->
+<!-- Chart -->
 <div class="chart-box">
     <canvas id="statusChart"></canvas>
 </div>
 
-<!-- FILTERS -->
+<!-- Filters -->
 <div class="controls">
     <input type="text" id="search" placeholder="Search constituency...">
     <input type="text" id="provinceFilter" placeholder="Filter province...">
 </div>
 
-<!-- TABLE -->
+<!-- Table -->
 <table>
     <thead>
         <tr>
@@ -109,7 +109,6 @@ tr:hover {
     <tbody id="table-body"></tbody>
 </table>
 
-<!-- ✅ YOUR SCRIPT (PLACED LAST INSIDE BLOCK CONTENT) -->
 <script>
 document.addEventListener("DOMContentLoaded", function(){
 
@@ -140,8 +139,8 @@ function render() {
         return
     }
 
-    let search = searchEl.value.toLowerCase()
-    let provinceFilter = provinceEl.value.toLowerCase()
+    let search = (searchEl.value || "").toLowerCase()
+    let provinceFilter = (provinceEl.value || "").toLowerCase()
 
     let win = 0, lose = 0, toss = 0
     let totalMembers = 0
@@ -149,16 +148,17 @@ function render() {
 
     allData.forEach(c => {
 
-        if (!c.constituency || !c.province) return
+        let constituency = (c.constituency || "").toLowerCase()
+        let province = (c.province || "").toLowerCase()
 
         totalMembers += c.members || 0
 
         if (
-            !c.constituency.toLowerCase().includes(search) &&
-            !c.province.toLowerCase().includes(search)
+            !constituency.includes(search) &&
+            !province.includes(search)
         ) return
 
-        if (provinceFilter && !c.province.toLowerCase().includes(provinceFilter)) return
+        if (provinceFilter && !province.includes(provinceFilter)) return
 
         if (c.status === "WIN") win++
         else if (c.status === "LOSE") lose++
@@ -210,9 +210,16 @@ function render() {
     })
 }
 
-document.getElementById("search").addEventListener("input", render)
-document.getElementById("provinceFilter").addEventListener("input", render)
+/* ✅ SAFE EVENT BINDING */
+setTimeout(() => {
+    let s = document.getElementById("search")
+    let p = document.getElementById("provinceFilter")
 
+    if (s) s.addEventListener("input", render)
+    if (p) p.addEventListener("input", render)
+}, 100)
+
+/* refresh */
 setInterval(loadData, 5000)
 
 function drill(name){
