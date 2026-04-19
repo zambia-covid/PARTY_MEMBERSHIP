@@ -7,6 +7,236 @@
 <h2 style="margin-bottom:15px;">📊 Constituency Intelligence</h2>
 
 <style>
+
+/* ===== CONTROLS ===== */
+.controls {
+    padding: 10px;
+    background: #f0f5f0;
+    display: flex;
+    gap: 10px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+input {
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+/* ===== SUMMARY CARDS ===== */
+.cards {
+    margin-bottom: 15px;
+}
+
+.card-mini {
+    display: inline-block;
+    margin-right: 10px;
+    padding: 12px;
+    background: white;
+    border-radius: 8px;
+    min-width: 120px;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* ===== TABLE FIX ===== */
+.table-container {
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    table-layout: fixed; /* 🔥 fixes alignment */
+}
+
+th, td {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    text-align: left;
+    word-wrap: break-word;
+}
+
+th {
+    background: #0B5D1E;
+    color: white;
+}
+
+/* numeric alignment */
+td:nth-child(3),
+td:nth-child(4),
+td:nth-child(5),
+td:nth-child(6) {
+    text-align: right;
+}
+
+tr:hover {
+    background: #f3f7f3;
+    cursor: pointer;
+}
+
+/* status colors */
+.WIN { color: green; font-weight: bold; }
+.LOSE { color: red; font-weight: bold; }
+.TOSS-UP { color: orange; font-weight: bold; }
+
+.danger {
+    background: rgba(255,0,0,0.1);
+}
+
+</style>
+
+<!-- FILTERS -->
+<div class="controls">
+    <input type="text" id="search" placeholder="Search constituency...">
+    <input type="text" id="provinceFilter" placeholder="Filter province...">
+</div>
+
+<!-- SUMMARY -->
+<div class="cards" id="summary"></div>
+
+<!-- TABLE -->
+<div class="table-container">
+<table>
+    <colgroup>
+        <col style="width:18%">
+        <col style="width:15%">
+        <col style="width:12%">
+        <col style="width:12%">
+        <col style="width:13%">
+        <col style="width:12%">
+        <col style="width:10%">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>Constituency</th>
+            <th>Province</th>
+            <th>Members</th>
+            <th>Voters</th>
+            <th>Penetration %</th>
+            <th>Margin</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody id="table-body"></tbody>
+</table>
+</div>
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function(){
+
+let allData = []
+
+async function loadData() {
+    try {
+        let res = await fetch("/api/constituency_intelligence")
+        let data = await res.json()
+
+        console.log("DATA:", data)
+
+        allData = data
+        renderTable()
+
+    } catch (e) {
+        console.error("LOAD ERROR:", e)
+    }
+}
+
+function renderTable() {
+
+    let tbody = document.getElementById("table-body")
+    let summary = document.getElementById("summary")
+
+    if (!tbody || !summary) {
+        console.error("DOM elements missing")
+        return
+    }
+
+    let search = (document.getElementById("search").value || "").toLowerCase()
+    let provinceFilter = (document.getElementById("provinceFilter").value || "").toLowerCase()
+
+    let win = 0, lose = 0, toss = 0
+    let html = ""
+
+    allData.forEach(c => {
+
+        let constituency = (c.constituency || "").toLowerCase()
+        let province = (c.province || "").toLowerCase()
+
+        if (
+            !constituency.includes(search) &&
+            !province.includes(search)
+        ) return
+
+        if (provinceFilter && !province.includes(provinceFilter)) return
+
+        if (c.status === "WIN") win++
+        else if (c.status === "LOSE") lose++
+        else toss++
+
+        let danger = (c.status === "LOSE" && c.margin < -500) ? "danger" : ""
+
+        html += `
+            <tr class="${danger}" onclick="drill('${c.constituency}')">
+                <td>${c.constituency}</td>
+                <td>${c.province}</td>
+                <td>${c.members}</td>
+                <td>${c.voters}</td>
+                <td>${c.penetration}%</td>
+                <td>${c.margin}</td>
+                <td class="${c.status}">${c.status}</td>
+            </tr>
+        `
+    })
+
+    tbody.innerHTML = html
+
+    summary.innerHTML = `
+        <div class="card-mini">WIN<br><b>${win}</b></div>
+        <div class="card-mini">TOSS-UP<br><b>${toss}</b></div>
+        <div class="card-mini">LOSE<br><b>${lose}</b></div>
+        <div class="card-mini">TOTAL<br><b>${win + lose + toss}</b></div>
+    `
+}
+
+/* safe event binding */
+setTimeout(() => {
+    let s = document.getElementById("search")
+    let p = document.getElementById("provinceFilter")
+
+    if (s) s.addEventListener("input", renderTable)
+    if (p) p.addEventListener("input", renderTable)
+}, 100)
+
+/* auto refresh */
+setInterval(loadData, 5000)
+
+/* drilldown */
+function drill(name){
+    window.location.href = "/polling_intelligence?constituency=" + name
+}
+
+/* initial load */
+loadData()
+
+})
+
+</script>
+
+{% endblock %}{% extends "base.html" %}
+
+{% block title %}Constituency Intelligence{% endblock %}
+
+{% block content %}
+
+<h2 style="margin-bottom:15px;">📊 Constituency Intelligence</h2>
+
+<style>
 /* page-specific styles only */
 .controls {
     padding: 10px;
