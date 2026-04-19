@@ -59,18 +59,25 @@ def build_polling_intelligence(cur):
         SELECT 
             cs.constituency,
             cs.province,
+
             COUNT(DISTINCT m.membership_id) AS members,
             cs.total_voters,
             cs.total_polling_stations,
+
             COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
             COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes,
+
             COUNT(DISTINCT r.polling_station) AS reporting_stations
+
         FROM constituency_stats cs
+
         LEFT JOIN members m
             ON m.constituency = cs.constituency
             AND m.status = 'Active'
+
         LEFT JOIN polling_station_results r
             ON r.constituency = cs.constituency
+
         GROUP BY 
             cs.constituency,
             cs.province,
@@ -93,11 +100,68 @@ def build_polling_intelligence(cur):
             reporting_stations
         ) = r
 
+        # =========================
+        # CORE METRICS
+        # =========================
         penetration = (members / voters * 100) if voters else 0
         margin = pf_votes - upnd_votes
+        turnout = pf_votes + upnd_votes
         coverage = (reporting_stations / total_stations * 100) if total_stations else 0
 
-        # classification
+        # =========================
+        # BASELINE INTELLIGENCE
+        # =========================
+
+        # voter importance
+        if voters >= 80000:
+            voter_weight = "HIGH VALUE"
+        elif voters >= 40000:
+            voter_weight = "MEDIUM VALUE"
+        else:
+            voter_weight = "LOW VALUE"
+
+        # visibility
+        if coverage < 40:
+            visibility = "BLIND"
+        elif coverage < 70:
+            visibility = "PARTIAL"
+        else:
+            visibility = "FULL"
+
+        # =========================
+        # ADVANCED INTELLIGENCE
+        # =========================
+
+        # win classification
+        if margin > 0 and coverage >= 70:
+            win_type = "REAL WIN"
+        elif margin > 0:
+            win_type = "FAKE WIN"
+        else:
+            win_type = "NOT WINNING"
+
+        # structure strength
+        if penetration >= 40:
+            structure = "STRONG BASE"
+        elif penetration < 25:
+            structure = "WEAK BASE"
+        else:
+            structure = "AVERAGE BASE"
+
+        # risk detection
+        if coverage < 40 and voters > 50000:
+            risk = "CRITICAL BLIND SPOT"
+        elif margin < 0 and penetration < 30:
+            risk = "LOSING GROUND"
+        elif margin > 0 and coverage < 50:
+            risk = "UNSTABLE LEAD"
+        else:
+            risk = "STABLE"
+
+        # =========================
+        # FINAL STATUS
+        # =========================
+
         if margin > 0 and penetration >= 40 and coverage >= 70:
             status = "SECURE"
         elif margin < 0 and penetration < 30:
@@ -105,22 +169,83 @@ def build_polling_intelligence(cur):
         else:
             status = "BATTLEGROUND"
 
-        # fake win detection
+        # =========================
+        # ACTION ENGINE
+        # =========================
+
+        if coverage < 50:
+            action = "DEPLOY REPORTING TEAMS"
+        elif margin < 0 and penetration < 30:
+            action = "REBUILD STRUCTURE"
+        elif margin < 0:
+            action = "RECOVER VOTES"
+        elif coverage < 70:
+            action = "VERIFY LEAD"
+        else:
+            action = "MAINTAIN CONTROL"
+
+        # =========================
+        # CRITICAL FLAGS
+        # =========================
+
         fake_win = (margin > 0 and coverage < 70)
+        blind_zone = (coverage < 40 and voters > 50000)
+        weak_structure = (penetration < 25 and voters > 50000)
+
+        # =========================
+        # PRIORITY SCORE
+        # =========================
+
+        priority = 0
+
+        if status == "COLLAPSE":
+            priority += 3
+        if blind_zone:
+            priority += 3
+        if fake_win:
+            priority += 2
+        if coverage < 50:
+            priority += 2
+
+        # =========================
+        # FINAL OBJECT
+        # =========================
 
         stations.append({
             "constituency": constituency,
             "province": province,
+
             "members": members,
             "voters": voters,
+            "total_stations": total_stations,
+            "reporting_stations": reporting_stations,
+
+            "coverage": round(coverage, 2),
+            "penetration": round(penetration, 2),
+
             "pf_votes": pf_votes,
             "upnd_votes": upnd_votes,
             "margin": margin,
-            "penetration": round(penetration, 2),
-            "coverage": round(coverage, 2),
+            "turnout": turnout,
+
             "status": status,
-            "fake_win": fake_win
+            "win_type": win_type,
+            "structure": structure,
+            "risk": risk,
+            "action": action,
+
+            "voter_weight": voter_weight,
+            "visibility": visibility,
+
+            "fake_win": fake_win,
+            "blind_zone": blind_zone,
+            "weak_structure": weak_structure,
+
+            "priority": priority
         })
+
+    # 🔥 MOST IMPORTANT FIRST
+    stations.sort(key=lambda x: x["priority"], reverse=True)
 
     return stations
 
