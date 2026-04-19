@@ -6,12 +6,10 @@
 
 <h2 style="margin-bottom:15px;">📊 Constituency Intelligence</h2>
 
-<!-- ===== CHART LIBRARY ===== -->
+<!-- ✅ CHART.JS MUST COME FIRST -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-
-/* ===== LAYOUT ===== */
 .grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -19,7 +17,6 @@
     margin-bottom: 20px;
 }
 
-/* KPI cards */
 .kpi {
     background: white;
     padding: 15px;
@@ -28,11 +25,6 @@
     box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
-.kpi h3 {
-    margin: 5px 0;
-}
-
-/* controls */
 .controls {
     padding: 10px;
     background: #f0f5f0;
@@ -48,7 +40,6 @@ input {
     border: 1px solid #ccc;
 }
 
-/* table */
 table {
     width: 100%;
     border-collapse: collapse;
@@ -72,7 +63,6 @@ tr:hover {
     cursor: pointer;
 }
 
-/* status colors */
 .WIN { color: green; font-weight: bold; }
 .LOSE { color: red; font-weight: bold; }
 .TOSS-UP { color: orange; font-weight: bold; }
@@ -87,24 +77,23 @@ tr:hover {
     border-radius: 10px;
     margin-bottom: 20px;
 }
-
 </style>
 
-<!-- ===== KPI SUMMARY ===== -->
+<!-- KPI -->
 <div class="grid" id="kpis"></div>
 
-<!-- ===== CHART ===== -->
+<!-- CHART -->
 <div class="chart-box">
     <canvas id="statusChart"></canvas>
 </div>
 
-<!-- ===== FILTERS ===== -->
+<!-- FILTERS -->
 <div class="controls">
     <input type="text" id="search" placeholder="Search constituency...">
     <input type="text" id="provinceFilter" placeholder="Filter province...">
 </div>
 
-<!-- ===== TABLE ===== -->
+<!-- TABLE -->
 <table>
     <thead>
         <tr>
@@ -120,25 +109,39 @@ tr:hover {
     <tbody id="table-body"></tbody>
 </table>
 
+<!-- ✅ YOUR SCRIPT (PLACED LAST INSIDE BLOCK CONTENT) -->
 <script>
+document.addEventListener("DOMContentLoaded", function(){
 
 let allData = []
 let chart
 
 async function loadData() {
-    let res = await fetch("/api/constituency_intelligence")
-    let data = await res.json()
-    allData = data
-    render()
+    try {
+        let res = await fetch("/api/constituency_intelligence")
+        let data = await res.json()
+        console.log("DATA:", data)
+        allData = data
+        render()
+    } catch (e) {
+        console.error("LOAD ERROR:", e)
+    }
 }
 
 function render() {
 
     let tbody = document.getElementById("table-body")
     let kpis = document.getElementById("kpis")
+    let searchEl = document.getElementById("search")
+    let provinceEl = document.getElementById("provinceFilter")
 
-    let search = document.getElementById("search").value.toLowerCase()
-    let provinceFilter = document.getElementById("provinceFilter").value.toLowerCase()
+    if (!tbody || !kpis || !searchEl || !provinceEl) {
+        console.error("DOM NOT READY")
+        return
+    }
+
+    let search = searchEl.value.toLowerCase()
+    let provinceFilter = provinceEl.value.toLowerCase()
 
     let win = 0, lose = 0, toss = 0
     let totalMembers = 0
@@ -146,14 +149,16 @@ function render() {
 
     allData.forEach(c => {
 
+        if (!c.constituency || !c.province) return
+
+        totalMembers += c.members || 0
+
         if (
             !c.constituency.toLowerCase().includes(search) &&
             !c.province.toLowerCase().includes(search)
         ) return
 
         if (provinceFilter && !c.province.toLowerCase().includes(provinceFilter)) return
-
-        totalMembers += c.members
 
         if (c.status === "WIN") win++
         else if (c.status === "LOSE") lose++
@@ -176,7 +181,6 @@ function render() {
 
     tbody.innerHTML = html
 
-    // ===== KPI CARDS =====
     kpis.innerHTML = `
         <div class="kpi"><h4>WIN</h4><h2>${win}</h2></div>
         <div class="kpi"><h4>TOSS-UP</h4><h2>${toss}</h2></div>
@@ -184,8 +188,14 @@ function render() {
         <div class="kpi"><h4>MEMBERS</h4><h2>${totalMembers}</h2></div>
     `
 
-    // ===== CHART =====
-    let ctx = document.getElementById("statusChart").getContext("2d")
+    let canvas = document.getElementById("statusChart")
+
+    if (!canvas || typeof Chart === "undefined") {
+        console.warn("Chart not ready")
+        return
+    }
+
+    let ctx = canvas.getContext("2d")
 
     if (chart) chart.destroy()
 
@@ -200,11 +210,9 @@ function render() {
     })
 }
 
-// filters
 document.getElementById("search").addEventListener("input", render)
 document.getElementById("provinceFilter").addEventListener("input", render)
 
-// refresh
 setInterval(loadData, 5000)
 
 function drill(name){
@@ -213,6 +221,7 @@ function drill(name){
 
 loadData()
 
+})
 </script>
 
 {% endblock %}
