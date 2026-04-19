@@ -1943,67 +1943,77 @@ def war_room():
     cur = conn.cursor()
 
     # ==============================
-    # CONSTITUENCY STATUS
+    # 1. BATTLEGROUND (CORE INTEL)
     # ==============================
     cur.execute("""
-    SELECT 
-        cs.constituency,
-        cs.province,
+        SELECT 
+            cs.constituency,
+            cs.province,
+            COUNT(DISTINCT m.membership_id) AS members,
+            cs.total_voters,
+            COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+            COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+        FROM constituency_stats cs
+        LEFT JOIN members m
+            ON m.constituency = cs.constituency
+            AND m.status = 'Active'
+        LEFT JOIN polling_station_results r
+            ON r.constituency = cs.constituency
+        GROUP BY cs.constituency, cs.province, cs.total_voters
+    """)
 
-        -- MEMBERS
-        COUNT(DISTINCT m.membership_id) AS members,
-
-        -- NATIONAL BASELINE
-        cs.total_voters,
-        cs.total_polling_stations,
-
-        -- REAL VOTES
-        COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
-        COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
-
-    FROM constituency_stats cs
-
-    LEFT JOIN members m
-        ON m.constituency = cs.constituency
-        AND m.status = 'Active'
-
-    LEFT JOIN polling_station_results r
-        ON r.constituency = cs.constituency
-
-    GROUP BY cs.constituency, cs.province, cs.total_voters, cs.total_polling_stations
-""")
+    rows = cur.fetchall()
 
     battleground = []
-    for c, pf, upnd in cur.fetchall():
+    win = lose = toss = 0
 
-        if pf > upnd:
+    for row in rows:
+        constituency, province, members, voters, pf, upnd = row
+
+        margin = pf - upnd
+
+        # smarter status logic
+        if margin > 0 and members > 0:
             status = "WIN"
-        elif pf < upnd:
+            win += 1
+        elif margin < 0:
             status = "LOSE"
+            lose += 1
         else:
-            status = "TIE"
+            status = "TOSS-UP"
+            toss += 1
 
-        battleground.append((c, pf, upnd, status))
+        battleground.append({
+            "constituency": constituency,
+            "province": province,
+            "members": members,
+            "voters": voters,
+            "pf": pf,
+            "upnd": upnd,
+            "margin": margin,
+            "status": status
+        })
 
     # ==============================
-    # SILENT STATIONS
+    # 2. SILENT STATIONS
     # ==============================
     cur.execute("""
         SELECT a.polling_station
         FROM agents a
         LEFT JOIN polling_station_results r
-        ON a.polling_station = r.polling_station
+            ON a.polling_station = r.polling_station
         WHERE r.id IS NULL
     """)
 
-    silent_stations = [row[0] for row in cur.fetchall()]
+    silent_stations = [r[0] for r in cur.fetchall()]
 
     # ==============================
-    # TOP ALERT ZONES (LOSING BADLY)
+    # 3. DANGER ZONES (HIGH RISK)
     # ==============================
     cur.execute("""
-        SELECT constituency,
-               SUM(upnd_votes - pf_votes) as gap
+        SELECT 
+            constituency,
+            SUM(upnd_votes - pf_votes) AS gap
         FROM polling_station_results
         GROUP BY constituency
         HAVING SUM(upnd_votes) > SUM(pf_votes)
@@ -2013,14 +2023,27 @@ def war_room():
 
     danger_zones = cur.fetchall()
 
+    # ==============================
+    # 4. SUMMARY (CRITICAL)
+    # ==============================
+    summary = {
+        "win": win,
+        "lose": lose,
+        "toss": toss
+    }
+
     cur.close()
     conn.close()
 
+    # ==============================
+    # 5. RENDER
+    # ==============================
     return render_template(
         "war_room.html",
         battleground=battleground,
         silent_stations=silent_stations,
-        danger_zones=danger_zones
+        danger_zones=danger_zones,
+        summary=summary
     )
 
 # ==============================
