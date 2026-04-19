@@ -1,138 +1,150 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% extends "base.html" %}
 
-<title>Command Dashboard</title>
+{% block title %}Dashboard | PF Command{% endblock %}
 
-<style>
+{% block content %}
 
-/* ===== GLOBAL ===== */
-body{
-    margin:0;
-    font-family: Arial, sans-serif;
-    background:#f4f6f9;
-}
+<h2 style="margin-bottom:20px;">National Command Dashboard</h2>
 
-/* ===== SIDEBAR ===== */
-.sidebar {
-    width: 260px;
-    height: 100vh;
-    position: fixed;
-    background: #0B5D1E;
-    color: white;
-    display: flex;
-    flex-direction: column;
-    padding-top: 10px;
-}
-
-.logo {
-    font-size: 20px;
-    font-weight: bold;
-    padding: 15px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.2);
-}
-
-.menu-section {
-    font-size: 11px;
-    opacity: 0.7;
-    padding: 15px 20px 5px;
-    letter-spacing: 1px;
-}
-
-.sidebar a {
-    color: white;
-    text-decoration: none;
-    padding: 12px 20px;
-    display: block;
-    transition: 0.2s;
-}
-
-.sidebar a:hover {
-    background: #083D14;
-    padding-left: 25px;
-}
-
-.logout {
-    color: #ffcccc;
-}
-
-/* ===== MAIN CONTENT ===== */
-.main {
-    margin-left: 260px; /* 🔴 critical */
-    padding: 20px;
-}
-
-/* cards */
-.card{
-    background:white;
-    padding:20px;
-    margin-bottom:20px;
-    border-radius:10px;
-    box-shadow:0 2px 6px rgba(0,0,0,0.1);
-}
-
-</style>
-</head>
-
-<body>
-
-<!-- ===== SIDEBAR ===== -->
-<div class="sidebar">
-
-    <div class="logo">PF COMMAND</div>
-
-    <div class="menu-section">CORE</div>
-    <a href="/">Dashboard</a>
-    <a href="/war_room">War Room</a>
-    <a href="/live_stats">Live Stats</a>
-
-    <div class="menu-section">INTELLIGENCE</div>
-    <a href="/polling_intelligence">Polling Intelligence</a>
-    <a href="/constituency_intelligence">Constituency Intel</a>
-    <a href="/analytics">Analytics</a>
-    <a href="/ai_insights">AI Insights</a>
-
-    <div class="menu-section">FIELD OPS</div>
-    <a href="/agents">Agents</a>
-    <a href="/agent_results">Agent Results</a>
-    <a href="/voter_tabulation">Vote Tabulation</a>
-
-    <div class="menu-section">INCIDENTS</div>
-    <a href="/incidents">Incident Feed</a>
-    <a href="/report_incident">Report Incident</a>
-    <a href="/request_help">Request Help</a>
-
-    <div class="menu-section">MEMBERS</div>
-    <a href="/members?key={{config.ADMIN_KEY}}">Members</a>
-    <a href="/register">Register</a>
-
-    <div class="menu-section">AI</div>
-    <a href="/ai">AI Command</a>
-
-    <div class="menu-section">SYSTEM</div>
-    <a href="/logout" class="logout">Logout</a>
-
-</div>
-
-<!-- ===== MAIN CONTENT ===== -->
-<div class="main">
+<!-- ===== TOP METRICS ===== -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:15px;">
 
     <div class="card">
-        <h2>Dashboard Overview</h2>
-        <p>Total Members: {{ total_members }}</p>
-        <p>PF Votes: {{ pf_total }}</p>
-        <p>UPND Votes: {{ upnd_total }}</p>
-        <p>Status: <strong>{{ status }}</strong></p>
+        <h4>Total Members</h4>
+        <h2>{{ total_members }}</h2>
     </div>
 
     <div class="card">
-        <h3>Coverage</h3>
-        <p>{{ coverage }}% reporting</p>
+        <h4>PF Votes</h4>
+        <h2>{{ pf_total }}</h2>
+    </div>
+
+    <div class="card">
+        <h4>UPND Votes</h4>
+        <h2>{{ upnd_total }}</h2>
+    </div>
+
+    <div class="card">
+        <h4>Status</h4>
+        <h2 style="color:
+            {% if status == 'WINNING' %}green
+            {% elif status == 'LOSING' %}red
+            {% else %}orange
+            {% endif %}
+        ">
+            {{ status }}
+        </h2>
     </div>
 
 </div>
 
-</body>
-</html>
+<!-- ===== STRATEGIC METRICS ===== -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px;margin-top:20px;">
+
+    <div class="card">
+        <h4>Coverage</h4>
+        <p><strong>{{ coverage }}%</strong></p>
+        <small>{{ reporting_stations }} / {{ total_stations }} stations reporting</small>
+    </div>
+
+    <div class="card">
+        <h4>Expected Votes</h4>
+        <p>{{ expected_votes }}</p>
+    </div>
+
+    <div class="card">
+        <h4>Vote Gap</h4>
+        <p>{{ vote_gap }}</p>
+    </div>
+
+    <div class="card">
+        <h4>Distance to Majority</h4>
+        <p>{{ distance_to_majority }}</p>
+    </div>
+
+</div>
+
+<!-- ===== NATIONAL POWER ===== -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px;margin-top:20px;">
+
+    <div class="card">
+        <h4>Total Voters</h4>
+        <p>{{ total_voters }}</p>
+    </div>
+
+    <div class="card">
+        <h4>Polling Stations</h4>
+        <p>{{ national_stations }}</p>
+    </div>
+
+    <div class="card">
+        <h4>Turnout Efficiency</h4>
+        <p>{{ turnout_efficiency }}%</p>
+    </div>
+
+</div>
+
+<!-- ===== RECENT RESULTS ===== -->
+<div class="card" style="margin-top:20px;">
+    <h3>Recent Results</h3>
+
+    <table style="width:100%;border-collapse:collapse;margin-top:10px;">
+        <thead>
+            <tr style="text-align:left;border-bottom:1px solid #ddd;">
+                <th>Station</th>
+                <th>PF</th>
+                <th>UPND</th>
+                <th>Other</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in recent_results %}
+            <tr style="border-bottom:1px solid #eee;">
+                <td>{{ r[0] }}</td>
+                <td>{{ r[1] }}</td>
+                <td>{{ r[2] }}</td>
+                <td>{{ r[3] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- ===== DANGER ZONES ===== -->
+<div class="card" style="margin-top:20px;">
+    <h3>Danger Zones (Losing)</h3>
+
+    <ul>
+        {% for dz in danger_zones %}
+        <li>
+            <strong>{{ dz[0] }}</strong> → Gap: {{ dz[1] }}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+
+<!-- ===== STRONGHOLDS ===== -->
+<div class="card" style="margin-top:20px;">
+    <h3>Strongholds</h3>
+
+    <ul>
+        {% for sh in strongholds %}
+        <li>
+            <strong>{{ sh[0] }}</strong> → Lead: {{ sh[1] }}
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+
+<!-- ===== SYSTEM STATUS ===== -->
+<div class="card" style="margin-top:20px;">
+    <h3>System Status</h3>
+
+    <ul>
+        <li>Telegram: {{ system_status.telegram }}</li>
+        <li>Database: {{ system_status.database }}</li>
+        <li>Server: {{ system_status.server }}</li>
+    </ul>
+</div>
+
+{% endblock %}
