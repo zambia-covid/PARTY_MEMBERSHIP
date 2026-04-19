@@ -1077,7 +1077,184 @@ def login():
 def logout():
     logout_user()
     return redirect("/login")
-    
+
+@app.route("/api/live_dashboard")
+@login_required
+def live_dashboard():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT constituency,
+               COALESCE(SUM(pf_votes),0),
+               COALESCE(SUM(upnd_votes),0)
+        FROM polling_station_results
+        GROUP BY constituency
+    """)
+
+    data = []
+
+    for c, pf, upnd in cur.fetchall():
+        margin = pf - upnd
+
+        if margin > 0:
+            status = "WIN"
+        elif margin < 0:
+            status = "LOSE"
+        else:
+            status = "TOSS-UP"
+
+        data.append({
+            "constituency": c,
+            "pf": pf,
+            "upnd": upnd,
+            "margin": margin,
+            "status": status
+        })
+
+    cur.close()
+    conn.close()
+
+    return jsonify(data)
+
+@app.route("/api/map_intelligence")
+@login_required
+def map_intelligence():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT constituency,
+               SUM(pf_votes),
+               SUM(upnd_votes)
+        FROM polling_station_results
+        GROUP BY constituency
+    """)
+
+    map_data = []
+    alerts = []
+
+    for c, pf, upnd in cur.fetchall():
+
+        margin = (pf or 0) - (upnd or 0)
+
+        if margin > 1000:
+            heat = "strong_pf"
+        elif margin > 0:
+            heat = "lean_pf"
+        elif margin < -1000:
+            heat = "strong_upnd"
+        elif margin < 0:
+            heat = "lean_upnd"
+        else:
+            heat = "neutral"
+
+        map_data.append({
+            "constituency": c,
+            "pf": pf,
+            "upnd": upnd,
+            "margin": margin,
+            "heat": heat
+        })
+
+        # 🔥 Alert zones
+        if abs(margin) < 500:
+            alerts.append({"constituency": c})
+
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "map": map_data,
+        "alerts": alerts
+    })
+
+@app.route("/api/turnout_targets")
+@login_required
+def turnout_targets():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT 
+            polling_station,
+            COUNT(m.membership_id) as members,
+            COALESCE(SUM(r.pf_votes + r.upnd_votes),0) as votes
+        FROM members m
+        LEFT JOIN polling_station_results r
+        ON m.polling_station = r.polling_station
+        GROUP BY polling_station
+    """)
+
+    targets = []
+
+    for station, members, votes in cur.fetchall():
+
+        gap = members - votes
+
+        if gap > 200:
+            priority = "HIGH"
+        elif gap > 100:
+            priority = "MEDIUM"
+        else:
+            priority = "LOW"
+
+        targets.append({
+            "station": station,
+            "gap": gap,
+            "priority": priority
+        })
+
+    cur.close()
+    conn.close()
+
+    return jsonify(targets)
+
+@app.route("/api/strategy")
+@login_required
+def strategy():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT 
+            SUM(pf_votes),
+            SUM(upnd_votes)
+        FROM polling_station_results
+    """)
+
+    pf, upnd = cur.fetchone()
+    margin = (pf or 0) - (upnd or 0)
+
+    prompt = f"""
+Election status:
+PF: {pf}
+UPND: {upnd}
+Margin: {margin}
+
+Give a short strategic directive (max 25 words).
+"""
+
+    try:
+        res = client.responses.create(
+            model="gpt-5-mini",
+            input=prompt
+        )
+
+        advice = res.output_text.strip()
+
+    except:
+        advice = "Stabilize strongholds. Push turnout in weak zones."
+
+    cur.close()
+    conn.close()
+
+    return jsonify({"advice": advice})
+
 # ==============================
 # CONSTITUENCY INTELLIGENCE
 # ==============================
