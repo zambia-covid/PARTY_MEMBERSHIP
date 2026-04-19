@@ -1,90 +1,85 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Constituency Intelligence</title>
+{% extends "base.html" %}
 
-    <style>
-        body {
-            font-family: Arial;
-            background: #0b1f0b;
-            color: white;
-            margin: 0;
-        }
+{% block title %}Constituency Intelligence{% endblock %}
 
-        .header {
-            background: #145214;
-            padding: 15px 25px;
-            font-size: 20px;
-            font-weight: bold;
-        }
+{% block content %}
 
-        .controls {
-            padding: 15px;
-            background: #0f2a0f;
-            display: flex;
-            gap: 10px;
-        }
+<h2 style="margin-bottom:15px;">📊 Constituency Intelligence</h2>
 
-        input {
-            padding: 8px;
-            border-radius: 5px;
-            border: none;
-        }
+<style>
+/* page-specific styles only */
+.controls {
+    padding: 10px;
+    background: #f0f5f0;
+    display: flex;
+    gap: 10px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+input {
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
 
-        th, td {
-            padding: 10px;
-            border-bottom: 1px solid #333;
-        }
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+}
 
-        th {
-            background: #1f3d1f;
-        }
+th, td {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
 
-        tr:hover {
-            background: #1a2e1a;
-            cursor: pointer;
-        }
+th {
+    background: #0B5D1E;
+    color: white;
+}
 
-        .WIN { color: #00ff88; font-weight: bold; }
-        .LOSE { color: #ff4d4d; font-weight: bold; }
-        .TOSS-UP { color: #ffcc00; font-weight: bold; }
+tr:hover {
+    background: #f3f7f3;
+    cursor: pointer;
+}
 
-        .danger {
-            background: rgba(255,0,0,0.2);
-        }
+.WIN { color: green; font-weight: bold; }
+.LOSE { color: red; font-weight: bold; }
+.TOSS-UP { color: orange; font-weight: bold; }
 
-        .cards {
-            padding: 10px;
-        }
+.danger {
+    background: rgba(255,0,0,0.1);
+}
 
-        .card {
-            display: inline-block;
-            margin: 5px;
-            padding: 12px;
-            background: #132913;
-            border-radius: 10px;
-            min-width: 140px;
-            text-align: center;
-        }
-    </style>
-</head>
+.cards {
+    margin-bottom: 15px;
+}
 
-<body>
+.card-mini {
+    display: inline-block;
+    margin-right: 10px;
+    padding: 12px;
+    background: white;
+    border-radius: 8px;
+    min-width: 120px;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+</style>
 
-<div class="header">📊 Constituency Intelligence Dashboard</div>
-
+<!-- FILTERS -->
 <div class="controls">
     <input type="text" id="search" placeholder="Search constituency...">
     <input type="text" id="provinceFilter" placeholder="Filter province...">
 </div>
 
+<!-- SUMMARY -->
 <div class="cards" id="summary"></div>
 
+<!-- TABLE -->
 <table>
     <thead>
         <tr>
@@ -105,11 +100,14 @@
 let allData = []
 
 async function loadData() {
-    let res = await fetch("/api/constituency_intelligence")
-    let data = await res.json()
-
-    allData = data
-    renderTable()
+    try {
+        let res = await fetch("/api/constituency_intelligence")
+        let data = await res.json()
+        allData = data
+        renderTable()
+    } catch (e) {
+        console.error("Failed to load data", e)
+    }
 }
 
 function renderTable() {
@@ -154,29 +152,28 @@ function renderTable() {
     tbody.innerHTML = html
 
     summary.innerHTML = `
-        <div class="card">WIN<br><b>${win}</b></div>
-        <div class="card">TOSS-UP<br><b>${toss}</b></div>
-        <div class="card">LOSE<br><b>${lose}</b></div>
-        <div class="card">TOTAL<br><b>${win + lose + toss}</b></div>
+        <div class="card-mini">WIN<br><b>${win}</b></div>
+        <div class="card-mini">TOSS-UP<br><b>${toss}</b></div>
+        <div class="card-mini">LOSE<br><b>${lose}</b></div>
+        <div class="card-mini">TOTAL<br><b>${win + lose + toss}</b></div>
     `
 }
 
-// 🔍 filters
+// filters
 document.getElementById("search").addEventListener("input", renderTable)
 document.getElementById("provinceFilter").addEventListener("input", renderTable)
 
-// 🔁 auto refresh every 5 sec
+// auto refresh
 setInterval(loadData, 5000)
 
-// 🚀 drill down
+// drilldown
 function drill(name){
     window.location.href = "/polling_intelligence?constituency=" + name
 }
 
-// first load
+// initial load
 loadData()
 
 </script>
 
-</body>
-</html>
+{% endblock %}
