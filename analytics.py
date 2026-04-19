@@ -1,7 +1,14 @@
+from flask import Blueprint, jsonify
 from flask_login import login_required
-from flask import jsonify
 from db import get_db
 
+# ✅ THIS LINE WAS MISSING (CRITICAL)
+analytics_bp = Blueprint("analytics", __name__)
+
+
+# =========================
+# TURNOUT TARGETS
+# =========================
 @analytics_bp.route("/api/turnout_targets")
 @login_required
 def turnout_targets():
@@ -35,6 +42,8 @@ def turnout_targets():
 
         results.append({
             "station": station,
+            "members": members,
+            "votes": votes,
             "gap": gap,
             "priority": priority
         })
