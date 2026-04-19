@@ -1,197 +1,200 @@
-<!DOCTYPE html>
-<html>
+{% extends "base.html" %}
 
-<head>
-<title>Polling Station Intelligence</title>
+{% block title %}Polling Intelligence{% endblock %}
+
+{% block content %}
+
+<h2 style="margin-bottom:15px;">📡 Polling Intelligence</h2>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body{
-margin:0;
-font-family:Arial, Helvetica;
-background:#eef5ee;
+
+/* ===== PAGE WRAPPER ===== */
+.section {
+    margin-bottom: 20px;
 }
 
-.navbar{
-background:#0b6623;
-color:white;
-padding:15px;
-display:flex;
-justify-content:space-between;
-align-items:center;
+/* ===== KPI ===== */
+.kpi {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
-.navbar h2{ margin:0; }
-
-.nav-links a{
-color:white;
-text-decoration:none;
-margin-left:20px;
-font-weight:bold;
+.kpi h2 {
+    margin: 5px 0;
+    color: #0B5D1E;
 }
 
-.container{ padding:30px; }
-
-.grid{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:25px;
-margin-top:20px;
+/* ===== GRID ===== */
+.grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
 }
 
-.card{
-background:white;
-padding:20px;
-border-radius:8px;
-box-shadow:0 3px 8px rgba(0,0,0,0.1);
+/* ===== CARD ===== */
+.card {
+    background: white;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
-.stat{
-font-size:36px;
-font-weight:bold;
-color:#0b6623;
+/* ===== TABLE ===== */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
 }
 
-table{
-width:100%;
-border-collapse:collapse;
+th, td {
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-th,td{
-padding:10px;
-border-bottom:1px solid #eee;
+th {
+    background: #0B5D1E;
+    color: white;
+    text-align: left;
 }
 
-th{
-background:#e2f0e4;
-text-align:left;
+.num {
+    text-align: center;
 }
 
-.strong{ color:green; font-weight:bold; }
-.medium{ color:#b38f00; font-weight:bold; }
-.weak{ color:red; font-weight:bold; }
+/* ===== STATUS COLORS ===== */
+.secure { color: green; font-weight: bold; }
+.battle { color: orange; font-weight: bold; }
+.collapse { color: red; font-weight: bold; }
 
-.small{
-font-size:12px;
-color:#666;
+/* ===== RISK ===== */
+.risk {
+    font-size: 12px;
+    color: #666;
 }
+
+/* ===== ACTION ===== */
+.action {
+    font-size: 12px;
+    color: #0B5D1E;
+}
+
 </style>
 
-</head>
-
-<body>
-
-<div class="navbar">
-<h2>Campaign Intelligence</h2>
-
-<div class="nav-links">
-<a href="/">Dashboard</a>
-<a href="/members">Members</a>
-<a href="/analytics">Analytics</a>
-<a href="/polling_intelligence">Polling Intelligence</a>
+<!-- KPI -->
+<div class="section">
+    <div class="kpi">
+        <h4>Total Constituencies</h4>
+        <h2>{{ stations|length }}</h2>
+    </div>
 </div>
-</div>
-
-
-<div class="container">
-
-<!-- SUMMARY -->
-<div class="card">
-<h3>Total Constituencies Tracked</h3>
-<div class="stat">{{ stations|length }}</div>
-</div>
-
 
 <div class="grid">
 
-<!-- CHART -->
-<div class="card">
-<h3>Membership Strength by Constituency</h3>
-<canvas id="stationChart"></canvas>
+    <!-- CHART -->
+    <div class="card">
+        <h3>Membership Strength</h3>
+        <canvas id="stationChart"></canvas>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card">
+        <h3>Constituency Intelligence</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Constituency</th>
+                    <th>Province</th>
+                    <th class="num">Members</th>
+                    <th class="num">Coverage</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+            {% for s in stations %}
+
+            <tr>
+                <td>
+                    <b>{{ s.constituency }}</b><br>
+                    <span class="action">{{ s.action }}</span><br>
+                    <span class="risk">{{ s.risk }}</span>
+                </td>
+
+                <td>{{ s.province }}</td>
+
+                <td class="num">{{ s.members }}</td>
+
+                <td class="num">{{ s.coverage }}%</td>
+
+                <td>
+                    {% if s.status == "SECURE" %}
+                        <span class="secure">SECURE</span>
+                    {% elif s.status == "COLLAPSE" %}
+                        <span class="collapse">COLLAPSE</span>
+                    {% else %}
+                        <span class="battle">BATTLEGROUND</span>
+                    {% endif %}
+                </td>
+
+            </tr>
+
+            {% endfor %}
+
+            </tbody>
+        </table>
+    </div>
+
 </div>
-
-<!-- TABLE -->
-<div class="card">
-<h3>Constituency Intelligence</h3>
-
-<table>
-<tr>
-<th>Constituency</th>
-<th>Province</th>
-<th>Members</th>
-<th>Coverage</th>
-<th>Status</th>
-</tr>
-
-{% for s in stations %}
-
-<tr>
-<td>
-<b>{{ s.constituency }}</b><br>
-<span class="small">{{ s.action }}</span>
-</td>
-
-<td>{{ s.province }}</td>
-
-<td>{{ s.members }}</td>
-
-<td>{{ s.coverage }}%</td>
-
-<td>
-{% if s.status == "STRONG" %}
-<span class="strong">STRONG</span>
-
-{% elif s.status == "WEAK" %}
-<span class="weak">WEAK</span>
-
-{% else %}
-<span class="medium">BATTLEGROUND</span>
-{% endif %}
-</td>
-
-</tr>
-
-{% endfor %}
-</table>
-
-</div>
-
-</div>
-
-</div>
-
 
 <script>
 
-// FIX: correct object-based structure
-let stations = {{ stations | tojson }};
+/* SAFE DATA LOAD */
+let stations = {{ stations | tojson | safe }};
 
-let labels = stations.map(s => s.constituency);
-let data = stations.map(s => s.members);
+/* LIMIT chart size (top 15 for clarity) */
+let topStations = stations.slice(0, 15);
 
-new Chart(document.getElementById("stationChart"),{
+let labels = topStations.map(s => s.constituency);
+let data = topStations.map(s => s.members);
 
-type:"bar",
+new Chart(document.getElementById("stationChart"), {
 
-data:{
-labels:labels,
-datasets:[{
-label:"Members",
-data:data,
-backgroundColor:"#0b6623"
-}]
-},
+    type: "bar",
 
-options:{
-responsive:true,
-plugins:{
-legend:{ display:false }
-}
-}
+    data: {
+        labels: labels,
+        datasets: [{
+            label: "Members",
+            data: data
+        }]
+    },
+
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false }
+        },
+        scales: {
+            x: {
+                ticks: {
+                    maxRotation: 90,
+                    minRotation: 45
+                }
+            }
+        }
+    }
 });
 
 </script>
 
-</body>
-</html>
+{% endblock %}
