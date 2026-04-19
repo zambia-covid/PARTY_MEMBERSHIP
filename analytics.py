@@ -1,38 +1,45 @@
-from flask import Blueprint, jsonify
+from flask_login import login_required
+from flask import jsonify
 from db import get_db
 
-analytics_bp = Blueprint("analytics", __name__)
-
-@analytics_bp.route("/api/live_dashboard")
-def live_dashboard():
+@analytics_bp.route("/api/turnout_targets")
+@login_required
+def turnout_targets():
 
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT constituency,
-               SUM(pf_votes),
-               SUM(upnd_votes)
-        FROM polling_station_results
-        GROUP BY constituency
+        SELECT 
+            m.polling_station,
+            COUNT(m.membership_id) AS members,
+            COALESCE(SUM(r.pf_votes + r.upnd_votes),0) AS votes
+        FROM members m
+        LEFT JOIN polling_station_results r
+            ON m.polling_station = r.polling_station
+        GROUP BY m.polling_station
     """)
 
-    data = []
+    results = []
 
-    for c, pf, upnd in cur.fetchall():
-        margin = pf - upnd
+    for station, members, votes in cur.fetchall():
 
-        status = "WIN" if margin > 0 else "LOSE"
+        gap = members - votes
 
-        data.append({
-            "constituency": c,
-            "pf": pf,
-            "upnd": upnd,
-            "margin": margin,
-            "status": status
+        if gap > 50:
+            priority = "CRITICAL"
+        elif gap > 20:
+            priority = "HIGH"
+        else:
+            priority = "LOW"
+
+        results.append({
+            "station": station,
+            "gap": gap,
+            "priority": priority
         })
 
     cur.close()
     conn.close()
 
-    return jsonify(data)
+    return jsonify(results)
