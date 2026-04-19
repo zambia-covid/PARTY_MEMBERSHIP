@@ -1258,8 +1258,12 @@ Give a short strategic directive (max 25 words).
 # ==============================
 # CONSTITUENCY INTELLIGENCE
 # ==============================
-@app.route("/api/constituency_intelligence")
 @app.route("/constituency_intelligence")
+@login_required
+def constituency_intelligence():
+    return render_template("constituency_intelligence.html")
+
+@app.route("/api/constituency_intelligence")
 @login_required
 def api_constituency_intelligence():
 
