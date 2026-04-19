@@ -1,65 +1,60 @@
 from flask import Blueprint, request, render_template, redirect, url_for, flash
-from flask_login import LoginManager, login_user, logout_user, login_required, UserMixin
+from flask_login import login_user
 from werkzeug.security import check_password_hash
 import os
 
 auth_bp = Blueprint("auth", __name__)
-login_manager = LoginManager()
 
-class User(UserMixin):
-    def __init__(self, id, role):
+# Simple user class for Flask-Login
+class AdminUser:
+    def __init__(self, id):
         self.id = id
-        self.role = role
 
-users = {
-    "admin": os.getenv("ADMIN_PASSWORD_HASH")
-}
+    def is_active(self):
+        return True
 
-@login_manager.user_loader
-def load_user(user_id):
-    if user_id == "admin":
-        return User("admin", "admin")
-    if str(user_id).isdigit():
-        return User(user_id, "agent")
-    return None
+    def is_authenticated(self):
+        return True
 
+    def is_anonymous(self):
+        return False
 
-def admin_required(f):
-    from functools import wraps
-    from flask_login import current_user
-
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if not current_user.is_authenticated or current_user.role != "admin":
-            return "Forbidden", 403
-        return f(*args, **kwargs)
-    return wrapper
+    def get_id(self):
+        return self.id
 
 
-def agent_required(f):
-    from functools import wraps
-    from flask_login import current_user
-
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if not current_user.is_authenticated or current_user.role != "agent":
-            return "Forbidden", 403
-        return f(*args, **kwargs)
-    return wrapper
+def get_admin_hash():
+    return os.getenv("ADMIN_PASSWORD_HASH")
 
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
+
     if request.method == "POST":
-        if check_password_hash(users["admin"], request.form["password"]):
-            login_user(User("admin", "admin"))
-            return redirect("/")
-        flash("Invalid login")
+
+        password = request.form.get("password")
+
+        if not password:
+            flash("Password is required", "error")
+            return render_template("login.html")
+
+        stored_hash = get_admin_hash()
+
+        # 🚨 Hard failure if config is broken
+        if not stored_hash:
+            return "Server error: ADMIN_PASSWORD_HASH missing", 500
+
+        # ✅ Password check
+        if check_password_hash(stored_hash, password):
+
+            user = AdminUser(id="admin")
+            login_user(user)
+
+            # redirect to next page or default
+            next_page = request.args.get("next")
+            return redirect(next_page or url_for("members.members"))
+
+        else:
+            flash("Invalid password", "error")
+
     return render_template("login.html")
-
-
-@auth_bp.route("/logout")
-@login_required
-def logout():
-    logout_user()
-    return redirect("/login")
