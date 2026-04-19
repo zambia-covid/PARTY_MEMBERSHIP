@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}PF Command{% endblock %}</title>
+
+<style>
+
+/* ===== GLOBAL ===== */
+body{
+    margin:0;
+    font-family: Arial, sans-serif;
+    background:#f4f6f9;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+    width: 260px;
+    height: 100vh;
+    position: fixed;
+    background: #0B5D1E;
+    color: white;
+    display: flex;
+    flex-direction: column;
+}
+
+.logo {
+    font-size: 20px;
+    font-weight: bold;
+    padding: 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.2);
+}
+
+/* sections */
+.menu-section {
+    font-size: 11px;
+    opacity: 0.7;
+    padding: 15px 20px 5px;
+    letter-spacing: 1px;
+}
+
+/* links */
+.sidebar a {
+    color: white;
+    text-decoration: none;
+    padding: 12px 20px;
+    display: block;
+    transition: 0.2s;
+}
+
+/* hover */
+.sidebar a:hover {
+    background: #083D14;
+    padding-left: 25px;
+}
+
+/* ACTIVE LINK */
+.sidebar a.active {
+    background: #FFD700;
+    color: black;
+    font-weight: bold;
+}
+
+/* logout */
+.logout {
+    color: #ffcccc;
+}
+
+/* ===== MAIN ===== */
+.main {
+    margin-left: 260px;
+    padding: 20px;
+}
+
+/* cards */
+.card{
+    background:white;
+    padding:20px;
+    margin-bottom:20px;
+    border-radius:10px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.1);
+}
+
+</style>
+</head>
+
+<body>
+
+    {% include "sidebar.html" %}
+
+    <div class="main">
+        {% block content %}{% endblock %}
+    </div>
+
+</body>
+</html>

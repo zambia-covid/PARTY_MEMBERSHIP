@@ -1,0 +1,43 @@
+<div class="sidebar">
+
+    <div class="logo">PF COMMAND</div>
+
+    <!-- CORE -->
+    <div class="menu-section">CORE</div>
+    <a href="/" class="{% if request.path == '/' %}active{% endif %}">Dashboard</a>
+    <a href="/war_room" class="{% if request.path.startswith('/war_room') %}active{% endif %}">War Room</a>
+    <a href="/live_stats" class="{% if request.path.startswith('/live_stats') %}active{% endif %}">Live Stats</a>
+
+    <!-- INTELLIGENCE -->
+    <div class="menu-section">INTELLIGENCE</div>
+    <a href="/polling_intelligence" class="{% if 'polling_intelligence' in request.path %}active{% endif %}">Polling Intelligence</a>
+    <a href="/constituency_intelligence" class="{% if 'constituency_intelligence' in request.path %}active{% endif %}">Constituency Intel</a>
+    <a href="/analytics" class="{% if 'analytics' in request.path %}active{% endif %}">Analytics</a>
+    <a href="/ai_insights" class="{% if 'ai_insights' in request.path %}active{% endif %}">AI Insights</a>
+
+    <!-- FIELD OPS -->
+    <div class="menu-section">FIELD OPS</div>
+    <a href="/agents" class="{% if 'agents' in request.path %}active{% endif %}">Agents</a>
+    <a href="/agent_results" class="{% if 'agent_results' in request.path %}active{% endif %}">Agent Results</a>
+    <a href="/voter_tabulation" class="{% if 'voter_tabulation' in request.path %}active{% endif %}">Vote Tabulation</a>
+
+    <!-- INCIDENTS -->
+    <div class="menu-section">INCIDENTS</div>
+    <a href="/incidents" class="{% if 'incidents' in request.path %}active{% endif %}">Incident Feed</a>
+    <a href="/report_incident" class="{% if 'report_incident' in request.path %}active{% endif %}">Report Incident</a>
+    <a href="/request_help" class="{% if 'request_help' in request.path %}active{% endif %}">Request Help</a>
+
+    <!-- MEMBERS -->
+    <div class="menu-section">MEMBERS</div>
+    <a href="/members?key={{config.ADMIN_KEY}}" class="{% if 'members' in request.path %}active{% endif %}">Members</a>
+    <a href="/register" class="{% if 'register' in request.path %}active{% endif %}">Register</a>
+
+    <!-- AI -->
+    <div class="menu-section">AI</div>
+    <a href="/ai" class="{% if 'ai' in request.path %}active{% endif %}">AI Command</a>
+
+    <!-- SYSTEM -->
+    <div class="menu-section">SYSTEM</div>
+    <a href="/logout" class="logout">Logout</a>
+
+</div>
