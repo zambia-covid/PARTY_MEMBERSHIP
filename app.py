@@ -2025,53 +2025,14 @@ def agent_login():
 
     return render_template("agent_login.html")
 
+# ==============================
+# AGENT DASHBOARD
+# ==============================
+
 @app.route("/agent_dashboard")
 @login_required
-@agent_required
 def agent_dashboard():
-
-    agent_id = current_user.id.replace("agent_", "")
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    # Agent info
-    cur.execute("""
-        SELECT name, province, constituency, polling_station
-        FROM agents
-        WHERE agent_id=%s
-    """, (agent_id,))
-    agent = cur.fetchone()
-
-    # Latest result
-    cur.execute("""
-        SELECT pf_votes, upnd_votes, other_votes
-        FROM polling_station_results
-        WHERE agent_id=%s
-        ORDER BY id DESC
-        LIMIT 1
-    """, (agent_id,))
-    result = cur.fetchone()
-
-    # Incidents
-    cur.execute("""
-        SELECT message
-        FROM incidents
-        WHERE agent_id=%s
-        ORDER BY id DESC
-        LIMIT 5
-    """, (agent_id,))
-    incidents = cur.fetchall()
-
-    cur.close()
-    conn.close()
-
-    return render_template(
-        "agent_dashboard.html",
-        agent=agent,
-        result=result,
-        incidents=incidents
-    )
+    return render_template("agent_dashboard.html")
 
 # ==============================
 # WAR ROOM
