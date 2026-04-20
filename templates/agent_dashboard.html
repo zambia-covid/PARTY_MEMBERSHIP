@@ -1,15 +1,167 @@
-<div style="padding:20px;">
-    <h2>Agent Dashboard</h2>
+<!DOCTYPE html>
+<html>
+<head>
+<title>Agent Dashboard</title>
 
-    <a href="/report_incident">
-        <button style="width:100%; padding:15px; margin-bottom:10px;">
-            🚨 Report Incident
-        </button>
-    </a>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <a href="/incidents">
-        <button style="width:100%; padding:15px;">
-            📡 View Incident Feed
-        </button>
-    </a>
+<style>
+body {
+    margin:0;
+    font-family: Arial;
+    background:#0b5d1e;
+    color:white;
+}
+
+.header{
+    padding:15px;
+    background:#063312;
+    font-size:18px;
+    font-weight:bold;
+    display:flex;
+    justify-content:space-between;
+}
+
+.container{
+    padding:20px;
+}
+
+.card{
+    background:white;
+    color:black;
+    padding:15px;
+    border-radius:12px;
+    margin-bottom:15px;
+}
+
+button{
+    width:100%;
+    padding:15px;
+    margin-top:10px;
+    border:none;
+    border-radius:10px;
+    font-size:16px;
+    font-weight:bold;
+}
+
+.report{ background:red; color:white; }
+.feed{ background:#0b5d1e; color:white; }
+
+.grid{
+    display:flex;
+    gap:10px;
+    margin-bottom:15px;
+}
+
+.box{
+    flex:1;
+    padding:12px;
+    border-radius:8px;
+    text-align:center;
+    font-weight:bold;
+}
+
+.critical{ background:#8b0000; }
+.open{ background:#cc5500; }
+.resolved{ background:#006400; }
+
+.small{
+    font-size:12px;
+    opacity:0.9;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <span>Agent Dashboard</span>
+    <a href="/logout" style="color:white; text-decoration:none;">Logout</a>
 </div>
+
+<div class="container">
+
+<!-- 🔴 STATUS -->
+<div class="grid">
+    <div class="box critical">
+        Critical<br>
+        <span id="criticalCount">0</span>
+    </div>
+
+    <div class="box open">
+        Open<br>
+        <span id="openCount">0</span>
+    </div>
+
+    <div class="box resolved">
+        Resolved<br>
+        <span id="resolvedCount">0</span>
+    </div>
+</div>
+
+<!-- 🎯 ACTIONS -->
+<div class="card">
+    <button class="report" onclick="location.href='/report_incident'">
+        🚨 Report Incident
+    </button>
+
+    <button class="feed" onclick="location.href='/incidents'">
+        📡 View Live Feed
+    </button>
+</div>
+
+<!-- 📡 RECENT INCIDENTS -->
+<div class="card">
+    <h3>Recent Activity</h3>
+    <div id="recentFeed" class="small">Loading...</div>
+</div>
+
+</div>
+
+<script>
+async function loadDashboard(){
+
+    const res = await fetch("/api/incidents");
+    const data = await res.json();
+
+    let critical = 0;
+    let open = 0;
+    let resolved = 0;
+
+    let recentHTML = "";
+
+    data.slice(0,5).forEach(i => {
+
+        if(i.status === "Critical") critical++;
+        else if(i.status === "Open") open++;
+        else if(i.status === "Resolved") resolved++;
+
+        // ✅ YOUR EXACT FIX APPLIED HERE
+        recentHTML += `
+            <div style="margin-bottom:8px;">
+                <strong>${i.type || "Incident"}</strong> - 
+                ${(i.constituency || "Unknown")}${i.province ? ", " + i.province : ""}
+                <br>
+                <span style="color:${
+                    i.status === "Critical" ? "red" :
+                    i.status === "Open" ? "orange" :
+                    "green"
+                }">${i.status}</span>
+            </div>
+        `;
+    });
+
+    document.getElementById("criticalCount").innerText = critical;
+    document.getElementById("openCount").innerText = open;
+    document.getElementById("resolvedCount").innerText = resolved;
+
+    document.getElementById("recentFeed").innerHTML = recentHTML || "No activity";
+}
+
+/* 🔁 AUTO REFRESH */
+setInterval(loadDashboard, 5000);
+loadDashboard();
+</script>
+
+</body>
+</html>
