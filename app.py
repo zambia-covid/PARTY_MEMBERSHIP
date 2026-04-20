@@ -2637,19 +2637,28 @@ def toggle_agent(agent_id):
 
 @app.route("/members")
 @login_required
-@admin_required
+@role_required("admin", "manager")
 def members():
+
+    page = int(request.args.get("page", 1))
+    per_page = 25
+    offset = (page - 1) * per_page
 
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute("""
-    SELECT membership_id, full_name, province, district, constituency, phone, status
-    FROM members
-    ORDER BY full_name
-    """)
+        SELECT membership_id, full_name, province, district, constituency, phone, status
+        FROM members
+        WHERE COALESCE(is_deleted, FALSE) = FALSE
+        ORDER BY full_name
+        LIMIT %s OFFSET %s
+    """, (per_page, offset))
 
     rows = cur.fetchall()
+
+    cur.execute("SELECT COUNT(*) FROM members WHERE COALESCE(is_deleted, FALSE) = FALSE")
+    total = cur.fetchone()[0]
 
     cur.close()
     conn.close()
@@ -2667,7 +2676,12 @@ def members():
         for r in rows
     ]
 
-    return render_template("members.html", members=members)
+    return render_template(
+        "members.html",
+        members=members,
+        page=page,
+        total_pages=(total // per_page) + 1
+    )
 
 # ==============================
 # EDIT MEMBER
