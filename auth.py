@@ -2,6 +2,8 @@ import os
 from datetime import datetime
 from functools import wraps
 
+print("🔥 DEPLOY VERSION 2 — CREATE USER ACTIVE 🔥")
+
 from flask import Blueprint, request, render_template, redirect, flash
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
