@@ -1637,59 +1637,52 @@ def request_help():
         return redirect(url_for('agent_dashboard'))
 
     return render_template('request_help.html')
-
-
+    
+# ==============================
+# INCIDENTS
+# ==============================
 @app.route("/incidents")
 @login_required
 def incidents_page():
     return render_template("incidents.html")
 
-@app.route('/report_incident', methods=['GET', 'POST'])
+@app.route("/report_incident", methods=["GET", "POST"])
 @login_required
-@agent_required
 def report_incident():
 
-    if request.method == 'POST':
-
-        message = request.form.get("incident")
-
-        if not message:
-            return "Incident message required", 400
-
-        agent_id = current_user.id.replace("agent_", "")
+    if request.method == "POST":
 
         conn = get_db()
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT province, constituency, polling_station
-            FROM agents
-            WHERE agent_id=%s
-        """, (agent_id,))
-
-        agent = cur.fetchone()
-
-        if not agent:
-            cur.close()
-            conn.close()
-            return "Agent not found", 404
-
-        province, constituency, polling_station = agent
-
-        cur.execute("""
-            INSERT INTO incidents
-            (agent_id, province, constituency, polling_station, message)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (agent_id, province, constituency, polling_station, message))
+            INSERT INTO incidents (
+                type,
+                province,
+                constituency,
+                severity,
+                description,
+                contact,
+                status,
+                created_at
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,'Open', NOW())
+        """, (
+            request.form["type"],
+            request.form["province"],
+            request.form["constituency"],
+            request.form["severity"],
+            request.form["description"],
+            request.form.get("contact")
+        ))
 
         conn.commit()
-
         cur.close()
         conn.close()
 
-        return redirect(url_for('agent_dashboard'))
+        return redirect("/agent_dashboard")
 
-    return render_template('report_incident.html')
+    return render_template("report_incident.html")
 
 # ==============================
 # VOTE TABULATION
