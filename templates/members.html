@@ -30,10 +30,11 @@ input{
 }
 
 button{
-    padding:10px;
+    padding:6px 10px;
     border:none;
-    border-radius:6px;
-    background:gold;
+    border-radius:4px;
+    background:red;
+    color:white;
     cursor:pointer;
 }
 
@@ -79,7 +80,7 @@ a{
 <!-- 🔎 SEARCH -->
 <form method="GET">
     <input type="text" name="q" placeholder="Search name or phone">
-    <button type="submit">Search</button>
+    <button type="submit" style="background:gold; color:black;">Search</button>
 </form>
 
 <!-- 📊 TABLE -->
@@ -93,6 +94,7 @@ a{
     <th>Constituency</th>
     <th>Status</th>
     <th>Card</th>
+    <th>Actions</th>
 </tr>
 </thead>
 
@@ -108,16 +110,30 @@ a{
         <td>{{ m.constituency }}</td>
         <td>{{ m.status }}</td>
 
+        <!-- CARD -->
         <td>
             <a href="/download_card/{{ m.membership_id }}" target="_blank">
                 Download
             </a>
         </td>
+
+        <!-- ACTIONS -->
+        <td>
+            <a href="/edit/{{ m.membership_id }}">Edit</a>
+
+            |
+
+            <form action="/delete/{{ m.membership_id }}" method="POST" style="display:inline;">
+                <button onclick="return confirm('Are you sure you want to delete this member?')">
+                    Delete
+                </button>
+            </form>
+        </td>
     </tr>
     {% endfor %}
 {% else %}
     <tr>
-        <td colspan="7">No members found</td>
+        <td colspan="8">No members found</td>
     </tr>
 {% endif %}
 
