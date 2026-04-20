@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Incident Dashboard</title>
+<title>Incident Command Center</title>
 
 <style>
 body {
@@ -11,6 +11,7 @@ body {
     margin: 0;
 }
 
+/* HEADER */
 .header {
     background: #b30000;
     padding: 15px;
@@ -18,23 +19,37 @@ body {
     font-weight: bold;
 }
 
+/* CONTAINER */
 .container {
     padding: 20px;
 }
 
-input {
-    padding: 10px;
-    border-radius: 6px;
-    border: none;
-    width: 250px;
+/* SUMMARY PANELS */
+.grid{
+    display:flex;
+    gap:15px;
+    margin-bottom:20px;
 }
 
+.panel{
+    flex:1;
+    padding:20px;
+    border-radius:8px;
+    text-align:center;
+    font-size:22px;
+    font-weight:bold;
+}
+
+.critical{ background:#8b0000; }
+.warning{ background:#cc5500; }
+.success{ background:#006400; }
+
+/* TABLE */
 table {
     width: 100%;
     border-collapse: collapse;
     background: white;
     color: black;
-    margin-top: 20px;
 }
 
 th {
@@ -48,36 +63,53 @@ td {
     border-bottom: 1px solid #ddd;
 }
 
-.badge {
-    padding: 5px 8px;
-    border-radius: 4px;
-    color: white;
-    font-size: 12px;
+/* BUTTON */
+button{
+    padding:6px 10px;
+    border:none;
+    border-radius:4px;
+    background:green;
+    color:white;
+    cursor:pointer;
 }
-
-.badge-open {
-    background: red;
-}
-
-.badge-resolved {
-    background: green;
-}
-
 </style>
+
 </head>
 
 <body>
 
 <div class="header">
-    Incident Dashboard
+    🚨 Incident Command Center
 </div>
 
 <div class="container">
 
-<!-- 🔎 SEARCH -->
-<input type="text" id="searchBox" placeholder="Search incidents...">
+<!-- 🔴 SUMMARY -->
+<div class="grid">
 
-<!-- 📊 TABLE -->
+    <div class="panel critical">
+        Critical
+        <div id="criticalCount">0</div>
+    </div>
+
+    <div class="panel warning">
+        Open
+        <div id="openCount">0</div>
+    </div>
+
+    <div class="panel success">
+        Resolved
+        <div id="resolvedCount">0</div>
+    </div>
+
+</div>
+
+<!-- 🔎 SEARCH -->
+<input type="text" id="searchBox" placeholder="Search incidents..." style="padding:10px; margin-bottom:10px; width:250px;">
+
+<!-- 🔴 LIVE FEED -->
+<h3>Live Incident Feed</h3>
+
 <table>
 <thead>
 <tr>
@@ -87,71 +119,92 @@ td {
     <th>Description</th>
     <th>Status</th>
     <th>Date</th>
+    <th>Action</th>
 </tr>
 </thead>
 
-<tbody>
-
-{% if incidents %}
-    {% for i in incidents %}
-    <tr>
-        <td>{{ i.id }}</td>
-        <td>{{ i.type }}</td>
-        <td>{{ i.location }}</td>
-        <td>{{ i.description }}</td>
-
-        <td>
-            {% if i.status == "Resolved" %}
-                <span class="badge badge-resolved">Resolved</span>
-            {% else %}
-                <span class="badge badge-open">Open</span>
-            {% endif %}
-        </td>
-
-        <td>{{ i.created_at }}</td>
-    </tr>
-    {% endfor %}
-{% else %}
-    <tr>
-        <td colspan="6">No incidents reported</td>
-    </tr>
-{% endif %}
-
+<tbody id="incidentFeed">
 </tbody>
 </table>
 
 </div>
 
-<!-- 🔴 LIVE SEARCH SCRIPT -->
+<!-- 🔊 ALERT SOUND -->
+<audio id="alertSound" src="/static/alert.mp3"></audio>
+
+<!-- 🔴 REAL-TIME ENGINE -->
 <script>
+
+let lastCritical = 0;
+
 async function loadIncidents() {
 
-    const q = document.getElementById("searchBox").value;
+    const q = document.getElementById("searchBox").value.toLowerCase();
 
-    const res = await fetch(`/api/incidents?q=${q}`);
+    const res = await fetch("/api/incidents");
     const data = await res.json();
 
-    const tbody = document.querySelector("tbody");
+    let critical = 0;
+    let open = 0;
+    let resolved = 0;
+
+    const tbody = document.getElementById("incidentFeed");
     tbody.innerHTML = "";
 
     data.forEach(i => {
+
+        // 🔎 SEARCH FILTER
+        if(q && !i.description.toLowerCase().includes(q)) return;
+
+        if (i.status === "Critical") critical++;
+        else if (i.status === "Open") open++;
+        else if (i.status === "Resolved") resolved++;
+
         tbody.innerHTML += `
         <tr>
             <td>${i.id}</td>
             <td>${i.type}</td>
             <td>${i.location}</td>
             <td>${i.description}</td>
-            <td>
-                ${i.status === "Resolved"
-                    ? '<span class="badge badge-resolved">Resolved</span>'
-                    : '<span class="badge badge-open">Open</span>'}
-            </td>
+            <td style="color:${
+                i.status === "Critical" ? "red" :
+                i.status === "Open" ? "orange" :
+                "green"
+            }">${i.status}</td>
             <td>${i.created_at}</td>
+            <td>
+                ${i.status !== "Resolved" ? 
+                `<button onclick="resolveIncident('${i.id}')">Resolve</button>` 
+                : "—"}
+            </td>
         </tr>`;
     });
+
+    // 🔴 UPDATE PANELS
+    document.getElementById("criticalCount").innerText = critical;
+    document.getElementById("openCount").innerText = open;
+    document.getElementById("resolvedCount").innerText = resolved;
+
+    // 🔊 ALERT ON NEW CRITICAL
+    if(critical > lastCritical){
+        document.getElementById("alertSound").play();
+    }
+    lastCritical = critical;
 }
 
+/* 🔁 AUTO REFRESH */
+setInterval(loadIncidents, 5000);
+loadIncidents();
+
+/* 🎯 ACTION */
+async function resolveIncident(id){
+    await fetch(`/resolve/${id}`, { method: "POST" });
+    loadIncidents();
+}
+
+/* 🔎 SEARCH LISTENER */
 document.getElementById("searchBox").addEventListener("input", loadIncidents);
+
 </script>
 
 </body>
