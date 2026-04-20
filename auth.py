@@ -1,4 +1,5 @@
 import os
+print("AUTH FILE PATH:", os.path.abspath(__file__))
 from datetime import datetime
 from functools import wraps
 
