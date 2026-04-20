@@ -2639,16 +2639,12 @@ def toggle_agent(agent_id):
 @login_required
 @admin_required
 def members():
-    key = request.args.get("key")
-
-    if key != os.getenv("ADMIN_KEY"):
-        return {"error": "Unauthorized"}, 403
 
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute("""
-    SELECT membership_id,full_name,province,district,constituency,phone,status
+    SELECT membership_id, full_name, province, district, constituency, phone, status
     FROM members
     ORDER BY full_name
     """)
@@ -2658,11 +2654,8 @@ def members():
     cur.close()
     conn.close()
 
-    members = []
-
-    for r in rows:
-
-        members.append({
+    members = [
+        {
             "membership_id": r[0],
             "full_name": r[1],
             "province": r[2],
@@ -2670,8 +2663,9 @@ def members():
             "constituency": r[4],
             "phone": r[5],
             "status": r[6]
-        })
-
+        }
+        for r in rows
+    ]
 
     return render_template("members.html", members=members)
 
