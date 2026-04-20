@@ -1,61 +1,238 @@
-from flask import Blueprint, request, render_template, redirect, url_for, flash
+from flask import Blueprint, request, render_template, redirect, flash, session
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-import os
 from functools import wraps
+from datetime import datetime
+import os
+
+from db import get_db
 
 auth_bp = Blueprint("auth", __name__)
 
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"
+login_manager.session_protection = "strong"
 
-users = {
-    "admin": generate_password_hash(os.getenv("ADMIN_PASSWORD"))
-}
-
+# ======================
+# USER MODEL
+# ======================
 class User(UserMixin):
-    def __init__(self, id, role):
-        self.id = id
+    def __init__(self, id, username, role):
+        self.id = str(id)
+        self.username = username
         self.role = role
 
+
+# ======================
+# LOAD USER
+# ======================
 @login_manager.user_loader
 def load_user(user_id):
-    if user_id == "admin":
-        return User("admin", "admin")
-    if str(user_id).isdigit():
-        return User(user_id, "agent")
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id, username, role
+        FROM users
+        WHERE id=%s AND is_active=TRUE
+    """, (user_id,))
+
+    row = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    if row:
+        return User(row[0], row[1], row[2])
+
     return None
 
-# ======================
-# ROLES
-# ======================
-def admin_required(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if not current_user.is_authenticated or current_user.role != "admin":
-            return "Forbidden", 403
-        return f(*args, **kwargs)
-    return wrapper
 
 # ======================
-# ROUTES
+# ROLE CONTROL
 # ======================
-@auth_bp.route("/login", methods=["GET","POST"])
+def role_required(*roles):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if not current_user.is_authenticated or current_user.role not in roles:
+                return "Forbidden", 403
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+# ======================
+# LOGIN
+# ======================
+@auth_bp.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
 
-        if username in users and check_password_hash(users[username], password):
-            login_user(User(username, "admin"))
+    if request.method == "POST":
+
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT id, username, password_hash, role, failed_attempts
+            FROM users
+            WHERE username=%s AND is_active=TRUE
+        """, (username,))
+
+        user = cur.fetchone()
+
+        if not user:
+            flash("Invalid credentials")
+            return render_template("login.html")
+
+        # 🔴 LOCKOUT PROTECTION
+        if user[4] >= 5:
+            flash("Account locked. Contact admin.")
+            return render_template("login.html")
+
+        # 🔴 PASSWORD CHECK
+        if check_password_hash(user[2], password):
+
+            login_user(User(user[0], user[1], user[3]))
+
+            # reset failed attempts + update login
+            cur.execute("""
+                UPDATE users
+                SET failed_attempts=0,
+                    last_login=%s
+                WHERE id=%s
+            """, (datetime.utcnow(), user[0]))
+
+            conn.commit()
+
+            cur.close()
+            conn.close()
+
             return redirect("/")
 
-        flash("Invalid credentials")
+        else:
+            # increment failed attempts
+            cur.execute("""
+                UPDATE users
+                SET failed_attempts = failed_attempts + 1
+                WHERE id=%s
+            """, (user[0],))
+
+            conn.commit()
+
+            cur.close()
+            conn.close()
+
+            flash("Invalid credentials")
 
     return render_template("login.html")
 
+
+# ======================
+# LOGOUT
+# ======================
 @auth_bp.route("/logout")
 @login_required
 def logout():
     logout_user()
+    session.clear()
     return redirect("/login")
+
+
+# ======================
+# ADMIN: CREATE USER
+# ======================
+@auth_bp.route("/create_user", methods=["GET", "POST"])
+@login_required
+@role_required("admin")
+def create_user():
+
+    if request.method == "POST":
+
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        role = request.form.get("role", "agent")
+
+        if not username or not password:
+            return "Username and password required", 400
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        try:
+            cur.execute("""
+                INSERT INTO users (username, password_hash, role)
+                VALUES (%s, %s, %s)
+            """, (
+                username,
+                generate_password_hash(password),
+                role
+            ))
+
+            conn.commit()
+
+        except Exception:
+            conn.rollback()
+            return "User already exists", 400
+
+        cur.close()
+        conn.close()
+
+        return redirect("/")
+
+    return render_template("create_user.html")
+
+
+# ======================
+# ADMIN: DEACTIVATE USER
+# ======================
+@auth_bp.route("/deactivate_user/<int:user_id>", methods=["POST"])
+@login_required
+@role_required("admin")
+def deactivate_user(user_id):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE users
+        SET is_active = FALSE
+        WHERE id = %s
+    """, (user_id,))
+
+    conn.commit()
+
+    cur.close()
+    conn.close()
+
+    return redirect("/")
+
+
+# ======================
+# SEED ADMIN
+# ======================
+def seed_admin():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM users WHERE username='admin'")
+    exists = cur.fetchone()
+
+    if not exists:
+        cur.execute("""
+            INSERT INTO users (username, password_hash, role)
+            VALUES (%s, %s, %s)
+        """, (
+            "admin",
+            generate_password_hash(os.getenv("ADMIN_PASSWORD")),
+            "admin"
+        ))
+        conn.commit()
+
+    cur.close()
+    conn.close()
