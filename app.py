@@ -1804,6 +1804,28 @@ def api_incidents():
     ])
 
 # ==============================
+# API ACCIDENTS
+# ==============================
+@app.route("/resolve/<incident_id>", methods=["POST"])
+@login_required
+def resolve_incident(incident_id):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE incidents
+        SET status = 'Resolved'
+        WHERE id = %s
+    """, (incident_id,))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return {"status": "ok"}
+
+# ==============================
 # AGENT VOTE SEND
 # ==============================
 
