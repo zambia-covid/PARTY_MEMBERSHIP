@@ -2675,6 +2675,7 @@ def members():
 
 @app.route("/edit/<membership_id>", methods=["GET","POST"])
 @login_required
+@admin_required
 def edit_member(membership_id):
 
     conn = get_db()
