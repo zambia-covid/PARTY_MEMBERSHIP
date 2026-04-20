@@ -1974,79 +1974,6 @@ def agent_vote_send():
     return jsonify({"reply": reply})
 
 # ==============================
-# LIVE STATS
-# ==============================
-
-@app.route("/live_stats")
-@login_required
-def live_stats():
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-    SELECT 
-        cs.constituency,
-        cs.province,
-
-        COUNT(DISTINCT m.membership_id) AS members,
-        cs.total_voters,
-        cs.total_polling_stations,
-
-        COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
-        COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
-
-    FROM constituency_stats cs
-
-    LEFT JOIN members m
-        ON m.constituency = cs.constituency
-        AND m.status = 'Active'
-
-    LEFT JOIN polling_station_results r
-        ON r.constituency = cs.constituency
-
-    GROUP BY cs.constituency, cs.province, cs.total_voters, cs.total_polling_stations
-    """)
-
-    rows = cur.fetchall()
-
-    results = []
-
-    for r in rows:
-        constituency, province, members, voters, stations, pf, upnd = r
-
-        # 🔴 CORE INTELLIGENCE
-        penetration = (members / voters * 100) if voters > 0 else 0
-        expected_votes = int(members * 0.65)
-        margin = pf - upnd
-
-        # 🔴 FINAL STATUS (REALITY-BASED)
-        if pf > upnd and penetration >= 40:
-            status = "WIN"
-        elif pf < upnd and penetration < 30:
-            status = "LOSE"
-        else:
-            status = "TOSS-UP"
-
-        results.append({
-            "constituency": constituency,
-            "province": province,
-            "members": members,
-            "voters": voters,
-            "stations": stations,
-            "pf_votes": pf,
-            "upnd_votes": upnd,
-            "expected_votes": expected_votes,
-            "penetration": round(penetration, 2),
-            "margin": margin,
-            "status": status
-        })
-
-    cur.close()
-    conn.close()
-
-    return jsonify(results)
-
-# ==============================
 # AGENT LOGIN
 # ==============================
 
@@ -2230,7 +2157,6 @@ def war_room():
 # ==============================
 # MAP DATA
 # ==============================
-
 @app.route("/map_data")
 @login_required
 def map_data():
@@ -2270,7 +2196,6 @@ def map_data():
 # ==============================
 # DASHBOARD
 # ==============================
-
 @app.route("/")
 @login_required
 @admin_required
@@ -2485,7 +2410,6 @@ def polling_intelligence():
 # ==============================
 # ANALYTICS ROUTE
 # ==============================
-
 @app.route("/analytics")
 @login_required
 def analytics():
@@ -2574,7 +2498,6 @@ def analytics():
 # ==============================
 # AGENTS LIST
 # ==============================
-
 @app.route("/agents", methods=["GET", "POST"])
 @login_required
 @admin_required
@@ -2612,7 +2535,6 @@ def agents():
 # ==============================
 # TOGGLE AGENT
 # ==============================
-
 @app.route("/toggle_agent/<int:agent_id>")
 @login_required
 def toggle_agent(agent_id):
@@ -2635,7 +2557,6 @@ def toggle_agent(agent_id):
 # ==============================
 # MEMBERS LIST
 # ==============================
-
 @app.route("/members")
 @login_required
 @role_required("admin", "manager")
@@ -2687,7 +2608,6 @@ def members():
 # ==============================
 # EDIT MEMBER
 # ==============================
-
 @app.route("/edit/<membership_id>", methods=["GET","POST"])
 @login_required
 @admin_required
@@ -2746,7 +2666,6 @@ def edit_member(membership_id):
 # ==============================
 # SEARCH MEMBERS
 # ==============================
-
 @app.route("/search")
 @login_required
 def search():
@@ -2801,7 +2720,6 @@ def search():
 # ==============================
 # SEND CARD TO EXISTING MEMBER
 # ==============================
-
 def send_cards_to_existing_members():
     conn = get_db()
     cur = conn.cursor()
@@ -2862,34 +2780,31 @@ def send_existing_cards():
 # ==============================
 # DELETE MEMBER
 # ==============================
-
-@app.route("/delete_member/<membership_id>")
+@app.route("/delete/<membership_id>", methods=["POST"])
 @login_required
+@role_required("admin")
 def delete_member(membership_id):
-
-    key = request.args.get("key")
-    if key != os.getenv("EXPORT_KEY"):
-        return {"error": "Unauthorized"}, 403
 
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute(
-        "DELETE FROM members WHERE membership_id=%s",
-        (membership_id,)
-    )
+    # ✅ SOFT DELETE (DON’T LOSE DATA)
+    cur.execute("""
+        UPDATE members
+        SET is_deleted = TRUE
+        WHERE membership_id = %s
+    """, (membership_id,))
 
     conn.commit()
 
     cur.close()
     conn.close()
 
-    return {"message": "Member deleted"}
+    return redirect("/members")
 
 # ==============================
 # EXPORT MEMBER
 # ==============================
-
 import os
 import psycopg2
 from flask import send_file, request
