@@ -1,175 +1,23 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Agent Login</title>
+@app.route("/agent_login", methods=["GET","POST"])
+def agent_login():
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    if request.method == "POST":
+        phone = request.form["phone"]
+        password = request.form["password"]
 
-    <style>
-        * {
-            box-sizing: border-box;
-            font-family: Arial, sans-serif;
-        }
+        conn = get_db()
+        cur = conn.cursor()
 
-        body {
-            margin: 0;
-            padding: 0;
-            background: linear-gradient(135deg, #0b5d1e, #063312);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
+        cur.execute("""
+            SELECT id, password FROM agents WHERE phone=%s
+        """, (phone,))
 
-        .box {
-            width: 92%;
-            max-width: 360px;
-            background: #ffffff;
-            padding: 22px;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.35);
-            animation: fadeIn 0.5s ease;
-        }
+        user = cur.fetchone()
 
-        @keyframes fadeIn {
-            from {opacity:0; transform:translateY(10px);}
-            to {opacity:1; transform:translateY(0);}
-        }
+        if user and check_password_hash(user[1], password):
+            session["agent_id"] = user[0]
+            return redirect("/agent_dashboard")
 
-        h2 {
-            text-align: center;
-            margin-bottom: 18px;
-            color: #0b5d1e;
-        }
+        return render_template("agent_login.html", error="Invalid login")
 
-        input {
-            width: 100%;
-            padding: 14px;
-            margin-bottom: 12px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            font-size: 16px;
-            outline: none;
-        }
-
-        input:focus {
-            border-color: #0b5d1e;
-            box-shadow: 0 0 5px rgba(11,93,30,0.4);
-        }
-
-        .password-box {
-            position: relative;
-        }
-
-        .toggle {
-            position: absolute;
-            right: 10px;
-            top: 12px;
-            cursor: pointer;
-            font-size: 14px;
-            color: #555;
-        }
-
-        button {
-            width: 100%;
-            padding: 14px;
-            background: #0b5d1e;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            transition: 0.2s;
-        }
-
-        button:active {
-            transform: scale(0.98);
-        }
-
-        button.loading {
-            background: gray;
-        }
-
-        .error {
-            margin-top: 10px;
-            color: red;
-            text-align: center;
-            font-size: 14px;
-        }
-
-        .status {
-            text-align: center;
-            font-size: 12px;
-            margin-top: 8px;
-            color: #999;
-        }
-
-        .footer {
-            text-align: center;
-            font-size: 12px;
-            margin-top: 12px;
-            color: #666;
-        }
-    </style>
-</head>
-
-<body>
-
-<div class="box">
-    <h2>🔐 Agent Login</h2>
-
-    <form method="POST" id="loginForm">
-
-        <input type="text" name="phone" placeholder="Phone Number" required>
-
-        <div class="password-box">
-            <input type="password" name="password" id="password" placeholder="Password" required>
-            <span class="toggle" onclick="togglePassword()">Show</span>
-        </div>
-
-        <button type="submit" id="loginBtn">Login</button>
-    </form>
-
-    {% if error %}
-    <p class="error">{{ error }}</p>
-    {% endif %}
-
-    <div class="status" id="statusText"></div>
-
-    <div class="footer">
-        Secure Agent Access Portal
-    </div>
-</div>
-
-<script>
-function togglePassword(){
-    const input = document.getElementById("password");
-    input.type = input.type === "password" ? "text" : "password";
-}
-
-/* 🔄 Prevent double submit + show loading */
-document.getElementById("loginForm").addEventListener("submit", function(){
-    const btn = document.getElementById("loginBtn");
-    btn.classList.add("loading");
-    btn.innerText = "Logging in...";
-});
-
-/* 📡 Network awareness */
-function updateStatus(){
-    const status = document.getElementById("statusText");
-    if(navigator.onLine){
-        status.innerText = "Online";
-        status.style.color = "green";
-    } else {
-        status.innerText = "Offline — check connection";
-        status.style.color = "red";
-    }
-}
-
-window.addEventListener("online", updateStatus);
-window.addEventListener("offline", updateStatus);
-updateStatus();
-</script>
-
-</body>
-</html>
+    return render_template("agent_login.html")
