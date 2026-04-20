@@ -1646,7 +1646,7 @@ def request_help():
 def incidents_page():
     return render_template("incidents.html")
 
-@app.route("/report_incident", methods=["GET", "POST"])
+@app.route("/report_incident", methods=["GET","POST"])
 @login_required
 def report_incident():
 
@@ -1759,26 +1759,18 @@ def agent_results():
 @login_required
 def api_incidents():
 
-    q = request.args.get("q", "").lower()
-
     conn = get_db()
     cur = conn.cursor()
 
-    query = """
-        SELECT id, type, location, description, status, created_at
+    cur.execute("""
+        SELECT id, type, province, constituency, severity,
+               description, status, created_at
         FROM incidents
-        WHERE 1=1
-    """
+        WHERE COALESCE(status,'Open') != 'Deleted'
+        ORDER BY created_at DESC
+        LIMIT 100
+    """)
 
-    params = []
-
-    if q:
-        query += " AND LOWER(description) LIKE %s"
-        params.append(f"%{q}%")
-
-    query += " ORDER BY created_at DESC LIMIT 100"
-
-    cur.execute(query, params)
     rows = cur.fetchall()
 
     cur.close()
@@ -1788,16 +1780,18 @@ def api_incidents():
         {
             "id": r[0],
             "type": r[1],
-            "location": r[2],
-            "description": r[3],
-            "status": r[4],
-            "created_at": r[5]
+            "province": r[2],
+            "constituency": r[3],
+            "severity": r[4],
+            "description": r[5],
+            "status": r[6],
+            "created_at": str(r[7])
         }
         for r in rows
     ])
 
 # ==============================
-# API ACCIDENTS
+# RESOLVE ACCIDENTS
 # ==============================
 @app.route("/resolve/<incident_id>", methods=["POST"])
 @login_required
