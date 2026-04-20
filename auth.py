@@ -1,281 +1,241 @@
 import os
-import psycopg2
-from flask import Flask, request, jsonify, render_template, redirect, url_for, send_file, flash
-from dotenv import load_dotenv
+from datetime import datetime
 from functools import wraps
 
-from flask_login import login_required, current_user
+from flask import Blueprint, request, render_template, redirect, flash
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 
-# ✅ NEW AUTH SYSTEM
-from auth import auth_bp, login_manager, seed_admin, role_required
+from db import get_db
 
-load_dotenv()
-
-# ======================
-# CREATE APP
-# ======================
-app = Flask(__name__)
-
-SECRET_KEY = os.getenv("SECRET_KEY")
-if not SECRET_KEY:
-    raise ValueError("SECRET_KEY is required")
-
-app.secret_key = SECRET_KEY
+auth_bp = Blueprint("auth", __name__)
 
 # ======================
-# SESSION SECURITY
+# LOGIN MANAGER
 # ======================
-ENV = os.getenv("ENV", "development")
-
-app.config["SESSION_COOKIE_SECURE"] = ENV == "production"
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-
-# ======================
-# INIT AUTH (CRITICAL)
-# ======================
-login_manager.init_app(app)
+login_manager = LoginManager()
 login_manager.login_view = "auth.login"
-
-app.register_blueprint(auth_bp)
-
-# ======================
-# DATABASE
-# ======================
-def get_db():
-    db_url = os.getenv("DATABASE_URL")
-
-    if not db_url:
-        return psycopg2.connect(
-            host="localhost",
-            database="membership_db",
-            user="postgres",
-            password=os.getenv("DB_PASSWORD")
-        )
-
-    return psycopg2.connect(db_url, sslmode="require")
+login_manager.session_protection = "strong"
 
 # ======================
-# SEED ADMIN
+# USER MODEL
 # ======================
-with app.app_context():
-    seed_admin()
-
-# ======================
-# ROLE SHORTCUT (OPTIONAL)
-# ======================
-def admin_required(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if not current_user.is_authenticated or current_user.role != "admin":
-            return "Forbidden", 403
-        return f(*args, **kwargs)
-    return wrapper
+class User(UserMixin):
+    def __init__(self, id, username, role):
+        self.id = str(id)
+        self.username = username
+        self.role = role
 
 # ======================
-# HOME DASHBOARD
+# LOAD USER
 # ======================
-@app.route("/")
-@login_required
-@role_required("admin")
-def dashboard():
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("SELECT COUNT(*) FROM members WHERE status='Active'")
-    total_members = cur.fetchone()[0]
-
-    cur.close()
-    conn.close()
-
-    return render_template("index.html", total_members=total_members)
-
-# ======================
-# MEMBERS (PAGINATED + SECURE)
-# ======================
-@app.route("/members")
-@login_required
-@role_required("admin", "manager")
-def members():
-
-    page = int(request.args.get("page", 1))
-    per_page = 25
-    offset = (page - 1) * per_page
+@login_manager.user_loader
+def load_user(user_id):
 
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT membership_id, full_name, province, district, constituency, phone, status
-        FROM members
-        WHERE is_deleted = FALSE
-        ORDER BY full_name
-        LIMIT %s OFFSET %s
-    """, (per_page, offset))
+        SELECT id, username, role
+        FROM users
+        WHERE id=%s AND is_active=TRUE
+    """, (user_id,))
 
-    rows = cur.fetchall()
-
-    cur.execute("SELECT COUNT(*) FROM members WHERE is_deleted = FALSE")
-    total = cur.fetchone()[0]
+    row = cur.fetchone()
 
     cur.close()
     conn.close()
 
-    members = [
-        {
-            "membership_id": r[0],
-            "full_name": r[1],
-            "province": r[2],
-            "district": r[3],
-            "constituency": r[4],
-            "phone": r[5],
-            "status": r[6]
-        }
-        for r in rows
-    ]
+    if row:
+        return User(row[0], row[1], row[2])
 
-    return render_template(
-        "members.html",
-        members=members,
-        page=page,
-        total_pages=(total // per_page) + 1
-    )
+    return None
 
 # ======================
-# EDIT MEMBER
+# ROLE CONTROL
 # ======================
-@app.route("/edit/<membership_id>", methods=["GET", "POST"])
-@login_required
-@role_required("admin", "manager")
-def edit_member(membership_id):
+def role_required(*roles):
+    def decorator(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            if not current_user.is_authenticated or current_user.role not in roles:
+                return "Forbidden", 403
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
 
-    conn = get_db()
-    cur = conn.cursor()
+# ======================
+# LOGIN
+# ======================
+@auth_bp.route("/login", methods=["GET", "POST"])
+def login():
 
     if request.method == "POST":
 
-        full_name = request.form.get("full_name", "").strip()
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
 
-        if not full_name:
-            return "Full name required", 400
+        conn = get_db()
+        cur = conn.cursor()
 
         cur.execute("""
-            UPDATE members
-            SET full_name=%s,
-                province=%s,
-                district=%s,
-                constituency=%s,
-                phone=%s,
-                status=%s,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE membership_id=%s
-        """, (
-            full_name,
-            request.form["province"],
-            request.form["district"],
-            request.form["constituency"],
-            request.form["phone"],
-            request.form["status"],
-            membership_id
-        ))
+            SELECT id, username, password_hash, role, failed_attempts
+            FROM users
+            WHERE username=%s AND is_active=TRUE
+        """, (username,))
 
-        conn.commit()
+        user = cur.fetchone()
 
-        cur.close()
-        conn.close()
+        if not user:
+            flash("Invalid credentials")
+            return render_template("login.html")
 
-        return redirect("/members")
+        # 🔴 LOCKOUT (5 failed attempts)
+        if user[4] >= 5:
+            flash("Account locked. Contact admin.")
+            return render_template("login.html")
 
-    cur.execute("SELECT * FROM members WHERE membership_id=%s", (membership_id,))
-    row = cur.fetchone()
+        if check_password_hash(user[2], password):
 
-    if not row:
-        return "Member not found"
+            login_user(User(user[0], user[1], user[3]))
 
-    columns = [d[0] for d in cur.description]
-    member = dict(zip(columns, row))
+            # reset attempts + update login time
+            cur.execute("""
+                UPDATE users
+                SET failed_attempts=0,
+                    last_login=%s
+                WHERE id=%s
+            """, (datetime.utcnow(), user[0]))
 
-    cur.close()
-    conn.close()
+            conn.commit()
 
-    return render_template("edit_member.html", member=member)
+            cur.close()
+            conn.close()
+
+            return redirect("/")
+
+        else:
+            # increment failed attempts
+            cur.execute("""
+                UPDATE users
+                SET failed_attempts = failed_attempts + 1
+                WHERE id=%s
+            """, (user[0],))
+
+            conn.commit()
+
+            cur.close()
+            conn.close()
+
+            flash("Invalid credentials")
+
+    return render_template("login.html")
 
 # ======================
-# SOFT DELETE
+# LOGOUT
 # ======================
-@app.route("/delete/<membership_id>", methods=["POST"])
+@auth_bp.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect("/login")
+
+# ======================
+# CREATE USER (ADMIN ONLY)
+# ======================
+@auth_bp.route("/create_user", methods=["GET", "POST"])
 @login_required
 @role_required("admin")
-def delete_member(membership_id):
+def create_user():
+
+    if request.method == "POST":
+
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        role = request.form.get("role", "agent")
+
+        if not username or not password:
+            flash("Username and password required")
+            return redirect("/create_user")
+
+        if role not in ["admin", "manager", "agent"]:
+            flash("Invalid role")
+            return redirect("/create_user")
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        try:
+            cur.execute("""
+                INSERT INTO users (username, password_hash, role)
+                VALUES (%s, %s, %s)
+            """, (
+                username,
+                generate_password_hash(password),
+                role
+            ))
+
+            conn.commit()
+
+            flash(f"User '{username}' created")
+
+        except Exception:
+            conn.rollback()
+            flash("User already exists or error")
+
+        finally:
+            cur.close()
+            conn.close()
+
+        return redirect("/create_user")
+
+    return render_template("create_user.html")
+
+# ======================
+# DEACTIVATE USER
+# ======================
+@auth_bp.route("/deactivate_user/<int:user_id>", methods=["POST"])
+@login_required
+@role_required("admin")
+def deactivate_user(user_id):
 
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute("""
-        UPDATE members
-        SET is_deleted = TRUE
-        WHERE membership_id = %s
-    """, (membership_id,))
+        UPDATE users
+        SET is_active = FALSE
+        WHERE id = %s
+    """, (user_id,))
 
     conn.commit()
 
     cur.close()
     conn.close()
 
-    return redirect("/members")
+    return redirect("/")
 
 # ======================
-# SEARCH
+# SEED ADMIN
 # ======================
-@app.route("/search")
-@login_required
-def search():
-
-    q = request.args.get("q", "").strip().lower()
-
-    if not q:
-        return jsonify([])
+def seed_admin():
 
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT membership_id, full_name, phone, province, district, constituency, status
-        FROM members
-        WHERE is_deleted = FALSE
-        AND (LOWER(full_name) LIKE %s OR LOWER(phone) LIKE %s)
-        ORDER BY full_name
-        LIMIT 50
-    """, (f"%{q}%", f"%{q}%"))
+    cur.execute("SELECT id FROM users WHERE username='admin'")
+    exists = cur.fetchone()
 
-    rows = cur.fetchall()
+    if not exists:
+        cur.execute("""
+            INSERT INTO users (username, password_hash, role)
+            VALUES (%s, %s, %s)
+        """, (
+            "admin",
+            generate_password_hash(os.getenv("ADMIN_PASSWORD")),
+            "admin"
+        ))
+        conn.commit()
 
     cur.close()
     conn.close()
-
-    return jsonify([
-        {
-            "membership_id": r[0],
-            "full_name": r[1],
-            "phone": r[2],
-            "province": r[3],
-            "district": r[4],
-            "constituency": r[5],
-            "status": r[6]
-        }
-        for r in rows
-    ])
-
-# ======================
-# HEALTH CHECK
-# ======================
-@app.route("/health")
-def health():
-    return {"status": "ok"}
-
-# ======================
-# RUN
-# ======================
-if __name__ == "__main__":
-    app.run(debug=True)
