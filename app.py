@@ -1780,8 +1780,8 @@ def api_incidents():
         {
             "id": r[0],
             "type": r[1],
-            "province": r[2],
-            "constituency": r[3],
+            # 🔴 STANDARDIZED LOCATION HERE
+            "location": f"{r[3] or 'Unknown'}, {r[2] or ''}".strip(", "),
             "severity": r[4],
             "description": r[5],
             "status": r[6],
