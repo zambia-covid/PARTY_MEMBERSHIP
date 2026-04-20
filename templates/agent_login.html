@@ -3,7 +3,7 @@
 <head>
     <title>Agent Login</title>
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <style>
         * {
@@ -14,7 +14,7 @@
         body {
             margin: 0;
             padding: 0;
-            background: #0b5d1e;
+            background: linear-gradient(135deg, #0b5d1e, #063312);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -27,14 +27,19 @@
             background: #ffffff;
             padding: 22px;
             border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.35);
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {opacity:0; transform:translateY(10px);}
+            to {opacity:1; transform:translateY(0);}
         }
 
         h2 {
             text-align: center;
             margin-bottom: 18px;
             color: #0b5d1e;
-            font-size: 22px;
         }
 
         input {
@@ -43,13 +48,26 @@
             margin-bottom: 12px;
             border: 1px solid #ccc;
             border-radius: 8px;
-            font-size: 16px; /* prevents mobile zoom */
+            font-size: 16px;
             outline: none;
         }
 
         input:focus {
             border-color: #0b5d1e;
             box-shadow: 0 0 5px rgba(11,93,30,0.4);
+        }
+
+        .password-box {
+            position: relative;
+        }
+
+        .toggle {
+            position: absolute;
+            right: 10px;
+            top: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #555;
         }
 
         button {
@@ -61,10 +79,15 @@
             border-radius: 8px;
             font-size: 16px;
             font-weight: bold;
+            transition: 0.2s;
         }
 
         button:active {
             transform: scale(0.98);
+        }
+
+        button.loading {
+            background: gray;
         }
 
         .error {
@@ -72,6 +95,13 @@
             color: red;
             text-align: center;
             font-size: 14px;
+        }
+
+        .status {
+            text-align: center;
+            font-size: 12px;
+            margin-top: 8px;
+            color: #999;
         }
 
         .footer {
@@ -86,22 +116,60 @@
 <body>
 
 <div class="box">
-    <h2>Agent Login</h2>
+    <h2>🔐 Agent Login</h2>
 
-    <form method="POST">
+    <form method="POST" id="loginForm">
+
         <input type="text" name="phone" placeholder="Phone Number" required>
-        <input type="password" name="password" placeholder="Password" required>
-        <button type="submit">Login</button>
+
+        <div class="password-box">
+            <input type="password" name="password" id="password" placeholder="Password" required>
+            <span class="toggle" onclick="togglePassword()">Show</span>
+        </div>
+
+        <button type="submit" id="loginBtn">Login</button>
     </form>
 
     {% if error %}
     <p class="error">{{ error }}</p>
     {% endif %}
 
+    <div class="status" id="statusText"></div>
+
     <div class="footer">
         Secure Agent Access Portal
     </div>
 </div>
+
+<script>
+function togglePassword(){
+    const input = document.getElementById("password");
+    input.type = input.type === "password" ? "text" : "password";
+}
+
+/* 🔄 Prevent double submit + show loading */
+document.getElementById("loginForm").addEventListener("submit", function(){
+    const btn = document.getElementById("loginBtn");
+    btn.classList.add("loading");
+    btn.innerText = "Logging in...";
+});
+
+/* 📡 Network awareness */
+function updateStatus(){
+    const status = document.getElementById("statusText");
+    if(navigator.onLine){
+        status.innerText = "Online";
+        status.style.color = "green";
+    } else {
+        status.innerText = "Offline — check connection";
+        status.style.color = "red";
+    }
+}
+
+window.addEventListener("online", updateStatus);
+window.addEventListener("offline", updateStatus);
+updateStatus();
+</script>
 
 </body>
 </html>
