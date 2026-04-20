@@ -1766,42 +1766,42 @@ def agent_results():
 @login_required
 def api_incidents():
 
+    q = request.args.get("q", "").lower()
+
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT 
-            id,
-            agent_id,
-            province,
-            constituency,
-            polling_station,
-            message,
-            created_at
+    query = """
+        SELECT id, type, location, description, status, created_at
         FROM incidents
-        ORDER BY created_at DESC
-        LIMIT 100
-    """)
+        WHERE 1=1
+    """
 
+    params = []
+
+    if q:
+        query += " AND LOWER(description) LIKE %s"
+        params.append(f"%{q}%")
+
+    query += " ORDER BY created_at DESC LIMIT 100"
+
+    cur.execute(query, params)
     rows = cur.fetchall()
-
-    incidents = []
-
-    for r in rows:
-        incidents.append({
-            "id": r[0],
-            "agent_id": r[1],
-            "province": r[2],
-            "constituency": r[3],
-            "polling_station": r[4],
-            "message": r[5],
-            "created_at": str(r[6]) if r[6] else None
-        })
 
     cur.close()
     conn.close()
 
-    return jsonify(incidents)
+    return jsonify([
+        {
+            "id": r[0],
+            "type": r[1],
+            "location": r[2],
+            "description": r[3],
+            "status": r[4],
+            "created_at": r[5]
+        }
+        for r in rows
+    ])
 
 # ==============================
 # AGENT VOTE SEND
