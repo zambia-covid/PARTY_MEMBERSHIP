@@ -1,43 +1,158 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Incident Dashboard</title>
+<title>Incident Dashboard</title>
 
-    <style>
-        body {
-            font-family: Arial;
-            background: #111;
-            color: white;
-            margin: 0;
-        }
+<style>
+body {
+    font-family: Arial;
+    background: #111;
+    color: white;
+    margin: 0;
+}
 
-        .header {
-            background: #b30000;
-            padding: 15px;
-            font-size: 20px;
-        }
+.header {
+    background: #b30000;
+    padding: 15px;
+    font-size: 20px;
+    font-weight: bold;
+}
 
-        .container {
-            padding: 20px;
-        }
+.container {
+    padding: 20px;
+}
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            color: black;
-        }
+input {
+    padding: 10px;
+    border-radius: 6px;
+    border: none;
+    width: 250px;
+}
 
-        th {
-            background: #b30000;
-            color: white;
-            padding: 10px;
-        }
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    color: black;
+    margin-top: 20px;
+}
 
-        td {
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
-        }
+th {
+    background: #b30000;
+    color: white;
+    padding: 10px;
+}
 
-        .badge {
-            padding: 4
+td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+.badge {
+    padding: 5px 8px;
+    border-radius: 4px;
+    color: white;
+    font-size: 12px;
+}
+
+.badge-open {
+    background: red;
+}
+
+.badge-resolved {
+    background: green;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    Incident Dashboard
+</div>
+
+<div class="container">
+
+<!-- 🔎 SEARCH -->
+<input type="text" id="searchBox" placeholder="Search incidents...">
+
+<!-- 📊 TABLE -->
+<table>
+<thead>
+<tr>
+    <th>ID</th>
+    <th>Type</th>
+    <th>Location</th>
+    <th>Description</th>
+    <th>Status</th>
+    <th>Date</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% if incidents %}
+    {% for i in incidents %}
+    <tr>
+        <td>{{ i.id }}</td>
+        <td>{{ i.type }}</td>
+        <td>{{ i.location }}</td>
+        <td>{{ i.description }}</td>
+
+        <td>
+            {% if i.status == "Resolved" %}
+                <span class="badge badge-resolved">Resolved</span>
+            {% else %}
+                <span class="badge badge-open">Open</span>
+            {% endif %}
+        </td>
+
+        <td>{{ i.created_at }}</td>
+    </tr>
+    {% endfor %}
+{% else %}
+    <tr>
+        <td colspan="6">No incidents reported</td>
+    </tr>
+{% endif %}
+
+</tbody>
+</table>
+
+</div>
+
+<!-- 🔴 LIVE SEARCH SCRIPT -->
+<script>
+async function loadIncidents() {
+
+    const q = document.getElementById("searchBox").value;
+
+    const res = await fetch(`/api/incidents?q=${q}`);
+    const data = await res.json();
+
+    const tbody = document.querySelector("tbody");
+    tbody.innerHTML = "";
+
+    data.forEach(i => {
+        tbody.innerHTML += `
+        <tr>
+            <td>${i.id}</td>
+            <td>${i.type}</td>
+            <td>${i.location}</td>
+            <td>${i.description}</td>
+            <td>
+                ${i.status === "Resolved"
+                    ? '<span class="badge badge-resolved">Resolved</span>'
+                    : '<span class="badge badge-open">Open</span>'}
+            </td>
+            <td>${i.created_at}</td>
+        </tr>`;
+    });
+}
+
+document.getElementById("searchBox").addEventListener("input", loadIncidents);
+</script>
+
+</body>
+</html>
