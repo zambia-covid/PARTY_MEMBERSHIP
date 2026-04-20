@@ -1,3 +1,4 @@
+from auth import auth_bp, login_manager, seed_admin
 from flask import Blueprint, request, render_template, redirect, flash, session
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
