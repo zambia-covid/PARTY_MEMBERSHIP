@@ -2,6 +2,7 @@
 <html>
 <head>
 <title>Incident Command Center</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 body {
@@ -11,7 +12,6 @@ body {
     margin: 0;
 }
 
-/* HEADER */
 .header {
     background: #b30000;
     padding: 15px;
@@ -19,97 +19,108 @@ body {
     font-weight: bold;
 }
 
-/* CONTAINER */
-.container {
-    padding: 20px;
+/* CRITICAL STRIP */
+.critical-strip{
+    background:#300;
+    padding:8px;
+    overflow-x:auto;
+    white-space:nowrap;
+}
+.critical-item{
+    display:inline-block;
+    background:red;
+    padding:5px 10px;
+    margin-right:6px;
+    border-radius:6px;
+    font-size:12px;
 }
 
-/* SUMMARY PANELS */
+/* CONTAINER */
+.container { padding: 15px; }
+
+/* PANELS */
 .grid{
     display:flex;
-    gap:15px;
-    margin-bottom:20px;
+    gap:10px;
+    margin-bottom:15px;
 }
-
 .panel{
     flex:1;
-    padding:20px;
-    border-radius:8px;
+    padding:12px;
+    border-radius:6px;
     text-align:center;
-    font-size:22px;
     font-weight:bold;
 }
-
 .critical{ background:#8b0000; }
 .warning{ background:#cc5500; }
 .success{ background:#006400; }
 
+/* SEARCH */
+input{
+    padding:10px;
+    width:100%;
+    border-radius:6px;
+    border:none;
+    margin-bottom:10px;
+}
+
 /* TABLE */
+.table-wrap{
+    overflow-x:auto;
+}
+
 table {
-    width: 100%;
+    width:100%;
     border-collapse: collapse;
-    background: white;
-    color: black;
+    background:white;
+    color:black;
+    table-layout:fixed;
 }
 
-th {
-    background: #b30000;
-    color: white;
-    padding: 10px;
+th, td {
+    padding:8px;
+    border-bottom:1px solid #ddd;
+    word-wrap:break-word;
 }
 
-td {
-    padding: 10px;
-    border-bottom: 1px solid #ddd;
+th{
+    background:#b30000;
+    color:white;
 }
 
-/* BUTTON */
+img{
+    width:60px;
+    border-radius:6px;
+}
+
 button{
-    padding:6px 10px;
+    padding:6px;
     border:none;
     border-radius:4px;
     background:green;
     color:white;
-    cursor:pointer;
 }
 </style>
-
 </head>
 
 <body>
 
-<div class="header">
-    🚨 Incident Command Center
-</div>
+<div class="header">🚨 Incident Command Center</div>
+
+<!-- 🔴 CRITICAL STRIP -->
+<div id="criticalStrip" class="critical-strip"></div>
 
 <div class="container">
 
-<!-- 🔴 SUMMARY -->
 <div class="grid">
-
-    <div class="panel critical">
-        Critical
-        <div id="criticalCount">0</div>
-    </div>
-
-    <div class="panel warning">
-        Open
-        <div id="openCount">0</div>
-    </div>
-
-    <div class="panel success">
-        Resolved
-        <div id="resolvedCount">0</div>
-    </div>
-
+    <div class="panel critical">Critical<br><span id="criticalCount">0</span></div>
+    <div class="panel warning">Open<br><span id="openCount">0</span></div>
+    <div class="panel success">Resolved<br><span id="resolvedCount">0</span></div>
 </div>
 
-<!-- 🔎 SEARCH -->
-<input type="text" id="searchBox" placeholder="Search incidents..." style="padding:10px; margin-bottom:10px; width:250px;">
+<input id="searchBox" placeholder="Search incidents...">
 
-<!-- 🔴 LIVE FEED -->
-<h3>Live Incident Feed</h3>
-
+<div class="table-wrap">
 <table>
 <thead>
 <tr>
@@ -117,92 +128,91 @@ button{
     <th>Type</th>
     <th>Location</th>
     <th>Description</th>
+    <th>Photo</th>
     <th>Status</th>
     <th>Date</th>
     <th>Action</th>
 </tr>
 </thead>
-
-<tbody id="incidentFeed">
-</tbody>
+<tbody id="incidentFeed"></tbody>
 </table>
+</div>
 
 </div>
 
-<!-- 🔊 ALERT SOUND -->
 <audio id="alertSound" src="/static/alert.mp3"></audio>
 
-<!-- 🔴 REAL-TIME ENGINE -->
 <script>
 
 let lastCritical = 0;
 
-async function loadIncidents() {
+async function loadIncidents(){
 
     const q = document.getElementById("searchBox").value.toLowerCase();
 
     const res = await fetch("/api/incidents");
     const data = await res.json();
 
-    let critical = 0;
-    let open = 0;
-    let resolved = 0;
+    let critical=0, open=0, resolved=0;
 
     const tbody = document.getElementById("incidentFeed");
+    const strip = document.getElementById("criticalStrip");
+
     tbody.innerHTML = "";
+    strip.innerHTML = "";
 
-    data.forEach(i => {
+    // 🔴 LIMIT FEED (IMPORTANT)
+    data.slice(0, 100).forEach(i=>{
 
-        // 🔎 SEARCH FILTER
-        if(q && !i.description.toLowerCase().includes(q)) return;
+        const desc = (i.description || "").toLowerCase();
+        if(q && !desc.includes(q)) return;
 
-        if (i.status === "Critical") critical++;
-        else if (i.status === "Open") open++;
-        else if (i.status === "Resolved") resolved++;
+        if(i.status==="Critical"){
+            critical++;
+            strip.innerHTML += `<span class="critical-item">${i.type} - ${i.location}</span>`;
+        }
+        else if(i.status==="Open") open++;
+        else resolved++;
 
         tbody.innerHTML += `
         <tr>
             <td>${i.id}</td>
-            <td>${i.type}</td>
-            <td>${i.location}</td>
-            <td>${i.description}</td>
+            <td>${i.type || ""}</td>
+            <td>${i.location || ""}</td>
+            <td>${i.description || ""}</td>
+            <td>${i.photo ? `<img src="/static/uploads/${i.photo}">` : ""}</td>
             <td style="color:${
-                i.status === "Critical" ? "red" :
-                i.status === "Open" ? "orange" :
-                "green"
+                i.status==="Critical" ? "red" :
+                i.status==="Open" ? "orange" : "green"
             }">${i.status}</td>
             <td>${i.created_at}</td>
             <td>
-                ${i.status !== "Resolved" ? 
-                `<button onclick="resolveIncident('${i.id}')">Resolve</button>` 
-                : "—"}
+                ${i.status !== "Resolved"
+                    ? `<button onclick="resolveIncident('${i.id}')">Resolve</button>`
+                    : "—"}
             </td>
         </tr>`;
     });
 
-    // 🔴 UPDATE PANELS
     document.getElementById("criticalCount").innerText = critical;
     document.getElementById("openCount").innerText = open;
     document.getElementById("resolvedCount").innerText = resolved;
 
-    // 🔊 ALERT ON NEW CRITICAL
     if(critical > lastCritical){
         document.getElementById("alertSound").play();
     }
+
     lastCritical = critical;
 }
 
-/* 🔁 AUTO REFRESH */
 setInterval(loadIncidents, 5000);
 loadIncidents();
 
-/* 🎯 ACTION */
 async function resolveIncident(id){
-    await fetch(`/resolve/${id}`, { method: "POST" });
+    await fetch(`/resolve/${id}`, { method:"POST" });
     loadIncidents();
 }
 
-/* 🔎 SEARCH LISTENER */
 document.getElementById("searchBox").addEventListener("input", loadIncidents);
 
 </script>
