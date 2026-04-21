@@ -1,86 +1,185 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Submit Results</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Submit Results</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <style>
-        body {
-            font-family: Arial;
-            background: #0b5d1e;
-            color: white;
-            margin: 0;
-            padding: 15px;
-        }
+<style>
+body {
+    font-family: Arial;
+    background: #0b5d1e;
+    color: white;
+    margin: 0;
+}
 
-        h2 {
-            text-align: center;
-        }
+.header{
+    text-align:center;
+    padding:15px;
+    background:#063312;
+    font-size:18px;
+    font-weight:bold;
+}
 
-        .card {
-            background: white;
-            color: black;
-            padding: 15px;
-            border-radius: 12px;
-        }
+.container{
+    padding:15px;
+}
 
-        label {
-            font-weight: bold;
-            display: block;
-            margin-top: 10px;
-        }
+.card {
+    background: white;
+    color: black;
+    padding: 15px;
+    border-radius: 12px;
+}
 
-        input {
-            width: 100%;
-            padding: 12px;
-            font-size: 16px;
-            margin-top: 5px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-        }
+label {
+    font-weight: bold;
+    margin-top: 10px;
+    display:block;
+}
 
-        button {
-            width: 100%;
-            padding: 14px;
-            margin-top: 15px;
-            font-size: 16px;
-            border: none;
-            border-radius: 8px;
-            background: green;
-            color: white;
-            font-weight: bold;
-        }
+input {
+    width: 100%;
+    padding: 14px;
+    margin-top: 5px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size:16px;
+}
 
-        a {
-            display: block;
-            text-align: center;
-            margin-top: 15px;
-            color: white;
-            text-decoration: none;
-        }
-    </style>
+/* TOTAL DISPLAY */
+.total-box{
+    margin-top:10px;
+    padding:10px;
+    background:#f4f4f4;
+    border-radius:8px;
+    font-weight:bold;
+}
+
+/* BUTTON */
+button {
+    width: 100%;
+    padding: 16px;
+    margin-top: 15px;
+    border-radius: 10px;
+    border: none;
+    background: green;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* STATUS */
+.status{
+    text-align:center;
+    margin-top:10px;
+    font-size:12px;
+}
+
+/* ERROR */
+.error{
+    color:red;
+    font-size:13px;
+    margin-top:10px;
+}
+</style>
 </head>
 
 <body>
 
-<h2>Submit Results</h2>
+<div class="header">🗳 Submit Results</div>
+
+<div class="container">
 
 <div class="card">
-    <form method="POST">
-        <label>PF Votes</label>
-        <input type="number" name="pf" required>
 
-        <label>UPND Votes</label>
-        <input type="number" name="upnd" required>
+<form method="POST" id="resultsForm">
 
-        <label>Other Votes</label>
-        <input type="number" name="other" required>
+<label>Polling Station</label>
+<input name="station" placeholder="Station name or code" required>
 
-        <button type="submit">Submit Results</button>
-    </form>
+<label>PF Votes</label>
+<input type="number" id="pf" name="pf" required>
+
+<label>UPND Votes</label>
+<input type="number" id="upnd" name="upnd" required>
+
+<label>Other Votes</label>
+<input type="number" id="other" name="other" required>
+
+<div class="total-box">
+Total Votes: <span id="totalVotes">0</span>
+</div>
+
+<div class="error" id="errorBox"></div>
+
+<button type="submit" id="submitBtn">Submit Results</button>
+
+</form>
+
+<div class="status" id="networkStatus"></div>
+
 </div>
 
 <a href="{{ url_for('agent_dashboard') }}">⬅ Back to Dashboard</a>
+
+</div>
+
+<script>
+
+/* 🔢 AUTO TOTAL */
+function calculateTotal(){
+    const pf = parseInt(document.getElementById("pf").value) || 0;
+    const upnd = parseInt(document.getElementById("upnd").value) || 0;
+    const other = parseInt(document.getElementById("other").value) || 0;
+
+    const total = pf + upnd + other;
+    document.getElementById("totalVotes").innerText = total;
+}
+
+/* LISTENERS */
+document.getElementById("pf").addEventListener("input", calculateTotal);
+document.getElementById("upnd").addEventListener("input", calculateTotal);
+document.getElementById("other").addEventListener("input", calculateTotal);
+
+/* 🛑 VALIDATION */
+document.getElementById("resultsForm").addEventListener("submit", function(e){
+
+    const pf = parseInt(document.getElementById("pf").value) || 0;
+    const upnd = parseInt(document.getElementById("upnd").value) || 0;
+    const other = parseInt(document.getElementById("other").value) || 0;
+
+    const total = pf + upnd + other;
+
+    if(total <= 0){
+        e.preventDefault();
+        document.getElementById("errorBox").innerText = "Invalid vote total";
+        return;
+    }
+
+    /* ⏳ LOCK BUTTON */
+    const btn = document.getElementById("submitBtn");
+    btn.innerText = "Submitting...";
+    btn.disabled = true;
+});
+
+/* 📡 NETWORK STATUS */
+function updateNetwork(){
+    const el = document.getElementById("networkStatus");
+
+    if(navigator.onLine){
+        el.innerText = "Online";
+        el.style.color = "lightgreen";
+    } else {
+        el.innerText = "Offline — submission may fail";
+        el.style.color = "orange";
+    }
+}
+
+window.addEventListener("online", updateNetwork);
+window.addEventListener("offline", updateNetwork);
+updateNetwork();
+
+</script>
 
 </body>
 </html>
