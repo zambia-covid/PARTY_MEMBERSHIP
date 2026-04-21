@@ -6,8 +6,7 @@
     <div class="menu-section">CORE</div>
     <a href="/" class="{% if request.path == '/' %}active{% endif %}">Dashboard</a>
     <a href="/war_room" class="{% if request.path.startswith('/war_room') %}active{% endif %}">War Room</a>
-    <a href="/live_stats" class="{% if request.path.startswith('/live_stats') %}active{% endif %}">Live Stats</a>
-
+  
     <!-- INTELLIGENCE -->
     <div class="menu-section">INTELLIGENCE</div>
     <a href="/polling_intelligence" class="{% if 'polling_intelligence' in request.path %}active{% endif %}">Polling Intelligence</a>
@@ -25,11 +24,6 @@
     <!-- MEMBERS -->
     <div class="menu-section">MEMBERS</div>
     <a href="/members?key={{config.ADMIN_KEY}}" class="{% if 'members' in request.path %}active{% endif %}">Members</a>
-    <a href="/register" class="{% if 'register' in request.path %}active{% endif %}">Register</a>
-
-    <!-- AI -->
-    <div class="menu-section">AI</div>
-    <a href="/ai" class="{% if 'ai' in request.path %}active{% endif %}">AI Command</a>
 
     <!-- SYSTEM -->
     <div class="menu-section">SYSTEM</div>
