@@ -5,23 +5,111 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body { font-family: Arial; background:#0b5d1e; color:white; padding:15px; }
-.card { background:white; color:black; padding:15px; border-radius:12px; }
-input, select { width:100%; padding:12px; margin-top:10px; border-radius:8px; border:1px solid #ccc; }
-button { width:100%; padding:14px; margin-top:15px; background:green; color:white; border:none; border-radius:8px; font-weight:bold; }
+*{
+    box-sizing:border-box;
+    font-family: Arial, sans-serif;
+}
+
+body{
+    margin:0;
+    background:linear-gradient(135deg,#0b5d1e,#063312);
+    color:white;
+}
+
+/* HEADER */
+.header{
+    padding:15px;
+    text-align:center;
+    font-size:20px;
+    font-weight:bold;
+}
+
+/* CONTAINER */
+.container{
+    padding:15px;
+    max-width:500px;
+    margin:auto;
+}
+
+/* CARD */
+.card{
+    background:white;
+    color:black;
+    padding:18px;
+    border-radius:14px;
+    box-shadow:0 8px 20px rgba(0,0,0,0.25);
+}
+
+/* LABELS */
+label{
+    display:block;
+    font-size:13px;
+    font-weight:bold;
+    margin-top:14px;
+}
+
+/* INPUTS */
+input, select{
+    width:100%;
+    padding:14px;
+    margin-top:6px;
+    border-radius:10px;
+    border:1px solid #ccc;
+    font-size:16px; /* prevents zoom */
+}
+
+/* BUTTON */
+button{
+    width:100%;
+    padding:16px;
+    margin-top:18px;
+    border:none;
+    border-radius:10px;
+    background:#0b5d1e;
+    color:white;
+    font-size:16px;
+    font-weight:bold;
+}
+
+/* BUTTON ACTIVE */
+button:active{
+    transform:scale(0.98);
+}
+
+/* STATUS */
+.status{
+    text-align:center;
+    font-size:12px;
+    margin-top:10px;
+    color:#ddd;
+}
+
+/* ROLE HELP */
+.helper{
+    font-size:11px;
+    color:#666;
+    margin-top:4px;
+}
 </style>
 </head>
 
 <body>
 
-<h2>Create User</h2>
+<div class="header">👤 Create User</div>
+
+<div class="container">
 
 <div class="card">
-<form method="POST">
 
-<input name="phone" placeholder="Phone" required>
-<input name="password" placeholder="Password" required>
+<form method="POST" id="userForm">
 
+<label>Phone Number</label>
+<input name="phone" placeholder="e.g. 097XXXXXXX" required>
+
+<label>Password</label>
+<input type="password" name="password" required>
+
+<label>Role</label>
 <select name="role" required>
     <option value="">Select Role</option>
     <option value="admin">Admin (Full Access)</option>
@@ -29,15 +117,56 @@ button { width:100%; padding:14px; margin-top:15px; background:green; color:whit
     <option value="agent">Agent (Field)</option>
     <option value="guest">Guest (View Only)</option>
 </select>
+<div class="helper">
+Admin = full control • Manager = oversight • Agent = field ops • Guest = read-only
+</div>
 
-<input name="province" placeholder="Province">
-<input name="constituency" placeholder="Constituency">
-<input name="polling_station" placeholder="Polling Station">
+<label>Province</label>
+<input name="province" placeholder="e.g. Lusaka">
 
-<button>Create User</button>
+<label>Constituency</label>
+<input name="constituency" placeholder="e.g. Lusaka Central">
+
+<label>Polling Station</label>
+<input name="polling_station" placeholder="Optional">
+
+<button type="submit" id="submitBtn">Create User</button>
 
 </form>
+
+<div class="status" id="statusText"></div>
+
 </div>
+
+</div>
+
+<script>
+
+/* ⏳ LOADING STATE */
+document.getElementById("userForm").addEventListener("submit", function(){
+    const btn = document.getElementById("submitBtn");
+    btn.innerText = "Creating...";
+    btn.disabled = true;
+});
+
+/* 📡 NETWORK STATUS */
+function updateStatus(){
+    const el = document.getElementById("statusText");
+
+    if(navigator.onLine){
+        el.innerText = "Online";
+        el.style.color = "lightgreen";
+    } else {
+        el.innerText = "Offline — submission may fail";
+        el.style.color = "orange";
+    }
+}
+
+window.addEventListener("online", updateStatus);
+window.addEventListener("offline", updateStatus);
+updateStatus();
+
+</script>
 
 </body>
 </html>
