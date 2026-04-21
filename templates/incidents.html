@@ -19,6 +19,14 @@ body {
     font-weight: bold;
 }
 
+/* STRATEGY PANEL */
+.strategy {
+    background:#002b36;
+    padding:15px;
+    margin:10px;
+    border-radius:8px;
+}
+
 /* CRITICAL STRIP */
 .critical-strip{
     background:#300;
@@ -36,7 +44,7 @@ body {
 }
 
 /* CONTAINER */
-.container { padding: 15px; }
+.container { padding: 10px; }
 
 /* PANELS */
 .grid{
@@ -85,9 +93,9 @@ td, th {
 }
 
 td {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    word-wrap: break-word;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    word-wrap:break-word;
 }
 
 th{
@@ -95,12 +103,11 @@ th{
     color:white;
 }
 
-/* IMAGE FIX */
+/* IMAGE */
 img{
     width:60px;
     height:60px;
     object-fit:cover;
-    display:block;
 }
 
 /* BUTTON */
@@ -118,6 +125,15 @@ button{
 
 <div class="header">🚨 Incident Command Center</div>
 
+<!-- 🧠 STRATEGY -->
+<div class="strategy">
+    <strong>🧠 Strategic Directive</strong>
+    <div id="strategyBox" style="margin-top:8px;">
+        Loading strategy...
+    </div>
+</div>
+
+<!-- 🚨 CRITICAL -->
 <div id="criticalStrip" class="critical-strip"></div>
 
 <div class="container">
@@ -133,7 +149,6 @@ button{
 <div class="table-wrap">
 <table>
 
-<!-- ✅ CORRECT PLACEMENT -->
 <colgroup>
     <col style="width:6%">
     <col style="width:10%">
@@ -170,6 +185,19 @@ button{
 
 let lastCritical = 0;
 
+/* 🧠 LOAD STRATEGY */
+async function loadStrategy(){
+    try{
+        const res = await fetch("/api/strategy");
+        const data = await res.json();
+        document.getElementById("strategyBox").innerText = data.advice;
+    } catch {
+        document.getElementById("strategyBox").innerText =
+            "Strategy unavailable.";
+    }
+}
+
+/* 🚨 LOAD INCIDENTS */
 async function loadIncidents(){
 
     const q = document.getElementById("searchBox").value.toLowerCase();
@@ -185,10 +213,10 @@ async function loadIncidents(){
     tbody.innerHTML = "";
     strip.innerHTML = "";
 
-    data.slice(0, 100).forEach(i=>{
+    data.slice(0,100).forEach(i=>{
 
         const desc = (i.description || "").toLowerCase();
-        if(q && !desc.includes(desc)) return;
+        if(q && !desc.includes(q)) return;
 
         if(i.status==="Critical"){
             critical++;
@@ -228,13 +256,18 @@ async function loadIncidents(){
     lastCritical = critical;
 }
 
-setInterval(loadIncidents, 5000);
-loadIncidents();
-
+/* ACTION */
 async function resolveIncident(id){
     await fetch(`/resolve/${id}`, { method:"POST" });
     loadIncidents();
 }
+
+/* INIT */
+loadIncidents();
+loadStrategy();
+
+setInterval(loadIncidents, 5000);
+setInterval(loadStrategy, 30000);
 
 document.getElementById("searchBox").addEventListener("input", loadIncidents);
 
