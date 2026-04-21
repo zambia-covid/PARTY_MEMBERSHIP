@@ -13,6 +13,7 @@ body{
     color:white;
 }
 
+/* HEADER */
 .header{
     padding:15px;
     text-align:center;
@@ -20,28 +21,31 @@ body{
     font-weight:bold;
 }
 
+/* CONTAINER */
 .container{
     padding:15px;
     max-width:500px;
     margin:auto;
 }
 
+/* CARD */
 .card{
     background:white;
     color:black;
     padding:18px;
     border-radius:14px;
     box-shadow:0 8px 20px rgba(0,0,0,0.25);
-    margin-bottom:15px;
 }
 
+/* LABEL */
 label{
+    display:block;
     font-size:13px;
     font-weight:bold;
-    margin-top:12px;
-    display:block;
+    margin-top:14px;
 }
 
+/* INPUTS */
 input, select{
     width:100%;
     padding:14px;
@@ -51,10 +55,11 @@ input, select{
     font-size:16px;
 }
 
+/* BUTTON */
 button{
     width:100%;
     padding:16px;
-    margin-top:15px;
+    margin-top:18px;
     border:none;
     border-radius:10px;
     background:#0b5d1e;
@@ -63,9 +68,16 @@ button{
     font-weight:bold;
 }
 
-.helper{
-    font-size:11px;
-    color:#666;
+button:active{
+    transform:scale(0.98);
+}
+
+/* STATUS */
+.status{
+    text-align:center;
+    font-size:12px;
+    margin-top:10px;
+    color:#ddd;
 }
 </style>
 </head>
@@ -76,11 +88,11 @@ button{
 
 <div class="container">
 
-<!-- 🔴 SINGLE USER -->
 <div class="card">
+
 <form method="POST" id="userForm">
 
-<label>Phone</label>
+<label>Phone Number</label>
 <input name="phone" required>
 
 <label>Password</label>
@@ -96,31 +108,31 @@ button{
 </select>
 
 <label>Province</label>
-<select id="provinceSelect" name="province" required></select>
+<select name="province" required>
+    <option value="">Select Province</option>
+    <option>Lusaka</option>
+    <option>Copperbelt</option>
+    <option>Central</option>
+    <option>Eastern</option>
+    <option>Southern</option>
+    <option>Northern</option>
+    <option>Muchinga</option>
+    <option>Luapula</option>
+    <option>Western</option>
+    <option>North-Western</option>
+</select>
 
 <label>Constituency</label>
-<select id="constituencySelect" name="constituency" required></select>
+<input name="constituency" placeholder="Enter constituency">
 
 <label>Polling Station</label>
-<input name="polling_station">
+<input name="polling_station" placeholder="Optional">
 
-<button>Create User</button>
+<button type="submit" id="submitBtn">Create User</button>
 
 </form>
-</div>
 
-<!-- 🔴 BULK UPLOAD -->
-<div class="card">
-<h3>📋 Bulk Upload (CSV)</h3>
-
-<form method="POST" action="/bulk_upload_users" enctype="multipart/form-data">
-    <input type="file" name="file" accept=".csv" required>
-    <button>Upload CSV</button>
-</form>
-
-<div class="helper">
-Format: phone,password,role,province,constituency,polling_station
-</div>
+<div class="status" id="statusText"></div>
 
 </div>
 
@@ -128,45 +140,29 @@ Format: phone,password,role,province,constituency,polling_station
 
 <script>
 
-/* 🔽 LOAD PROVINCES */
-async function loadProvinces(){
-    const res = await fetch("/api/provinces_list");
-    const data = await res.json();
-
-    let html = '<option value="">Select Province</option>';
-
-    data.forEach(p=>{
-        html += `<option value="${p}">${p}</option>`;
-    });
-
-    document.getElementById("provinceSelect").innerHTML = html;
-}
-
-/* 🔽 LOAD CONSTITUENCIES */
-async function loadConstituencies(province){
-
-    const res = await fetch(`/api/constituencies?province=${province}`);
-    const data = await res.json();
-
-    let html = '<option value="">Select Constituency</option>';
-
-    data.forEach(c=>{
-        html += `<option value="${c}">${c}</option>`;
-    });
-
-    document.getElementById("constituencySelect").innerHTML = html;
-}
-
-/* LISTENER */
-document.getElementById("provinceSelect").addEventListener("change", function(){
-    const province = this.value;
-    if(province){
-        loadConstituencies(province);
-    }
+/* ⏳ LOADING STATE */
+document.getElementById("userForm").addEventListener("submit", function(){
+    const btn = document.getElementById("submitBtn");
+    btn.innerText = "Creating...";
+    btn.disabled = true;
 });
 
-/* INIT */
-loadProvinces();
+/* 📡 NETWORK STATUS */
+function updateStatus(){
+    const el = document.getElementById("statusText");
+
+    if(navigator.onLine){
+        el.innerText = "Online";
+        el.style.color = "lightgreen";
+    } else {
+        el.innerText = "Offline — submission may fail";
+        el.style.color = "orange";
+    }
+}
+
+window.addEventListener("online", updateStatus);
+window.addEventListener("offline", updateStatus);
+updateStatus();
 
 </script>
 
