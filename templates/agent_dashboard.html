@@ -13,6 +13,7 @@ body {
     color:white;
 }
 
+/* HEADER */
 .header{
     padding:15px;
     background:#063312;
@@ -20,33 +21,32 @@ body {
     font-weight:bold;
     display:flex;
     justify-content:space-between;
+    align-items:center;
 }
 
-.container{
-    padding:20px;
+.header small{
+    font-size:12px;
+    display:block;
+    opacity:0.8;
 }
 
-.card{
-    background:white;
-    color:black;
-    padding:15px;
-    border-radius:12px;
-    margin-bottom:15px;
-}
-
-button{
-    width:100%;
-    padding:15px;
-    margin-top:10px;
+/* LOGOUT BUTTON */
+.logout-btn{
+    background:red;
+    color:white;
     border:none;
-    border-radius:10px;
-    font-size:16px;
+    padding:8px 12px;
+    border-radius:6px;
     font-weight:bold;
+    cursor:pointer;
 }
 
-.report{ background:red; color:white; }
-.feed{ background:#0b5d1e; color:white; }
+/* CONTAINER */
+.container{
+    padding:15px;
+}
 
+/* STATUS GRID */
 .grid{
     display:flex;
     gap:10px;
@@ -65,23 +65,66 @@ button{
 .open{ background:#cc5500; }
 .resolved{ background:#006400; }
 
+/* CARD */
+.card{
+    background:white;
+    color:black;
+    padding:15px;
+    border-radius:12px;
+    margin-bottom:15px;
+}
+
+/* BUTTONS */
+button.action{
+    width:100%;
+    padding:15px;
+    margin-top:10px;
+    border:none;
+    border-radius:10px;
+    font-size:16px;
+    font-weight:bold;
+}
+
+.report{ background:red; color:white; }
+.feed{ background:#0b5d1e; color:white; }
+.results{ background:#003366; color:white; }
+
+/* FEED */
+.feed-item{
+    margin-bottom:10px;
+    padding-bottom:8px;
+    border-bottom:1px solid #eee;
+}
+
 .small{
     font-size:12px;
-    opacity:0.9;
+    opacity:0.8;
+}
+
+/* NETWORK */
+.status{
+    text-align:center;
+    font-size:12px;
+    margin-top:10px;
 }
 </style>
 </head>
 
 <body>
 
+<!-- HEADER -->
 <div class="header">
-    <span>Agent Dashboard</span>
-    <a href="/logout" style="color:white; text-decoration:none;">Logout</a>
+    <div>
+        Agent Dashboard
+        <small>{{ session.constituency }}</small>
+    </div>
+
+    <button class="logout-btn" onclick="confirmLogout()">Logout</button>
 </div>
 
 <div class="container">
 
-<!-- 🔴 STATUS -->
+<!-- STATUS -->
 <div class="grid">
     <div class="box critical">
         Critical<br>
@@ -99,68 +142,102 @@ button{
     </div>
 </div>
 
-<!-- 🎯 ACTIONS -->
+<!-- ACTIONS -->
 <div class="card">
-    <button class="report" onclick="location.href='/report_incident'">
+    <button class="action report" onclick="location.href='/report_incident'">
         🚨 Report Incident
     </button>
 
-    <button class="feed" onclick="location.href='/incidents'">
+    <button class="action feed" onclick="location.href='/incidents'">
         📡 View Live Feed
+    </button>
+
+    <button class="action results" onclick="location.href='/submit_results'">
+        🗳 Submit Results
     </button>
 </div>
 
-<!-- 📡 RECENT INCIDENTS -->
+<!-- RECENT ACTIVITY -->
 <div class="card">
     <h3>Recent Activity</h3>
     <div id="recentFeed" class="small">Loading...</div>
 </div>
 
+<!-- NETWORK STATUS -->
+<div class="status" id="networkStatus"></div>
+
 </div>
 
 <script>
-async function loadDashboard(){
 
-    const res = await fetch("/api/incidents");
-    const data = await res.json();
-
-    let critical = 0;
-    let open = 0;
-    let resolved = 0;
-
-    let recentHTML = "";
-
-    data.slice(0,5).forEach(i => {
-
-        if(i.status === "Critical") critical++;
-        else if(i.status === "Open") open++;
-        else if(i.status === "Resolved") resolved++;
-
-        // ✅ YOUR EXACT FIX APPLIED HERE
-        recentHTML += `
-            <div style="margin-bottom:8px;">
-                <strong>${i.type || "Incident"}</strong> - 
-                ${(i.constituency || "Unknown")}${i.province ? ", " + i.province : ""}
-                <br>
-                <span style="color:${
-                    i.status === "Critical" ? "red" :
-                    i.status === "Open" ? "orange" :
-                    "green"
-                }">${i.status}</span>
-            </div>
-        `;
-    });
-
-    document.getElementById("criticalCount").innerText = critical;
-    document.getElementById("openCount").innerText = open;
-    document.getElementById("resolvedCount").innerText = resolved;
-
-    document.getElementById("recentFeed").innerHTML = recentHTML || "No activity";
+/* 🔐 LOGOUT */
+function confirmLogout(){
+    if(confirm("Are you sure you want to logout?")){
+        window.location.href = "/logout";
+    }
 }
 
-/* 🔁 AUTO REFRESH */
-setInterval(loadDashboard, 5000);
+/* 📡 LOAD DATA */
+async function loadDashboard(){
+
+    try{
+        const res = await fetch("/api/my_incidents"); // 🔥 scoped to agent
+        const data = await res.json();
+
+        let critical = 0, open = 0, resolved = 0;
+        let html = "";
+
+        data.slice(0,5).forEach(i => {
+
+            if(i.status === "Critical") critical++;
+            else if(i.status === "Open") open++;
+            else resolved++;
+
+            html += `
+            <div class="feed-item">
+                <strong>${i.type || "Incident"}</strong><br>
+                ${i.location || "Unknown"}<br>
+                <span style="color:${
+                    i.status === "Critical" ? "red" :
+                    i.status === "Open" ? "orange" : "green"
+                }">${i.status}</span>
+            </div>`;
+        });
+
+        document.getElementById("criticalCount").innerText = critical;
+        document.getElementById("openCount").innerText = open;
+        document.getElementById("resolvedCount").innerText = resolved;
+
+        document.getElementById("recentFeed").innerHTML =
+            html || "No recent activity";
+
+    } catch {
+        document.getElementById("recentFeed").innerText =
+            "Error loading data";
+    }
+}
+
+/* 🌐 NETWORK STATUS */
+function updateNetwork(){
+    const el = document.getElementById("networkStatus");
+
+    if(navigator.onLine){
+        el.innerText = "Online";
+        el.style.color = "lightgreen";
+    } else {
+        el.innerText = "Offline — limited functionality";
+        el.style.color = "orange";
+    }
+}
+
+/* INIT */
 loadDashboard();
+setInterval(loadDashboard, 5000);
+
+updateNetwork();
+window.addEventListener("online", updateNetwork);
+window.addEventListener("offline", updateNetwork);
+
 </script>
 
 </body>
