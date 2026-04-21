@@ -1304,12 +1304,6 @@ def logout():
     logout_user()
     return redirect("/login")
     
-@app.route("/logout", methods=["POST"])
-@login_required
-def logout():
-    session.clear()
-    return redirect("/agent_login")
-
 @app.route("/api/live_dashboard")
 @login_required
 def live_dashboard():
