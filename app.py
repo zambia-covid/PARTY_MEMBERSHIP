@@ -16,6 +16,7 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 from openai import OpenAI
 from auth import role_required
+from flask import session
 
 # ======================
 # CREATE APP FIRST
@@ -1343,6 +1344,11 @@ def live_dashboard():
 
     return jsonify(data)
 
+@app.route("/logout")
+def logout():
+    session.clear()  # 🔴 clears everything
+    return redirect(url_for("agent_login"))
+
 @app.route("/api/map_intelligence")
 @login_required
 def map_intelligence():
@@ -1637,9 +1643,8 @@ def ai_page():
     return render_template("ai.html")
 
 # ==============================
-# AGENT REPORT
+#  SUBMIT RESULTS
 # ==============================
-
 @app.route('/submit_results', methods=['GET', 'POST'])
 @login_required
 @agent_required
@@ -1647,16 +1652,30 @@ def submit_results():
 
     if request.method == 'POST':
 
-        pf = int(request.form.get("pf", 0))
-        upnd = int(request.form.get("upnd", 0))
-        other = int(request.form.get("other", 0))
+        try:
+            pf = int(request.form.get("pf", 0))
+            upnd = int(request.form.get("upnd", 0))
+            other = int(request.form.get("other", 0))
+        except:
+            return "Invalid input", 400
+
+        # 🔴 BASIC VALIDATION
+        if pf < 0 or upnd < 0 or other < 0:
+            return "Votes cannot be negative", 400
+
+        total_votes = pf + upnd + other
+
+        if total_votes == 0:
+            return "Total votes cannot be zero", 400
 
         agent_id = current_user.id.replace("agent_", "")
 
         conn = get_db()
         cur = conn.cursor()
 
-        # Get agent details
+        # ==============================
+        # 🔴 GET AGENT DETAILS
+        # ==============================
         cur.execute("""
             SELECT province, constituency, polling_station
             FROM agents
@@ -1669,12 +1688,50 @@ def submit_results():
 
         province, constituency, polling_station = agent
 
-        # 🔴 INSERT INTO REAL TABULATION TABLE
+        # ==============================
+        # 🔴 CHECK DUPLICATE SUBMISSION
+        # ==============================
+        cur.execute("""
+            SELECT 1 FROM polling_station_results
+            WHERE polling_station=%s
+            LIMIT 1
+        """, (polling_station,))
+
+        if cur.fetchone():
+            return "Results already submitted for this station", 400
+
+        # ==============================
+        # 🔴 OPTIONAL: VOTER LIMIT CHECK
+        # ==============================
+        cur.execute("""
+            SELECT total_voters
+            FROM constituencies
+            WHERE constituency=%s
+        """, (constituency,))
+
+        row = cur.fetchone()
+
+        if row:
+            max_voters = row[0]
+            if total_votes > max_voters:
+                return "Votes exceed registered voters", 400
+
+        # ==============================
+        # 🔴 INSERT RESULTS
+        # ==============================
         cur.execute("""
             INSERT INTO polling_station_results
-            (agent_id, province, constituency, polling_station, pf_votes, upnd_votes, other_votes)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (agent_id, province, constituency, polling_station, pf, upnd, other))
+            (agent_id, province, constituency, polling_station, pf_votes, upnd_votes, other_votes, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+        """, (
+            agent_id,
+            province,
+            constituency,
+            polling_station,
+            pf,
+            upnd,
+            other
+        ))
 
         conn.commit()
         cur.close()
