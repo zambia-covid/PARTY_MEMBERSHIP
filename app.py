@@ -2068,7 +2068,7 @@ def agent_login():
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT id, password, constituency
+            SELECT agent_id, password, constituency
             FROM agents
             WHERE phone=%s
         """, (phone,))
