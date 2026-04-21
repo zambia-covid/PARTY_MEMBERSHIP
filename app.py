@@ -1848,26 +1848,36 @@ def resolve_incident(incident_id):
 # ==============================
 # API MY INCIDENTS
 # ==============================
+@app.route("/api/incidents")
+def api_incidents():
 
-@app.route("/api/my_incidents")
-@login_required
-def my_incidents():
-
-    constituency = session.get("constituency")
+    if session.get("role") not in ["agent", "admin"]:
+        return jsonify([])
 
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("""
-        SELECT id, type, province, constituency, severity,
-               description, status, created_at
-        FROM incidents
-        WHERE constituency = %s
-        ORDER BY created_at DESC
-        LIMIT 20
-    """, (constituency,))
+    # 🔴 ADMIN sees everything
+    if session.get("role") == "admin":
+        cur.execute("""
+            SELECT id, type, province, constituency, severity,
+                   description, status, created_at, photo
+            FROM incidents
+            ORDER BY created_at DESC
+        """)
+
+    # 🔴 AGENT sees only their area
+    else:
+        cur.execute("""
+            SELECT id, type, province, constituency, severity,
+                   description, status, created_at, photo
+            FROM incidents
+            WHERE constituency = %s
+            ORDER BY created_at DESC
+        """, (session.get("constituency"),))
 
     rows = cur.fetchall()
+
     cur.close()
     conn.close()
 
@@ -1877,8 +1887,10 @@ def my_incidents():
             "type": r[1],
             "location": f"{r[3]}, {r[2]}",
             "severity": r[4],
+            "description": r[5],
             "status": r[6],
-            "created_at": str(r[7])
+            "created_at": str(r[7]),
+            "photo": r[8]
         }
         for r in rows
     ])
@@ -2068,17 +2080,21 @@ def agent_login():
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT agent_id, password, constituency
+            SELECT agent_id, password, role, constituency
             FROM agents
             WHERE phone=%s
         """, (phone,))
 
         user = cur.fetchone()
 
+        cur.close()
+        conn.close()
+
         if user and check_password_hash(user[1], password):
 
             session["agent_id"] = user[0]
-            session["constituency"] = user[2]   # ✅ HERE
+            session["role"] = user[2]
+            session["constituency"] = user[3]
 
             return redirect("/agent_dashboard")
 
@@ -2089,10 +2105,12 @@ def agent_login():
 # ==============================
 # AGENT DASHBOARD
 # ==============================
-
 @app.route("/agent_dashboard")
-@login_required
 def agent_dashboard():
+
+    if session.get("role") not in ["agent", "admin"]:
+        return "Forbidden", 403
+
     return render_template("agent_dashboard.html")
 
 # ==============================
