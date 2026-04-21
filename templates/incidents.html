@@ -1,6 +1,222 @@
 <!DOCTYPE html>
 <html>
 <head>
+<title>Incident Feed</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+    font-family: Arial;
+    background:#111;
+    color:white;
+    margin:0;
+}
+
+/* HEADER */
+.header{
+    background:#b30000;
+    padding:14px;
+    font-size:18px;
+    font-weight:bold;
+    text-align:center;
+}
+
+/* SUMMARY (STACK ON MOBILE) */
+.grid{
+    display:flex;
+    flex-wrap:wrap;
+}
+
+.panel{
+    flex:1 1 33%;
+    padding:12px;
+    text-align:center;
+    font-weight:bold;
+}
+
+.critical{ background:#8b0000; }
+.warning{ background:#cc5500; }
+.success{ background:#006400; }
+
+/* SEARCH */
+.search{
+    padding:10px;
+    background:#222;
+}
+
+input{
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:6px;
+}
+
+/* FEED */
+.feed{
+    padding:10px;
+}
+
+/* CARD */
+.card{
+    background:white;
+    color:black;
+    border-radius:10px;
+    padding:12px;
+    margin-bottom:12px;
+    box-shadow:0 3px 8px rgba(0,0,0,0.4);
+}
+
+/* TOP LINE */
+.top{
+    display:flex;
+    justify-content:space-between;
+    font-weight:bold;
+    margin-bottom:5px;
+}
+
+/* LOCATION */
+.location{
+    font-size:12px;
+    color:#555;
+}
+
+/* STATUS */
+.status{
+    font-weight:bold;
+    margin-top:5px;
+}
+
+.status-critical{ color:red; }
+.status-open{ color:orange; }
+.status-resolved{ color:green; }
+
+/* IMAGE */
+img{
+    width:100%;
+    border-radius:8px;
+    margin-top:8px;
+}
+
+/* BUTTON */
+button{
+    margin-top:10px;
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:6px;
+    background:green;
+    color:white;
+    font-size:15px;
+}
+
+/* SMALL TEXT */
+.meta{
+    font-size:11px;
+    color:#777;
+    margin-top:6px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">🚨 Incident Feed</div>
+
+<!-- SUMMARY -->
+<div class="grid">
+    <div class="panel critical">Critical<br><span id="criticalCount">0</span></div>
+    <div class="panel warning">Open<br><span id="openCount">0</span></div>
+    <div class="panel success">Resolved<br><span id="resolvedCount">0</span></div>
+</div>
+
+<!-- SEARCH -->
+<div class="search">
+    <input type="text" id="searchBox" placeholder="Search incidents...">
+</div>
+
+<!-- FEED -->
+<div id="incidentFeed" class="feed"></div>
+
+<audio id="alertSound" src="/static/alert.mp3"></audio>
+
+<script>
+let lastCritical = 0;
+
+async function loadIncidents(){
+
+    const q = document.getElementById("searchBox").value.toLowerCase();
+
+    const res = await fetch("/api/incidents");
+    const data = await res.json();
+
+    let critical=0, open=0, resolved=0;
+
+    const container = document.getElementById("incidentFeed");
+    container.innerHTML = "";
+
+    data.forEach(i=>{
+
+        const desc = (i.description || "").toLowerCase();
+        if(q && !desc.includes(q)) return;
+
+        if(i.status==="Critical") critical++;
+        else if(i.status==="Open") open++;
+        else resolved++;
+
+        const statusClass =
+            i.status==="Critical" ? "status-critical" :
+            i.status==="Open" ? "status-open" :
+            "status-resolved";
+
+        container.innerHTML += `
+        <div class="card">
+
+            <div class="top">
+                <span>${i.type || "Incident"}</span>
+                <span class="${statusClass}">${i.status}</span>
+            </div>
+
+            <div class="location">${i.location || "Unknown"}</div>
+
+            <div>${i.description || ""}</div>
+
+            ${i.photo ? `<img src="/static/uploads/${i.photo}">` : ""}
+
+            <div class="meta">${i.created_at}</div>
+
+            ${i.status !== "Resolved"
+                ? `<button onclick="resolveIncident('${i.id}')">Resolve</button>`
+                : ""}
+        </div>`;
+    });
+
+    document.getElementById("criticalCount").innerText = critical;
+    document.getElementById("openCount").innerText = open;
+    document.getElementById("resolvedCount").innerText = resolved;
+
+    if(critical > lastCritical){
+        document.getElementById("alertSound").play();
+    }
+
+    lastCritical = critical;
+}
+
+setInterval(loadIncidents, 5000);
+loadIncidents();
+
+async function resolveIncident(id){
+    await fetch(`/resolve/${id}`, { method:"POST" });
+    loadIncidents();
+}
+
+document.getElementById("searchBox").addEventListener("input", loadIncidents);
+</script>
+
+</body>
+</html><!DOCTYPE html>
+<html>
+<head>
 <title>Incident Command Center</title>
 
 <style>
