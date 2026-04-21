@@ -24,7 +24,7 @@ body {
     padding: 20px;
 }
 
-/* SUMMARY PANELS */
+/* SUMMARY */
 .grid{
     display:flex;
     gap:15px;
@@ -36,7 +36,7 @@ body {
     padding:20px;
     border-radius:8px;
     text-align:center;
-    font-size:22px;
+    font-size:20px;
     font-weight:bold;
 }
 
@@ -44,183 +44,163 @@ body {
 .warning{ background:#cc5500; }
 .success{ background:#006400; }
 
-/* TABLE */
-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-    color: black;
+/* SEARCH */
+input{
+    padding:10px;
+    width:260px;
+    border-radius:6px;
+    border:none;
+    margin-bottom:15px;
 }
 
-th {
-    background: #b30000;
-    color: white;
-    padding: 10px;
+/* CARD FEED */
+.feed{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap:15px;
 }
 
-td {
-    padding: 10px;
-    border-bottom: 1px solid #ddd;
-    vertical-align: top;
+.card{
+    background:white;
+    color:black;
+    padding:15px;
+    border-radius:10px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.3);
 }
+
+/* STATUS COLORS */
+.status{
+    font-weight:bold;
+}
+
+.status-critical{ color:red; }
+.status-open{ color:orange; }
+.status-resolved{ color:green; }
 
 /* IMAGE */
-img{
-    border-radius:6px;
+.card img{
+    width:100%;
+    border-radius:8px;
+    margin-top:8px;
 }
 
 /* BUTTON */
 button{
-    padding:6px 10px;
+    margin-top:10px;
+    padding:8px;
     border:none;
-    border-radius:4px;
+    border-radius:6px;
     background:green;
     color:white;
     cursor:pointer;
+    width:100%;
 }
 </style>
-
 </head>
 
 <body>
 
 <div class="header">
-    🚨 Incident Command Center
+🚨 Incident Command Center
 </div>
 
 <div class="container">
 
-<!-- 🔴 SUMMARY -->
+<!-- SUMMARY -->
 <div class="grid">
     <div class="panel critical">
-        Critical
-        <div id="criticalCount">0</div>
+        Critical<br><span id="criticalCount">0</span>
     </div>
-
     <div class="panel warning">
-        Open
-        <div id="openCount">0</div>
+        Open<br><span id="openCount">0</span>
     </div>
-
     <div class="panel success">
-        Resolved
-        <div id="resolvedCount">0</div>
+        Resolved<br><span id="resolvedCount">0</span>
     </div>
 </div>
 
-<!-- 🔎 SEARCH -->
-<input type="text" id="searchBox" placeholder="Search incidents..." 
-style="padding:10px; margin-bottom:10px; width:250px;">
+<!-- SEARCH -->
+<input type="text" id="searchBox" placeholder="Search incidents...">
 
-<!-- 🔴 LIVE FEED -->
-<h3>Live Incident Feed</h3>
-
-<table>
-<thead>
-<tr>
-    <th>ID</th>
-    <th>Type</th>
-    <th>Location</th>
-    <th>Description</th>
-    <th>Photo</th>
-    <th>Status</th>
-    <th>Date</th>
-    <th>Action</th>
-</tr>
-</thead>
-
-<tbody id="incidentFeed"></tbody>
-</table>
+<!-- FEED -->
+<div id="incidentFeed" class="feed"></div>
 
 </div>
 
-<!-- 🔊 ALERT SOUND -->
 <audio id="alertSound" src="/static/alert.mp3"></audio>
 
 <script>
 
 let lastCritical = 0;
 
-async function loadIncidents() {
+async function loadIncidents(){
 
     const q = document.getElementById("searchBox").value.toLowerCase();
 
     const res = await fetch("/api/incidents");
     const data = await res.json();
 
-    let critical = 0;
-    let open = 0;
-    let resolved = 0;
+    let critical=0, open=0, resolved=0;
 
-    const tbody = document.getElementById("incidentFeed");
-    tbody.innerHTML = "";
+    const container = document.getElementById("incidentFeed");
+    container.innerHTML = "";
 
-    data.forEach(i => {
+    data.forEach(i=>{
 
-        // 🔎 SAFE SEARCH
         const desc = (i.description || "").toLowerCase();
         if(q && !desc.includes(q)) return;
 
-        // 📍 LOCATION FALLBACK
-        const location = i.location || 
-            `${i.constituency || "Unknown"}${i.province ? ", " + i.province : ""}`;
+        if(i.status==="Critical") critical++;
+        else if(i.status==="Open") open++;
+        else resolved++;
 
-        // 📊 COUNTING
-        if (i.status === "Critical") critical++;
-        else if (i.status === "Open") open++;
-        else if (i.status === "Resolved") resolved++;
+        const statusClass =
+            i.status==="Critical" ? "status-critical" :
+            i.status==="Open" ? "status-open" :
+            "status-resolved";
 
-        // 🎨 STATUS COLOR
-        const color =
-            i.status === "Critical" ? "red" :
-            i.status === "Open" ? "orange" :
-            "green";
+        const location = i.location || "Unknown";
 
-        // 📸 PHOTO
-        const photoHTML = i.photo
-            ? `<img src="/static/uploads/${i.photo}" width="70">`
-            : "";
+        container.innerHTML += `
+        <div class="card">
+            <strong>${i.type || "Incident"}</strong><br>
+            <small>${location}</small><br><br>
 
-        tbody.innerHTML += `
-        <tr>
-            <td>${i.id}</td>
-            <td>${i.type || "-"}</td>
-            <td>${location}</td>
-            <td>${i.description || ""}</td>
-            <td>${photoHTML}</td>
-            <td style="color:${color}">${i.status}</td>
-            <td>${i.created_at}</td>
-            <td>
-                ${i.status !== "Resolved" 
-                    ? `<button onclick="resolveIncident('${i.id}')">Resolve</button>` 
-                    : "—"}
-            </td>
-        </tr>`;
+            ${i.description || ""}
+
+            ${i.photo ? `<img src="/static/uploads/${i.photo}">` : ""}
+
+            <div class="status ${statusClass}">
+                ${i.status}
+            </div>
+
+            <small>${i.created_at}</small>
+
+            ${i.status !== "Resolved"
+                ? `<button onclick="resolveIncident('${i.id}')">Resolve</button>`
+                : ""}
+        </div>`;
     });
 
-    // 🔴 UPDATE PANELS
     document.getElementById("criticalCount").innerText = critical;
     document.getElementById("openCount").innerText = open;
     document.getElementById("resolvedCount").innerText = resolved;
 
-    // 🔊 ALERT
     if(critical > lastCritical){
         document.getElementById("alertSound").play();
     }
+
     lastCritical = critical;
 }
 
-/* 🔁 AUTO REFRESH */
 setInterval(loadIncidents, 5000);
 loadIncidents();
 
-/* 🎯 RESOLVE */
 async function resolveIncident(id){
-    await fetch(`/resolve/${id}`, { method: "POST" });
+    await fetch(`/resolve/${id}`, { method:"POST" });
     loadIncidents();
 }
 
-/* 🔎 SEARCH */
 document.getElementById("searchBox").addEventListener("input", loadIncidents);
 
 </script>
