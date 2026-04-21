@@ -1846,59 +1846,8 @@ def resolve_incident(incident_id):
     return {"status": "ok"}
     
 # ==============================
-# API MY INCIDENTS
-# ==============================
-@app.route("/api/incidents")
-def api_incidents():
-
-    if session.get("role") not in ["agent", "admin"]:
-        return jsonify([])
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    # 🔴 ADMIN sees everything
-    if session.get("role") == "admin":
-        cur.execute("""
-            SELECT id, type, province, constituency, severity,
-                   description, status, created_at, photo
-            FROM incidents
-            ORDER BY created_at DESC
-        """)
-
-    # 🔴 AGENT sees only their area
-    else:
-        cur.execute("""
-            SELECT id, type, province, constituency, severity,
-                   description, status, created_at, photo
-            FROM incidents
-            WHERE constituency = %s
-            ORDER BY created_at DESC
-        """, (session.get("constituency"),))
-
-    rows = cur.fetchall()
-
-    cur.close()
-    conn.close()
-
-    return jsonify([
-        {
-            "id": r[0],
-            "type": r[1],
-            "location": f"{r[3]}, {r[2]}",
-            "severity": r[4],
-            "description": r[5],
-            "status": r[6],
-            "created_at": str(r[7]),
-            "photo": r[8]
-        }
-        for r in rows
-    ])
-
-# ==============================
 # AGENT VOTE SEND
 # ==============================
-
 def send_votes_for_constituency(constituency):
     conn = get_db()
     cur = conn.cursor()
