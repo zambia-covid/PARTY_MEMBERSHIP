@@ -833,6 +833,22 @@ def provinces_list():
 
     return jsonify([r[0] for r in rows])
 
+@app.route("/api/constituencies")
+def constituencies():
+
+    province = request.args.get("province")
+
+    cur = get_db().cursor()
+
+    cur.execute("""
+        SELECT constituency
+        FROM constituencies
+        WHERE province=%s
+        ORDER BY constituency
+    """, (province,))
+
+    data = [r[0] for r in cur.fetchall()]
+    return jsonify(data)
 
 # ==============================
 # CREATE USER
