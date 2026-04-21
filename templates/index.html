@@ -6,28 +6,19 @@
 
 <h2 style="margin-bottom:20px;">National Command Dashboard</h2>
 
-<!-- ================= STRATEGY LAYER ================= -->
-
-<!-- 🧠 NATIONAL -->
+<!-- ================= 🧠 STRATEGY ================= -->
 <div class="card" style="margin-bottom:15px;background:#002b36;color:white;">
-    <h3>🧠 National Directive</h3>
-    <div id="nationalStrategy">Loading...</div>
+    <h3>🧠 Strategic Directive</h3>
+    <div id="strategyBox" style="margin-top:10px;">Loading strategy...</div>
 </div>
 
-<!-- 📍 PROVINCIAL -->
-<div class="card" style="margin-bottom:15px;">
-    <h3>📍 Provincial Strategy</h3>
-    <div id="provincialStrategy">Loading...</div>
-</div>
-
-<!-- 🎯 CONSTITUENCY -->
+<!-- ================= 📍 PROVINCIAL POWER ================= -->
 <div class="card" style="margin-bottom:20px;">
-    <h3>🎯 Priority Constituencies</h3>
-    <div id="constituencyStrategy">Loading...</div>
+    <h3>Provincial Power (Voter Weight)</h3>
+    <ul id="provinceList"></ul>
 </div>
 
-<!-- ================= CORE METRICS ================= -->
-
+<!-- ================= 📊 CORE METRICS ================= -->
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:15px;">
 
     <div class="card">
@@ -59,8 +50,7 @@
 
 </div>
 
-<!-- ================= STRATEGIC METRICS ================= -->
-
+<!-- ================= 📈 STRATEGIC METRICS ================= -->
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px;margin-top:20px;">
 
     <div class="card">
@@ -86,14 +76,13 @@
 
 </div>
 
-<!-- ================= RESULTS ================= -->
-
+<!-- ================= 📡 RECENT RESULTS ================= -->
 <div class="card" style="margin-top:20px;">
     <h3>Recent Results</h3>
 
-    <table style="width:100%;border-collapse:collapse;">
+    <table style="width:100%;border-collapse:collapse;margin-top:10px;">
         <thead>
-            <tr>
+            <tr style="border-bottom:1px solid #ddd;">
                 <th>Station</th>
                 <th>PF</th>
                 <th>UPND</th>
@@ -113,28 +102,27 @@
     </table>
 </div>
 
-<!-- ================= RISK ZONES ================= -->
-
+<!-- ================= 🚨 DANGER ZONES ================= -->
 <div class="card" style="margin-top:20px;">
-    <h3>Danger Zones</h3>
+    <h3>Danger Zones (Losing)</h3>
     <ul>
         {% for dz in danger_zones %}
-        <li>{{ dz[0] }} → Gap: {{ dz[1] }}</li>
+        <li><strong>{{ dz[0] }}</strong> → Gap: {{ dz[1] }}</li>
         {% endfor %}
     </ul>
 </div>
 
+<!-- ================= 🟢 STRONGHOLDS ================= -->
 <div class="card" style="margin-top:20px;">
     <h3>Strongholds</h3>
     <ul>
         {% for sh in strongholds %}
-        <li>{{ sh[0] }} → Lead: {{ sh[1] }}</li>
+        <li><strong>{{ sh[0] }}</strong> → Lead: {{ sh[1] }}</li>
         {% endfor %}
     </ul>
 </div>
 
-<!-- ================= SYSTEM ================= -->
-
+<!-- ================= ⚙️ SYSTEM ================= -->
 <div class="card" style="margin-top:20px;">
     <h3>System Status</h3>
     <ul>
@@ -144,51 +132,49 @@
     </ul>
 </div>
 
-<!-- ================= SCRIPT ================= -->
-
+<!-- ================= 🔴 SCRIPT ================= -->
 <script>
 
-/* 🧠 NATIONAL */
-async function loadNational(){
-    const res = await fetch("/api/strategy");
-    const data = await res.json();
-    document.getElementById("nationalStrategy").innerText = data.advice;
+/* 🧠 STRATEGY */
+async function loadStrategy(){
+    try{
+        const res = await fetch("/api/strategy");
+        const data = await res.json();
+        document.getElementById("strategyBox").innerText = data.advice;
+    } catch {
+        document.getElementById("strategyBox").innerText =
+            "Strategy unavailable.";
+    }
 }
 
-/* 📍 PROVINCIAL */
-async function loadProvincial(){
-    const res = await fetch("/api/provincial_strategy");
-    const data = await res.json();
+/* 📍 PROVINCES */
+async function loadProvinces(){
+    try{
+        const res = await fetch("/api/provinces");
+        const data = await res.json();
 
-    let html = "";
-    data.forEach(p=>{
-        html += `<div><strong>${p.province}</strong>: ${p.advice}</div>`;
-    });
+        let html = "";
+        data.forEach(p=>{
+            html += `<li><strong>${p.province}</strong>: ${p.voters.toLocaleString()}</li>`;
+        });
 
-    document.getElementById("provincialStrategy").innerHTML = html;
+        document.getElementById("provinceList").innerHTML = html;
+
+    } catch {
+        document.getElementById("provinceList").innerHTML =
+            "<li>Error loading provinces</li>";
+    }
 }
 
-/* 🎯 CONSTITUENCY */
-async function loadConstituency(){
-    const res = await fetch("/api/constituency_strategy");
-    const data = await res.json();
-
-    let html = "";
-    data.forEach(c=>{
-        html += `<div><strong>${c.constituency}</strong>: ${c.advice}</div>`;
-    });
-
-    document.getElementById("constituencyStrategy").innerHTML = html;
-}
-
-/* LOAD ALL */
+/* LOAD */
 function loadAll(){
-    loadNational();
-    loadProvincial();
-    loadConstituency();
+    loadStrategy();
+    loadProvinces();
 }
 
 loadAll();
+
+/* REFRESH */
 setInterval(loadAll, 30000);
 
 </script>
