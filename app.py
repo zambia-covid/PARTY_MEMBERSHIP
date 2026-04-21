@@ -787,6 +787,31 @@ def download_card(member_id):
     return send_file(path, as_attachment=True)
 
 # ==============================
+# API PROVINCES
+# ==============================
+@app.route("/api/provinces")
+def provinces_api():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT province, total_voters
+        FROM provinces
+        ORDER BY total_voters DESC
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return jsonify([
+        {"province": r[0], "voters": r[1]}
+        for r in rows
+    ])
+
+# ==============================
 # AI INSIGHTS
 # ==============================
 @app.route("/ai_insights")
