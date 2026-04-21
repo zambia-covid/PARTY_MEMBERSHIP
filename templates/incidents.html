@@ -1,214 +1,249 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Incident Command Center</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incident Command Center</title>
 
-<style>
-body { margin:0; font-family:Arial; background:#111; color:white; }
+    <style>
+        :root {
+            --bg: #0b1220;
+            --panel: #111827;
+            --panel-light: #1f2937;
+            --text: #e5e7eb;
+            --muted: #9ca3af;
+            --border: #374151;
 
-/* HEADER */
-.header{
-    background:#b30000;
-    padding:12px;
-    text-align:center;
-    font-weight:bold;
-}
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --info: #3b82f6;
+        }
 
-/* CRITICAL STRIP */
-.critical-strip{
-    background:#300;
-    padding:10px;
-    overflow-x:auto;
-    white-space:nowrap;
-}
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
 
-.critical-item{
-    display:inline-block;
-    background:red;
-    padding:6px 10px;
-    margin-right:8px;
-    border-radius:6px;
-    font-size:12px;
-}
+        .container {
+            max-width: 1400px;
+            margin: auto;
+            padding: 20px;
+        }
 
-/* HOTSPOTS */
-.hotspots{
-    padding:10px;
-    background:#1a1a1a;
-}
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
 
-.hotspot{
-    padding:6px;
-    border-bottom:1px solid #333;
-}
+        .header h2 {
+            margin: 0;
+            font-size: 22px;
+            letter-spacing: 1px;
+        }
 
-/* FILTERS */
-.filters{
-    padding:10px;
-    background:#222;
-}
+        .search-box input {
+            padding: 10px;
+            border-radius: 6px;
+            border: none;
+            background: var(--panel);
+            color: var(--text);
+            width: 250px;
+        }
 
-select, input{
-    width:100%;
-    padding:10px;
-    margin-top:5px;
-}
+        .card {
+            background: var(--panel);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
 
-/* FEED */
-.feed{
-    padding:10px;
-}
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
 
-.card{
-    background:white;
-    color:black;
-    padding:10px;
-    margin-bottom:10px;
-    border-radius:8px;
-}
+        thead {
+            background: var(--panel-light);
+        }
 
-.status-critical{ color:red; }
-.status-open{ color:orange; }
-.status-resolved{ color:green; }
+        th {
+            text-align: left;
+            padding: 14px;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--muted);
+            letter-spacing: 1px;
+        }
 
-button{
-    width:100%;
-    padding:10px;
-    margin-top:6px;
-}
-</style>
+        td {
+            padding: 14px;
+            border-top: 1px solid var(--border);
+            font-size: 14px;
+        }
+
+        tr:hover {
+            background: rgba(255,255,255,0.03);
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .high { background: rgba(239,68,68,0.15); color: var(--danger); }
+        .medium { background: rgba(245,158,11,0.15); color: var(--warning); }
+        .low { background: rgba(16,185,129,0.15); color: var(--success); }
+
+        .status-open {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .status-resolved {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-resolve {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-delete {
+            background: var(--danger);
+            color: white;
+        }
+
+        .meta {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+    </style>
 </head>
 
 <body>
 
-<div class="header">🚨 Command Center</div>
+<div class="container">
 
-<!-- 🔴 CRITICAL STRIP -->
-<div id="criticalStrip" class="critical-strip"></div>
+    <div class="header">
+        <h2>⚠ Incident Command Center</h2>
 
-<!-- 🔥 HOTSPOTS -->
-<div class="hotspots">
-<h4>🔥 Hotspots</h4>
-<div id="hotspotList"></div>
+        <div class="search-box">
+            <input type="text" id="search" placeholder="Search incidents...">
+        </div>
+    </div>
+
+    <div class="card">
+        <table id="incidentTable">
+
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Type</th>
+                    <th>Location</th>
+                    <th>Description</th>
+                    <th>Severity</th>
+                    <th>Status</th>
+                    <th>Time</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for i in incidents %}
+                <tr>
+                    <td>{{ i.id }}</td>
+
+                    <td>
+                        <strong>{{ i.type }}</strong>
+                        <div class="meta">{{ i.province }}</div>
+                    </td>
+
+                    <td>
+                        {{ i.constituency }}
+                    </td>
+
+                    <td>
+                        {{ i.description }}
+                    </td>
+
+                    <td>
+                        <span class="badge
+                            {% if i.severity == 'HIGH' %}high
+                            {% elif i.severity == 'MEDIUM' %}medium
+                            {% else %}low{% endif %}
+                        ">
+                            {{ i.severity }}
+                        </span>
+                    </td>
+
+                    <td class="
+                        {% if i.status == 'Open' %}status-open
+                        {% else %}status-resolved{% endif %}
+                    ">
+                        {{ i.status }}
+                    </td>
+
+                    <td class="meta">
+                        {{ i.created_at }}
+                    </td>
+
+                    <td>
+                        <div class="actions">
+
+                            {% if i.status == 'Open' %}
+                            <a href="/resolve_incident/{{ i.id }}">
+                                <button class="btn btn-resolve">Resolve</button>
+                            </a>
+                            {% endif %}
+
+                            <a href="/delete_incident/{{ i.id }}">
+                                <button class="btn btn-delete">Delete</button>
+                            </a>
+
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+
+        </table>
+    </div>
+
 </div>
-
-<!-- 🔎 FILTERS -->
-<div class="filters">
-<input id="searchBox" placeholder="Search...">
-<select id="statusFilter">
-<option value="">All Status</option>
-<option>Critical</option>
-<option>Open</option>
-<option>Resolved</option>
-</select>
-</div>
-
-<!-- 📡 FEED -->
-<div id="incidentFeed" class="feed"></div>
 
 <script>
+    const searchInput = document.getElementById("search");
+    const table = document.getElementById("incidentTable").getElementsByTagName("tbody")[0];
 
-let lastData = [];
+    searchInput.addEventListener("keyup", function() {
+        let filter = searchInput.value.toLowerCase();
+        let rows = table.getElementsByTagName("tr");
 
-async function load(){
-
-    const res = await fetch("/api/incidents");
-    const data = await res.json();
-
-    renderCritical(data);
-    renderHotspots(data);
-    renderFeed(data);
-
-    lastData = data;
-}
-
-/* 🔴 CRITICAL STRIP */
-function renderCritical(data){
-    const strip = document.getElementById("criticalStrip");
-    strip.innerHTML = "";
-
-    data.filter(i=>i.status==="Critical").slice(0,10).forEach(i=>{
-        strip.innerHTML += `
-        <span class="critical-item">
-            ${i.type} - ${i.location}
-        </span>`;
+        for (let i = 0; i < rows.length; i++) {
+            let text = rows[i].innerText.toLowerCase();
+            rows[i].style.display = text.includes(filter) ? "" : "none";
+        }
     });
-}
-
-/* 🔥 HOTSPOTS */
-function renderHotspots(data){
-
-    const map = {};
-
-    data.forEach(i=>{
-        const loc = i.location || "Unknown";
-        map[loc] = (map[loc] || 0) + 1;
-    });
-
-    const sorted = Object.entries(map)
-        .sort((a,b)=>b[1]-a[1])
-        .slice(0,5);
-
-    const box = document.getElementById("hotspotList");
-    box.innerHTML = "";
-
-    sorted.forEach(([loc,count])=>{
-        box.innerHTML += `<div class="hotspot">${loc} — ${count}</div>`;
-    });
-}
-
-/* 📡 FEED */
-function renderFeed(data){
-
-    const q = document.getElementById("searchBox").value.toLowerCase();
-    const statusFilter = document.getElementById("statusFilter").value;
-
-    const container = document.getElementById("incidentFeed");
-    container.innerHTML = "";
-
-    data.slice(0,50).forEach(i=>{
-
-        if(q && !(i.description || "").toLowerCase().includes(q)) return;
-        if(statusFilter && i.status !== statusFilter) return;
-
-        const statusClass =
-            i.status==="Critical" ? "status-critical" :
-            i.status==="Open" ? "status-open" :
-            "status-resolved";
-
-        container.innerHTML += `
-        <div class="card">
-            <strong>${i.type}</strong><br>
-            <small>${i.location}</small><br>
-
-            ${i.description || ""}
-
-            ${i.photo ? `<img src="/static/uploads/${i.photo}" width="100%">` : ""}
-
-            <div class="${statusClass}">${i.status}</div>
-
-            ${i.status !== "Resolved"
-                ? `<button onclick="resolve('${i.id}')">Resolve</button>`
-                : ""}
-        </div>`;
-    });
-}
-
-/* ACTION */
-async function resolve(id){
-    await fetch(`/resolve/${id}`, {method:"POST"});
-    load();
-}
-
-/* EVENTS */
-document.getElementById("searchBox").addEventListener("input", load);
-document.getElementById("statusFilter").addEventListener("change", load);
-
-/* REFRESH */
-setInterval(load, 5000);
-load();
-
 </script>
 
 </body>
