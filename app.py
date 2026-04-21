@@ -1646,7 +1646,17 @@ def request_help():
 def incidents_page():
     return render_template("incidents.html")
 
-@app.route("/report_incident", methods=["GET","POST"])
+import os
+from flask import request, render_template, redirect, session
+from werkzeug.utils import secure_filename
+
+UPLOAD_FOLDER = "static/uploads"
+
+# ensure folder exists (important on Render)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+@app.route("/report_incident", methods=["GET", "POST"])
 @login_required
 def report_incident():
 
@@ -1655,6 +1665,27 @@ def report_incident():
         conn = get_db()
         cur = conn.cursor()
 
+        # 🔴 HANDLE PHOTO
+        photo = request.files.get("photo")
+        filename = None
+
+        if photo and photo.filename != "":
+            filename = secure_filename(photo.filename)
+
+            # avoid overwriting files
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+
+            # if file exists, rename
+            counter = 1
+            while os.path.exists(filepath):
+                name, ext = os.path.splitext(filename)
+                filename = f"{name}_{counter}{ext}"
+                filepath = os.path.join(UPLOAD_FOLDER, filename)
+                counter += 1
+
+            photo.save(filepath)
+
+        # 🔴 INSERT DATA
         cur.execute("""
             INSERT INTO incidents (
                 type,
@@ -1663,17 +1694,19 @@ def report_incident():
                 severity,
                 description,
                 contact,
+                photo,
                 status,
                 created_at
             )
-            VALUES (%s,%s,%s,%s,%s,%s,'Open', NOW())
+            VALUES (%s,%s,%s,%s,%s,%s,%s,'Open', NOW())
         """, (
             request.form["type"],
             request.form["province"],
             request.form["constituency"],
             request.form["severity"],
             request.form["description"],
-            request.form.get("contact")
+            request.form.get("contact"),
+            filename
         ))
 
         conn.commit()
