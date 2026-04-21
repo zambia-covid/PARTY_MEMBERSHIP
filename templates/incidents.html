@@ -1,55 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Incident Feed</title>
-
+<title>Incident Command Center</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body {
-    font-family: Arial;
-    background:#111;
-    color:white;
-    margin:0;
-}
+body { margin:0; font-family:Arial; background:#111; color:white; }
 
 /* HEADER */
 .header{
     background:#b30000;
-    padding:14px;
-    font-size:18px;
-    font-weight:bold;
-    text-align:center;
-}
-
-/* SUMMARY */
-.grid{
-    display:flex;
-    flex-wrap:wrap;
-}
-
-.panel{
-    flex:1 1 33%;
     padding:12px;
     text-align:center;
     font-weight:bold;
 }
 
-.critical{ background:#8b0000; }
-.warning{ background:#cc5500; }
-.success{ background:#006400; }
+/* CRITICAL STRIP */
+.critical-strip{
+    background:#300;
+    padding:10px;
+    overflow-x:auto;
+    white-space:nowrap;
+}
 
-/* SEARCH */
-.search{
+.critical-item{
+    display:inline-block;
+    background:red;
+    padding:6px 10px;
+    margin-right:8px;
+    border-radius:6px;
+    font-size:12px;
+}
+
+/* HOTSPOTS */
+.hotspots{
+    padding:10px;
+    background:#1a1a1a;
+}
+
+.hotspot{
+    padding:6px;
+    border-bottom:1px solid #333;
+}
+
+/* FILTERS */
+.filters{
     padding:10px;
     background:#222;
 }
 
-input{
+select, input{
     width:100%;
-    padding:12px;
-    border:none;
-    border-radius:6px;
+    padding:10px;
+    margin-top:5px;
 }
 
 /* FEED */
@@ -57,63 +60,21 @@ input{
     padding:10px;
 }
 
-/* CARD */
 .card{
     background:white;
     color:black;
-    border-radius:10px;
-    padding:12px;
-    margin-bottom:12px;
-    box-shadow:0 3px 8px rgba(0,0,0,0.4);
-}
-
-/* TOP */
-.top{
-    display:flex;
-    justify-content:space-between;
-    font-weight:bold;
-    margin-bottom:5px;
-}
-
-/* LOCATION */
-.location{
-    font-size:12px;
-    color:#555;
-}
-
-/* STATUS */
-.status{
-    font-weight:bold;
-    margin-top:5px;
+    padding:10px;
+    margin-bottom:10px;
+    border-radius:8px;
 }
 
 .status-critical{ color:red; }
 .status-open{ color:orange; }
 .status-resolved{ color:green; }
 
-/* IMAGE */
-img{
-    width:100%;
-    border-radius:8px;
-    margin-top:8px;
-}
-
-/* BUTTON */
 button{
-    margin-top:10px;
     width:100%;
-    padding:12px;
-    border:none;
-    border-radius:6px;
-    background:green;
-    color:white;
-    font-size:15px;
-}
-
-/* META */
-.meta{
-    font-size:11px;
-    color:#777;
+    padding:10px;
     margin-top:6px;
 }
 </style>
@@ -121,107 +82,132 @@ button{
 
 <body>
 
-<div class="header">🚨 Incident Feed</div>
+<div class="header">🚨 Command Center</div>
 
-<!-- SUMMARY -->
-<div class="grid">
-    <div class="panel critical">
-        Critical<br><span id="criticalCount">0</span>
-    </div>
-    <div class="panel warning">
-        Open<br><span id="openCount">0</span>
-    </div>
-    <div class="panel success">
-        Resolved<br><span id="resolvedCount">0</span>
-    </div>
+<!-- 🔴 CRITICAL STRIP -->
+<div id="criticalStrip" class="critical-strip"></div>
+
+<!-- 🔥 HOTSPOTS -->
+<div class="hotspots">
+<h4>🔥 Hotspots</h4>
+<div id="hotspotList"></div>
 </div>
 
-<!-- SEARCH -->
-<div class="search">
-    <input type="text" id="searchBox" placeholder="Search incidents...">
+<!-- 🔎 FILTERS -->
+<div class="filters">
+<input id="searchBox" placeholder="Search...">
+<select id="statusFilter">
+<option value="">All Status</option>
+<option>Critical</option>
+<option>Open</option>
+<option>Resolved</option>
+</select>
 </div>
 
-<!-- FEED -->
+<!-- 📡 FEED -->
 <div id="incidentFeed" class="feed"></div>
-
-<audio id="alertSound" src="/static/alert.mp3"></audio>
 
 <script>
 
-let lastCritical = 0;
+let lastData = [];
 
-async function loadIncidents(){
-
-    const q = document.getElementById("searchBox").value.toLowerCase();
+async function load(){
 
     const res = await fetch("/api/incidents");
     const data = await res.json();
 
-    let critical = 0;
-    let open = 0;
-    let resolved = 0;
+    renderCritical(data);
+    renderHotspots(data);
+    renderFeed(data);
+
+    lastData = data;
+}
+
+/* 🔴 CRITICAL STRIP */
+function renderCritical(data){
+    const strip = document.getElementById("criticalStrip");
+    strip.innerHTML = "";
+
+    data.filter(i=>i.status==="Critical").slice(0,10).forEach(i=>{
+        strip.innerHTML += `
+        <span class="critical-item">
+            ${i.type} - ${i.location}
+        </span>`;
+    });
+}
+
+/* 🔥 HOTSPOTS */
+function renderHotspots(data){
+
+    const map = {};
+
+    data.forEach(i=>{
+        const loc = i.location || "Unknown";
+        map[loc] = (map[loc] || 0) + 1;
+    });
+
+    const sorted = Object.entries(map)
+        .sort((a,b)=>b[1]-a[1])
+        .slice(0,5);
+
+    const box = document.getElementById("hotspotList");
+    box.innerHTML = "";
+
+    sorted.forEach(([loc,count])=>{
+        box.innerHTML += `<div class="hotspot">${loc} — ${count}</div>`;
+    });
+}
+
+/* 📡 FEED */
+function renderFeed(data){
+
+    const q = document.getElementById("searchBox").value.toLowerCase();
+    const statusFilter = document.getElementById("statusFilter").value;
 
     const container = document.getElementById("incidentFeed");
     container.innerHTML = "";
 
-    data.forEach(i => {
+    data.slice(0,50).forEach(i=>{
 
-        const desc = (i.description || "").toLowerCase();
-        if(q && !desc.includes(q)) return;
-
-        if(i.status === "Critical") critical++;
-        else if(i.status === "Open") open++;
-        else resolved++;
+        if(q && !(i.description || "").toLowerCase().includes(q)) return;
+        if(statusFilter && i.status !== statusFilter) return;
 
         const statusClass =
-            i.status === "Critical" ? "status-critical" :
-            i.status === "Open" ? "status-open" :
+            i.status==="Critical" ? "status-critical" :
+            i.status==="Open" ? "status-open" :
             "status-resolved";
-
-        const location = i.location || "Unknown";
 
         container.innerHTML += `
         <div class="card">
+            <strong>${i.type}</strong><br>
+            <small>${i.location}</small><br>
 
-            <div class="top">
-                <span>${i.type || "Incident"}</span>
-                <span class="${statusClass}">${i.status}</span>
-            </div>
+            ${i.description || ""}
 
-            <div class="location">${location}</div>
+            ${i.photo ? `<img src="/static/uploads/${i.photo}" width="100%">` : ""}
 
-            <div>${i.description || ""}</div>
-
-            ${i.photo ? `<img src="/static/uploads/${i.photo}">` : ""}
-
-            <div class="meta">${i.created_at}</div>
+            <div class="${statusClass}">${i.status}</div>
 
             ${i.status !== "Resolved"
-                ? `<button onclick="resolveIncident('${i.id}')">Resolve</button>`
+                ? `<button onclick="resolve('${i.id}')">Resolve</button>`
                 : ""}
         </div>`;
     });
-
-    document.getElementById("criticalCount").innerText = critical;
-    document.getElementById("openCount").innerText = open;
-    document.getElementById("resolvedCount").innerText = resolved;
-
-    if(critical > lastCritical){
-        document.getElementById("alertSound").play();
-    }
-
-    lastCritical = critical;
 }
 
-setInterval(loadIncidents, 5000);
-loadIncidents();
-
-async function resolveIncident(id){
-    await fetch(`/resolve/${id}`, { method:"POST" });
-    loadIncidents();
+/* ACTION */
+async function resolve(id){
+    await fetch(`/resolve/${id}`, {method:"POST"});
+    load();
 }
 
-document.getElementById("searchBox").addEventListener("input", loadIncidents);
+/* EVENTS */
+document.getElementById("searchBox").addEventListener("input", load);
+document.getElementById("statusFilter").addEventListener("change", load);
+
+/* REFRESH */
+setInterval(load, 5000);
+load();
 
 </script>
 
