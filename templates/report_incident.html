@@ -1,63 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Report Incident</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Report Incident</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <style>
-        body {
-            font-family: Arial;
-            background: #0b5d1e;
-            color: white;
-            margin: 0;
-            padding: 15px;
-        }
-
-        h2 {
-            text-align: center;
-        }
-
-        .card {
-            background: white;
-            color: black;
-            padding: 15px;
-            border-radius: 12px;
-        }
-
-        textarea, select, input {
-            width: 100%;
-            padding: 12px;
-            margin-top: 10px;
-            font-size: 16px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-        }
-
-        button {
-            width: 100%;
-            padding: 14px;
-            margin-top: 15px;
-            font-size: 16px;
-            border: none;
-            border-radius: 8px;
-            background: red;
-            color: white;
-            font-weight: bold;
-        }
-
-        .critical { background:red; color:white; }
-        .high { background:orange; color:black; }
-        .medium { background:gold; color:black; }
-        .low { background:green; color:white; }
-
-        a {
-            display: block;
-            text-align: center;
-            margin-top: 15px;
-            color: white;
-            text-decoration: none;
-        }
-    </style>
+<style>
+body { font-family:Arial; background:#0b5d1e; color:white; padding:15px; }
+.card { background:white; color:black; padding:15px; border-radius:12px; }
+input, select, textarea { width:100%; padding:12px; margin-top:10px; border-radius:8px; }
+button { width:100%; padding:14px; margin-top:15px; background:red; color:white; border:none; }
+</style>
 </head>
 
 <body>
@@ -65,50 +17,34 @@
 <h2>🚨 Report Incident</h2>
 
 <div class="card">
-    <form method="POST">
+<form method="POST" enctype="multipart/form-data">
 
-        <!-- INCIDENT TYPE -->
-        <label>Incident Type</label>
-        <select name="type" required>
-            <option value="">Select type</option>
-            <option value="Violence">Violence</option>
-            <option value="Fraud">Fraud</option>
-            <option value="Intimidation">Intimidation</option>
-            <option value="Logistics">Logistics Issue</option>
-            <option value="Other">Other</option>
-        </select>
+<select name="type" required>
+<option value="">Type</option>
+<option>Violence</option>
+<option>Fraud</option>
+<option>Intimidation</option>
+</select>
 
-        <!-- LOCATION -->
-        <label>Province</label>
-        <input name="province" placeholder="Province" required>
+<input name="province" placeholder="Province" required>
+<input name="constituency" placeholder="Constituency" required>
 
-        <label>Constituency</label>
-        <input name="constituency" placeholder="Constituency" required>
+<select name="severity" required>
+<option value="">Severity</option>
+<option>Critical</option>
+<option>High</option>
+<option>Medium</option>
+<option>Low</option>
+</select>
 
-        <!-- SEVERITY -->
-        <label>Severity</label>
-        <select name="severity" required>
-            <option value="">Select severity</option>
-            <option value="Critical" class="critical">Critical</option>
-            <option value="High" class="high">High</option>
-            <option value="Medium" class="medium">Medium</option>
-            <option value="Low" class="low">Low</option>
-        </select>
+<textarea name="description" placeholder="Describe incident..." required></textarea>
 
-        <!-- DESCRIPTION -->
-        <label>Description</label>
-        <textarea name="description" placeholder="Describe the incident..." required></textarea>
+<input type="file" name="photo" accept="image/*">
 
-        <!-- OPTIONAL CONTACT -->
-        <label>Contact (optional)</label>
-        <input name="contact" placeholder="Phone or name">
+<button type="submit">Submit</button>
 
-        <button type="submit">🚨 Report Incident</button>
-
-    </form>
+</form>
 </div>
-
-<a href="{{ url_for('agent_dashboard') }}">⬅ Back to Dashboard</a>
 
 </body>
 </html>
