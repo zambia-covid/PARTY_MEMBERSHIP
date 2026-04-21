@@ -12,7 +12,6 @@ body {
     margin:0;
 }
 
-/* HEADER */
 .header{
     padding:15px;
     background:#063312;
@@ -21,12 +20,10 @@ body {
     font-weight:bold;
 }
 
-/* CONTAINER */
 .container{
     padding:15px;
 }
 
-/* CARD */
 .card{
     background:white;
     color:black;
@@ -34,7 +31,6 @@ body {
     border-radius:12px;
 }
 
-/* LABEL */
 label{
     font-size:13px;
     font-weight:bold;
@@ -42,28 +38,24 @@ label{
     display:block;
 }
 
-/* INPUTS */
 input, select, textarea{
     width:100%;
     padding:14px;
     margin-top:6px;
     border-radius:8px;
     border:1px solid #ccc;
-    font-size:16px; /* prevents zoom */
+    font-size:16px;
 }
 
-/* TEXTAREA */
 textarea{
     min-height:120px;
 }
 
-/* FILE INPUT */
 .file{
     background:#f4f4f4;
     padding:10px;
 }
 
-/* BUTTON */
 button{
     width:100%;
     padding:16px;
@@ -76,12 +68,10 @@ button{
     font-weight:bold;
 }
 
-/* BUTTON ACTIVE */
 button:active{
     transform:scale(0.98);
 }
 
-/* STATUS */
 .status{
     text-align:center;
     font-size:12px;
@@ -89,7 +79,6 @@ button:active{
     color:#ccc;
 }
 
-/* PREVIEW IMAGE */
 #preview{
     margin-top:10px;
     width:100%;
@@ -151,8 +140,6 @@ button:active{
 </div>
 
 <script>
-
-/* 📸 IMAGE PREVIEW */
 document.getElementById("photoInput").addEventListener("change", function(e){
     const file = e.target.files[0];
     if(file){
@@ -166,14 +153,12 @@ document.getElementById("photoInput").addEventListener("change", function(e){
     }
 });
 
-/* ⏳ LOADING STATE */
 document.getElementById("incidentForm").addEventListener("submit", function(){
     const btn = document.getElementById("submitBtn");
     btn.innerText = "Submitting...";
     btn.disabled = true;
 });
 
-/* 📡 NETWORK STATUS */
 function updateStatus(){
     const el = document.getElementById("statusText");
     if(navigator.onLine){
@@ -188,57 +173,7 @@ function updateStatus(){
 window.addEventListener("online", updateStatus);
 window.addEventListener("offline", updateStatus);
 updateStatus();
-
 </script>
-
-</body>
-</html><!DOCTYPE html>
-<html>
-<head>
-<title>Report Incident</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<style>
-body { font-family:Arial; background:#0b5d1e; color:white; padding:15px; }
-.card { background:white; color:black; padding:15px; border-radius:12px; }
-input, select, textarea { width:100%; padding:12px; margin-top:10px; border-radius:8px; }
-button { width:100%; padding:14px; margin-top:15px; background:red; color:white; border:none; }
-</style>
-</head>
-
-<body>
-
-<h2>🚨 Report Incident</h2>
-
-<div class="card">
-<form method="POST" enctype="multipart/form-data">
-
-<select name="type" required>
-<option value="">Type</option>
-<option>Violence</option>
-<option>Fraud</option>
-<option>Intimidation</option>
-</select>
-
-<input name="province" placeholder="Province" required>
-<input name="constituency" placeholder="Constituency" required>
-
-<select name="severity" required>
-<option value="">Severity</option>
-<option>Critical</option>
-<option>High</option>
-<option>Medium</option>
-<option>Low</option>
-</select>
-
-<textarea name="description" placeholder="Describe incident..." required></textarea>
-
-<input type="file" name="photo" accept="image/*">
-
-<button type="submit">Submit</button>
-
-</form>
-</div>
 
 </body>
 </html>
