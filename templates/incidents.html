@@ -22,7 +22,7 @@ body {
     text-align:center;
 }
 
-/* SUMMARY (STACK ON MOBILE) */
+/* SUMMARY */
 .grid{
     display:flex;
     flex-wrap:wrap;
@@ -67,7 +67,7 @@ input{
     box-shadow:0 3px 8px rgba(0,0,0,0.4);
 }
 
-/* TOP LINE */
+/* TOP */
 .top{
     display:flex;
     justify-content:space-between;
@@ -110,7 +110,7 @@ button{
     font-size:15px;
 }
 
-/* SMALL TEXT */
+/* META */
 .meta{
     font-size:11px;
     color:#777;
@@ -122,205 +122,6 @@ button{
 <body>
 
 <div class="header">🚨 Incident Feed</div>
-
-<!-- SUMMARY -->
-<div class="grid">
-    <div class="panel critical">Critical<br><span id="criticalCount">0</span></div>
-    <div class="panel warning">Open<br><span id="openCount">0</span></div>
-    <div class="panel success">Resolved<br><span id="resolvedCount">0</span></div>
-</div>
-
-<!-- SEARCH -->
-<div class="search">
-    <input type="text" id="searchBox" placeholder="Search incidents...">
-</div>
-
-<!-- FEED -->
-<div id="incidentFeed" class="feed"></div>
-
-<audio id="alertSound" src="/static/alert.mp3"></audio>
-
-<script>
-let lastCritical = 0;
-
-async function loadIncidents(){
-
-    const q = document.getElementById("searchBox").value.toLowerCase();
-
-    const res = await fetch("/api/incidents");
-    const data = await res.json();
-
-    let critical=0, open=0, resolved=0;
-
-    const container = document.getElementById("incidentFeed");
-    container.innerHTML = "";
-
-    data.forEach(i=>{
-
-        const desc = (i.description || "").toLowerCase();
-        if(q && !desc.includes(q)) return;
-
-        if(i.status==="Critical") critical++;
-        else if(i.status==="Open") open++;
-        else resolved++;
-
-        const statusClass =
-            i.status==="Critical" ? "status-critical" :
-            i.status==="Open" ? "status-open" :
-            "status-resolved";
-
-        container.innerHTML += `
-        <div class="card">
-
-            <div class="top">
-                <span>${i.type || "Incident"}</span>
-                <span class="${statusClass}">${i.status}</span>
-            </div>
-
-            <div class="location">${i.location || "Unknown"}</div>
-
-            <div>${i.description || ""}</div>
-
-            ${i.photo ? `<img src="/static/uploads/${i.photo}">` : ""}
-
-            <div class="meta">${i.created_at}</div>
-
-            ${i.status !== "Resolved"
-                ? `<button onclick="resolveIncident('${i.id}')">Resolve</button>`
-                : ""}
-        </div>`;
-    });
-
-    document.getElementById("criticalCount").innerText = critical;
-    document.getElementById("openCount").innerText = open;
-    document.getElementById("resolvedCount").innerText = resolved;
-
-    if(critical > lastCritical){
-        document.getElementById("alertSound").play();
-    }
-
-    lastCritical = critical;
-}
-
-setInterval(loadIncidents, 5000);
-loadIncidents();
-
-async function resolveIncident(id){
-    await fetch(`/resolve/${id}`, { method:"POST" });
-    loadIncidents();
-}
-
-document.getElementById("searchBox").addEventListener("input", loadIncidents);
-</script>
-
-</body>
-</html><!DOCTYPE html>
-<html>
-<head>
-<title>Incident Command Center</title>
-
-<style>
-body {
-    font-family: Arial;
-    background: #111;
-    color: white;
-    margin: 0;
-}
-
-/* HEADER */
-.header {
-    background: #b30000;
-    padding: 15px;
-    font-size: 20px;
-    font-weight: bold;
-}
-
-/* CONTAINER */
-.container {
-    padding: 20px;
-}
-
-/* SUMMARY */
-.grid{
-    display:flex;
-    gap:15px;
-    margin-bottom:20px;
-}
-
-.panel{
-    flex:1;
-    padding:20px;
-    border-radius:8px;
-    text-align:center;
-    font-size:20px;
-    font-weight:bold;
-}
-
-.critical{ background:#8b0000; }
-.warning{ background:#cc5500; }
-.success{ background:#006400; }
-
-/* SEARCH */
-input{
-    padding:10px;
-    width:260px;
-    border-radius:6px;
-    border:none;
-    margin-bottom:15px;
-}
-
-/* CARD FEED */
-.feed{
-    display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap:15px;
-}
-
-.card{
-    background:white;
-    color:black;
-    padding:15px;
-    border-radius:10px;
-    box-shadow:0 4px 10px rgba(0,0,0,0.3);
-}
-
-/* STATUS COLORS */
-.status{
-    font-weight:bold;
-}
-
-.status-critical{ color:red; }
-.status-open{ color:orange; }
-.status-resolved{ color:green; }
-
-/* IMAGE */
-.card img{
-    width:100%;
-    border-radius:8px;
-    margin-top:8px;
-}
-
-/* BUTTON */
-button{
-    margin-top:10px;
-    padding:8px;
-    border:none;
-    border-radius:6px;
-    background:green;
-    color:white;
-    cursor:pointer;
-    width:100%;
-}
-</style>
-</head>
-
-<body>
-
-<div class="header">
-🚨 Incident Command Center
-</div>
-
-<div class="container">
 
 <!-- SUMMARY -->
 <div class="grid">
@@ -336,12 +137,12 @@ button{
 </div>
 
 <!-- SEARCH -->
-<input type="text" id="searchBox" placeholder="Search incidents...">
+<div class="search">
+    <input type="text" id="searchBox" placeholder="Search incidents...">
+</div>
 
 <!-- FEED -->
 <div id="incidentFeed" class="feed"></div>
-
-</div>
 
 <audio id="alertSound" src="/static/alert.mp3"></audio>
 
@@ -356,41 +157,44 @@ async function loadIncidents(){
     const res = await fetch("/api/incidents");
     const data = await res.json();
 
-    let critical=0, open=0, resolved=0;
+    let critical = 0;
+    let open = 0;
+    let resolved = 0;
 
     const container = document.getElementById("incidentFeed");
     container.innerHTML = "";
 
-    data.forEach(i=>{
+    data.forEach(i => {
 
         const desc = (i.description || "").toLowerCase();
         if(q && !desc.includes(q)) return;
 
-        if(i.status==="Critical") critical++;
-        else if(i.status==="Open") open++;
+        if(i.status === "Critical") critical++;
+        else if(i.status === "Open") open++;
         else resolved++;
 
         const statusClass =
-            i.status==="Critical" ? "status-critical" :
-            i.status==="Open" ? "status-open" :
+            i.status === "Critical" ? "status-critical" :
+            i.status === "Open" ? "status-open" :
             "status-resolved";
 
         const location = i.location || "Unknown";
 
         container.innerHTML += `
         <div class="card">
-            <strong>${i.type || "Incident"}</strong><br>
-            <small>${location}</small><br><br>
 
-            ${i.description || ""}
+            <div class="top">
+                <span>${i.type || "Incident"}</span>
+                <span class="${statusClass}">${i.status}</span>
+            </div>
+
+            <div class="location">${location}</div>
+
+            <div>${i.description || ""}</div>
 
             ${i.photo ? `<img src="/static/uploads/${i.photo}">` : ""}
 
-            <div class="status ${statusClass}">
-                ${i.status}
-            </div>
-
-            <small>${i.created_at}</small>
+            <div class="meta">${i.created_at}</div>
 
             ${i.status !== "Resolved"
                 ? `<button onclick="resolveIncident('${i.id}')">Resolve</button>`
