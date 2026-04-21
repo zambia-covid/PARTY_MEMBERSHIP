@@ -1,249 +1,210 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Incident Command Center</title>
+<title>Incident Command Center</title>
 
-    <style>
-        :root {
-            --bg: #0b1220;
-            --panel: #111827;
-            --panel-light: #1f2937;
-            --text: #e5e7eb;
-            --muted: #9ca3af;
-            --border: #374151;
+<style>
+body {
+    font-family: Arial;
+    background: #111;
+    color: white;
+    margin: 0;
+}
 
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --success: #10b981;
-            --info: #3b82f6;
-        }
+/* HEADER */
+.header {
+    background: #b30000;
+    padding: 15px;
+    font-size: 20px;
+    font-weight: bold;
+}
 
-        body {
-            margin: 0;
-            font-family: "Segoe UI", Roboto, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-        }
+/* CONTAINER */
+.container {
+    padding: 20px;
+}
 
-        .container {
-            max-width: 1400px;
-            margin: auto;
-            padding: 20px;
-        }
+/* SUMMARY PANELS */
+.grid{
+    display:flex;
+    gap:15px;
+    margin-bottom:20px;
+}
 
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
+.panel{
+    flex:1;
+    padding:20px;
+    border-radius:8px;
+    text-align:center;
+    font-size:22px;
+    font-weight:bold;
+}
 
-        .header h2 {
-            margin: 0;
-            font-size: 22px;
-            letter-spacing: 1px;
-        }
+.critical{ background:#8b0000; }
+.warning{ background:#cc5500; }
+.success{ background:#006400; }
 
-        .search-box input {
-            padding: 10px;
-            border-radius: 6px;
-            border: none;
-            background: var(--panel);
-            color: var(--text);
-            width: 250px;
-        }
+/* TABLE */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    color: black;
+}
 
-        .card {
-            background: var(--panel);
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
-        }
+th {
+    background: #b30000;
+    color: white;
+    padding: 10px;
+}
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
 
-        thead {
-            background: var(--panel-light);
-        }
+/* BUTTON */
+button{
+    padding:6px 10px;
+    border:none;
+    border-radius:4px;
+    background:green;
+    color:white;
+    cursor:pointer;
+}
+</style>
 
-        th {
-            text-align: left;
-            padding: 14px;
-            font-size: 12px;
-            text-transform: uppercase;
-            color: var(--muted);
-            letter-spacing: 1px;
-        }
-
-        td {
-            padding: 14px;
-            border-top: 1px solid var(--border);
-            font-size: 14px;
-        }
-
-        tr:hover {
-            background: rgba(255,255,255,0.03);
-        }
-
-        .badge {
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        .high { background: rgba(239,68,68,0.15); color: var(--danger); }
-        .medium { background: rgba(245,158,11,0.15); color: var(--warning); }
-        .low { background: rgba(16,185,129,0.15); color: var(--success); }
-
-        .status-open {
-            color: var(--danger);
-            font-weight: 600;
-        }
-
-        .status-resolved {
-            color: var(--success);
-            font-weight: 600;
-        }
-
-        .actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .btn {
-            padding: 6px 10px;
-            border-radius: 6px;
-            border: none;
-            cursor: pointer;
-            font-size: 12px;
-        }
-
-        .btn-resolve {
-            background: var(--success);
-            color: white;
-        }
-
-        .btn-delete {
-            background: var(--danger);
-            color: white;
-        }
-
-        .meta {
-            font-size: 12px;
-            color: var(--muted);
-        }
-
-    </style>
 </head>
 
 <body>
 
+<div class="header">
+    🚨 Incident Command Center
+</div>
+
 <div class="container">
 
-    <div class="header">
-        <h2>⚠ Incident Command Center</h2>
+<!-- 🔴 SUMMARY -->
+<div class="grid">
 
-        <div class="search-box">
-            <input type="text" id="search" placeholder="Search incidents...">
-        </div>
+    <div class="panel critical">
+        Critical
+        <div id="criticalCount">0</div>
     </div>
 
-    <div class="card">
-        <table id="incidentTable">
+    <div class="panel warning">
+        Open
+        <div id="openCount">0</div>
+    </div>
 
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Type</th>
-                    <th>Location</th>
-                    <th>Description</th>
-                    <th>Severity</th>
-                    <th>Status</th>
-                    <th>Time</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                {% for i in incidents %}
-                <tr>
-                    <td>{{ i.id }}</td>
-
-                    <td>
-                        <strong>{{ i.type }}</strong>
-                        <div class="meta">{{ i.province }}</div>
-                    </td>
-
-                    <td>
-                        {{ i.constituency }}
-                    </td>
-
-                    <td>
-                        {{ i.description }}
-                    </td>
-
-                    <td>
-                        <span class="badge
-                            {% if i.severity == 'HIGH' %}high
-                            {% elif i.severity == 'MEDIUM' %}medium
-                            {% else %}low{% endif %}
-                        ">
-                            {{ i.severity }}
-                        </span>
-                    </td>
-
-                    <td class="
-                        {% if i.status == 'Open' %}status-open
-                        {% else %}status-resolved{% endif %}
-                    ">
-                        {{ i.status }}
-                    </td>
-
-                    <td class="meta">
-                        {{ i.created_at }}
-                    </td>
-
-                    <td>
-                        <div class="actions">
-
-                            {% if i.status == 'Open' %}
-                            <a href="/resolve_incident/{{ i.id }}">
-                                <button class="btn btn-resolve">Resolve</button>
-                            </a>
-                            {% endif %}
-
-                            <a href="/delete_incident/{{ i.id }}">
-                                <button class="btn btn-delete">Delete</button>
-                            </a>
-
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-
-        </table>
+    <div class="panel success">
+        Resolved
+        <div id="resolvedCount">0</div>
     </div>
 
 </div>
 
+<!-- 🔎 SEARCH -->
+<input type="text" id="searchBox" placeholder="Search incidents..." style="padding:10px; margin-bottom:10px; width:250px;">
+
+<!-- 🔴 LIVE FEED -->
+<h3>Live Incident Feed</h3>
+
+<table>
+<thead>
+<tr>
+    <th>ID</th>
+    <th>Type</th>
+    <th>Location</th>
+    <th>Description</th>
+    <th>Status</th>
+    <th>Date</th>
+    <th>Action</th>
+</tr>
+</thead>
+
+<tbody id="incidentFeed">
+</tbody>
+</table>
+
+</div>
+
+<!-- 🔊 ALERT SOUND -->
+<audio id="alertSound" src="/static/alert.mp3"></audio>
+
+<!-- 🔴 REAL-TIME ENGINE -->
 <script>
-    const searchInput = document.getElementById("search");
-    const table = document.getElementById("incidentTable").getElementsByTagName("tbody")[0];
 
-    searchInput.addEventListener("keyup", function() {
-        let filter = searchInput.value.toLowerCase();
-        let rows = table.getElementsByTagName("tr");
+let lastCritical = 0;
 
-        for (let i = 0; i < rows.length; i++) {
-            let text = rows[i].innerText.toLowerCase();
-            rows[i].style.display = text.includes(filter) ? "" : "none";
-        }
+async function loadIncidents() {
+
+    const q = document.getElementById("searchBox").value.toLowerCase();
+
+    const res = await fetch("/api/incidents");
+    const data = await res.json();
+
+    let critical = 0;
+    let open = 0;
+    let resolved = 0;
+
+    const tbody = document.getElementById("incidentFeed");
+    tbody.innerHTML = "";
+
+    data.forEach(i => {
+
+        // 🔎 SEARCH FILTER
+        if(q && !i.description.toLowerCase().includes(q)) return;
+
+        if (i.status === "Critical") critical++;
+        else if (i.status === "Open") open++;
+        else if (i.status === "Resolved") resolved++;
+
+        tbody.innerHTML += `
+        <tr>
+            <td>${i.id}</td>
+            <td>${i.type}</td>
+            <td>${i.location}</td>
+            <td>${i.description}</td>
+            <td style="color:${
+                i.status === "Critical" ? "red" :
+                i.status === "Open" ? "orange" :
+                "green"
+            }">${i.status}</td>
+            <td>${i.created_at}</td>
+            <td>
+                ${i.status !== "Resolved" ? 
+                `<button onclick="resolveIncident('${i.id}')">Resolve</button>` 
+                : "—"}
+            </td>
+        </tr>`;
     });
+
+    // 🔴 UPDATE PANELS
+    document.getElementById("criticalCount").innerText = critical;
+    document.getElementById("openCount").innerText = open;
+    document.getElementById("resolvedCount").innerText = resolved;
+
+    // 🔊 ALERT ON NEW CRITICAL
+    if(critical > lastCritical){
+        document.getElementById("alertSound").play();
+    }
+    lastCritical = critical;
+}
+
+/* 🔁 AUTO REFRESH */
+setInterval(loadIncidents, 5000);
+loadIncidents();
+
+/* 🎯 ACTION */
+async function resolveIncident(id){
+    await fetch(`/resolve/${id}`, { method: "POST" });
+    loadIncidents();
+}
+
+/* 🔎 SEARCH LISTENER */
+document.getElementById("searchBox").addEventListener("input", loadIncidents);
+
 </script>
 
 </body>
