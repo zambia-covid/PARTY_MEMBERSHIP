@@ -62,9 +62,21 @@ body{
     font-weight: bold;
 }
 
-/* logout */
-.logout {
-    color: #ffcccc;
+/* 🔴 LOGOUT BUTTON (UPDATED) */
+.logout-btn {
+    margin: 20px;
+    padding: 12px;
+    background: #8b0000;
+    border: none;
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    text-align: left;
+}
+
+.logout-btn:hover {
+    background: red;
 }
 
 /* ===== MAIN ===== */
@@ -87,11 +99,32 @@ body{
 
 <body>
 
-    {% include "sidebar.html" %}
+    <div class="sidebar">
+
+        <div class="logo">PF Command</div>
+
+        {% include "sidebar.html" %}
+
+        <!-- 🔴 SAFE LOGOUT FORM -->
+        <form method="POST" action="/logout" id="logoutForm">
+            <button type="button" class="logout-btn" onclick="confirmLogout()">
+                ⛔ Logout
+            </button>
+        </form>
+
+    </div>
 
     <div class="main">
         {% block content %}{% endblock %}
     </div>
+
+<script>
+function confirmLogout(){
+    if(confirm("Are you sure you want to logout?")){
+        document.getElementById("logoutForm").submit();
+    }
+}
+</script>
 
 </body>
 </html>
