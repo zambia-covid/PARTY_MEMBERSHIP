@@ -1844,6 +1844,44 @@ def resolve_incident(incident_id):
     conn.close()
 
     return {"status": "ok"}
+    
+# ==============================
+# API MY INCIDENTS
+# ==============================
+
+@app.route("/api/my_incidents")
+@login_required
+def my_incidents():
+
+    constituency = session.get("constituency")
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id, type, province, constituency, severity,
+               description, status, created_at
+        FROM incidents
+        WHERE constituency = %s
+        ORDER BY created_at DESC
+        LIMIT 20
+    """, (constituency,))
+
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return jsonify([
+        {
+            "id": r[0],
+            "type": r[1],
+            "location": f"{r[3]}, {r[2]}",
+            "severity": r[4],
+            "status": r[6],
+            "created_at": str(r[7])
+        }
+        for r in rows
+    ])
 
 # ==============================
 # AGENT VOTE SEND
