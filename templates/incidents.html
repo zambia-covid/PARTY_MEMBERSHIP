@@ -4,207 +4,52 @@
 <title>Incident Command Center</title>
 
 <style>
-body {
-    font-family: Arial;
-    background: #111;
-    color: white;
-    margin: 0;
-}
-
-/* HEADER */
-.header {
-    background: #b30000;
-    padding: 15px;
-    font-size: 20px;
-    font-weight: bold;
-}
-
-/* CONTAINER */
-.container {
-    padding: 20px;
-}
-
-/* SUMMARY PANELS */
-.grid{
-    display:flex;
-    gap:15px;
-    margin-bottom:20px;
-}
-
-.panel{
-    flex:1;
-    padding:20px;
-    border-radius:8px;
-    text-align:center;
-    font-size:22px;
-    font-weight:bold;
-}
-
-.critical{ background:#8b0000; }
-.warning{ background:#cc5500; }
-.success{ background:#006400; }
-
-/* TABLE */
-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-    color: black;
-}
-
-th {
-    background: #b30000;
-    color: white;
-    padding: 10px;
-}
-
-td {
-    padding: 10px;
-    border-bottom: 1px solid #ddd;
-}
-
-/* BUTTON */
-button{
-    padding:6px 10px;
-    border:none;
-    border-radius:4px;
-    background:green;
-    color:white;
-    cursor:pointer;
-}
+body { font-family:Arial; background:#111; color:white; }
+.panel { padding:15px; margin:5px; display:inline-block; }
+table { width:100%; background:white; color:black; }
 </style>
-
 </head>
 
 <body>
 
-<div class="header">
-    🚨 Incident Command Center
+<h2>🚨 Command Center</h2>
+
+<div>
+    <div class="panel" id="criticalCount">0</div>
+    <div class="panel" id="openCount">0</div>
+    <div class="panel" id="resolvedCount">0</div>
 </div>
-
-<div class="container">
-
-<!-- 🔴 SUMMARY -->
-<div class="grid">
-
-    <div class="panel critical">
-        Critical
-        <div id="criticalCount">0</div>
-    </div>
-
-    <div class="panel warning">
-        Open
-        <div id="openCount">0</div>
-    </div>
-
-    <div class="panel success">
-        Resolved
-        <div id="resolvedCount">0</div>
-    </div>
-
-</div>
-
-<!-- 🔎 SEARCH -->
-<input type="text" id="searchBox" placeholder="Search incidents..." style="padding:10px; margin-bottom:10px; width:250px;">
-
-<!-- 🔴 LIVE FEED -->
-<h3>Live Incident Feed</h3>
 
 <table>
 <thead>
 <tr>
-    <th>ID</th>
-    <th>Type</th>
-    <th>Location</th>
-    <th>Description</th>
-    <th>Status</th>
-    <th>Date</th>
-    <th>Action</th>
+<th>ID</th><th>Type</th><th>Location</th><th>Status</th><th>Photo</th>
 </tr>
 </thead>
-
-<tbody id="incidentFeed">
-</tbody>
+<tbody id="feed"></tbody>
 </table>
 
-</div>
-
-<!-- 🔊 ALERT SOUND -->
-<audio id="alertSound" src="/static/alert.mp3"></audio>
-
-<!-- 🔴 REAL-TIME ENGINE -->
 <script>
-
-let lastCritical = 0;
-
-async function loadIncidents() {
-
-    const q = document.getElementById("searchBox").value.toLowerCase();
-
+async function load(){
     const res = await fetch("/api/incidents");
     const data = await res.json();
 
-    let critical = 0;
-    let open = 0;
-    let resolved = 0;
-
-    const tbody = document.getElementById("incidentFeed");
-    tbody.innerHTML = "";
-
-    data.forEach(i => {
-
-        // 🔎 SEARCH FILTER
-        if(q && !i.description.toLowerCase().includes(q)) return;
-
-        if (i.status === "Critical") critical++;
-        else if (i.status === "Open") open++;
-        else if (i.status === "Resolved") resolved++;
-
-        tbody.innerHTML += `
-        <tr>
-            <td>${i.id}</td>
-            <td>${i.type}</td>
-            <td>${i.location}</td>
-            <td>${i.description}</td>
-            <td style="color:${
-                i.status === "Critical" ? "red" :
-                i.status === "Open" ? "orange" :
-                "green"
-            }">${i.status}</td>
-            <td>${i.created_at}</td>
-            <td>
-                ${i.status !== "Resolved" ? 
-                `<button onclick="resolveIncident('${i.id}')">Resolve</button>` 
-                : "—"}
-            </td>
+    let html="";
+    data.forEach(i=>{
+        html += `<tr>
+        <td>${i.id}</td>
+        <td>${i.type}</td>
+        <td>${i.location}</td>
+        <td>${i.status}</td>
+        <td>${i.photo ? `<img src="/static/uploads/${i.photo}" width="60">` : ""}</td>
         </tr>`;
     });
 
-    // 🔴 UPDATE PANELS
-    document.getElementById("criticalCount").innerText = critical;
-    document.getElementById("openCount").innerText = open;
-    document.getElementById("resolvedCount").innerText = resolved;
-
-    // 🔊 ALERT ON NEW CRITICAL
-    if(critical > lastCritical){
-        document.getElementById("alertSound").play();
-    }
-    lastCritical = critical;
+    document.getElementById("feed").innerHTML = html;
 }
 
-/* 🔁 AUTO REFRESH */
-setInterval(loadIncidents, 5000);
-loadIncidents();
-
-/* 🎯 ACTION */
-async function resolveIncident(id){
-    await fetch(`/resolve/${id}`, { method: "POST" });
-    loadIncidents();
-}
-
-/* 🔎 SEARCH LISTENER */
-document.getElementById("searchBox").addEventListener("input", loadIncidents);
-
+setInterval(load,5000);
+load();
 </script>
 
 </body>
