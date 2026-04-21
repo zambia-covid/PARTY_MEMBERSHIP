@@ -812,6 +812,28 @@ def provinces_api():
         for r in rows
     ])
 
+from flask import jsonify
+
+@app.route("/api/provinces_list")
+def provinces_list():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT DISTINCT province
+        FROM constituencies
+        ORDER BY province
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return jsonify([r[0] for r in rows])
+
+
 # ==============================
 # CREATE USER
 # ==============================
