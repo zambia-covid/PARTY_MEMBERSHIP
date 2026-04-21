@@ -813,6 +813,63 @@ def provinces_api():
     ])
 
 # ==============================
+# CREATE USER
+# ==============================
+@app.route("/create_user", methods=["GET", "POST"])
+@login_required  # 🔴 restrict to logged-in admin later
+def create_user():
+
+    if request.method == "POST":
+
+        phone = request.form.get("phone")
+        password = request.form.get("password")
+        role = request.form.get("role", "agent").lower()
+        province = request.form.get("province")
+        constituency = request.form.get("constituency")
+        polling_station = request.form.get("polling_station")
+
+        if not phone or not password:
+            return "Missing required fields", 400
+
+        hashed_password = generate_password_hash(password)
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        # 🔴 CHECK DUPLICATE
+        cur.execute("SELECT 1 FROM agents WHERE phone=%s", (phone,))
+        if cur.fetchone():
+            return "User already exists", 400
+
+        # 🔴 INSERT USER
+        cur.execute("""
+            INSERT INTO agents (
+                phone,
+                password,
+                role,
+                province,
+                constituency,
+                polling_station
+            )
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (
+            phone,
+            hashed_password,
+            role,
+            province,
+            constituency,
+            polling_station
+        ))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return redirect(url_for("admin_dashboard"))  # or wherever
+
+    return render_template("create_user.html")
+    
+# ==============================
 # AI INSIGHTS
 # ==============================
 @app.route("/ai_insights")
