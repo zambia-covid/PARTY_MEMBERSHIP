@@ -1445,25 +1445,76 @@ def strategy():
     conn = get_db()
     cur = conn.cursor()
 
+    # ==============================
+    # 🔴 NATIONAL TOTALS
+    # ==============================
     cur.execute("""
         SELECT 
-            SUM(pf_votes),
-            SUM(upnd_votes)
+            COALESCE(SUM(pf_votes),0),
+            COALESCE(SUM(upnd_votes),0)
         FROM polling_station_results
     """)
 
     pf, upnd = cur.fetchone()
-    margin = (pf or 0) - (upnd or 0)
+    margin = pf - upnd
 
+    # ==============================
+    # 📍 PROVINCIAL BREAKDOWN
+    # ==============================
+    cur.execute("""
+        SELECT 
+            p.province,
+            p.total_voters,
+            COALESCE(SUM(r.pf_votes),0) AS pf_votes,
+            COALESCE(SUM(r.upnd_votes),0) AS upnd_votes
+        FROM provinces p
+        LEFT JOIN polling_station_results r
+            ON p.province = r.province
+        GROUP BY p.province, p.total_voters
+        ORDER BY p.total_voters DESC
+    """)
+
+    rows = cur.fetchall()
+
+    province_lines = []
+
+    for r in rows:
+        province = r[0]
+        voters = r[1]
+        pf_votes = r[2]
+        upnd_votes = r[3]
+
+        turnout = (pf_votes + upnd_votes)
+        turnout_pct = (turnout / voters * 100) if voters else 0
+
+        province_lines.append(
+            f"{province}: {voters} voters | PF {pf_votes} vs UPND {upnd_votes} | turnout {turnout_pct:.1f}%"
+        )
+
+    province_breakdown = "\n".join(province_lines)
+
+    # ==============================
+    # 🧠 STRATEGY PROMPT
+    # ==============================
     prompt = f"""
-Election status:
-PF: {pf}
-UPND: {upnd}
+National election situation:
+
+{province_breakdown}
+
+Total PF: {pf}
+Total UPND: {upnd}
 Margin: {margin}
 
-Give a short strategic directive (max 25 words).
+Give a sharp strategic directive (max 25 words).
+Focus on:
+- high voter provinces
+- weak performance areas
+- immediate action
 """
 
+    # ==============================
+    # 🤖 AI CALL
+    # ==============================
     try:
         res = client.responses.create(
             model="gpt-5-mini",
@@ -1472,13 +1523,27 @@ Give a short strategic directive (max 25 words).
 
         advice = res.output_text.strip()
 
-    except:
-        advice = "Stabilize strongholds. Push turnout in weak zones."
+    except Exception as e:
+        print("Strategy error:", e)
 
+        # 🔴 fallback (never leave blank)
+        if margin < 0:
+            advice = "Recover urban turnout, reinforce Copperbelt, protect strongholds, deploy rapid mobilization in high voter provinces."
+        else:
+            advice = "Defend strongholds, increase turnout in key provinces, monitor weak margins, sustain mobilization pressure."
+
+    # ==============================
+    # 🔒 CLEANUP
+    # ==============================
     cur.close()
     conn.close()
 
-    return jsonify({"advice": advice})
+    return jsonify({
+        "advice": advice,
+        "margin": margin,
+        "pf": pf,
+        "upnd": upnd
+    })
 
 # ==============================
 # CONSTITUENCY INTELLIGENCE
