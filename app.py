@@ -1986,7 +1986,7 @@ def agent_vote_send():
 # AGENT LOGIN
 # ==============================
 
-@app.route("/agent_login", methods=["GET", "POST"])
+@app.route("/agent_login", methods=["GET","POST"])
 def agent_login():
 
     if request.method == "POST":
@@ -1997,25 +1997,21 @@ def agent_login():
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT agent_id, password
+            SELECT id, password, constituency
             FROM agents
-            WHERE phone=%s AND active=TRUE
+            WHERE phone=%s
         """, (phone,))
 
-        agent = cur.fetchone()
+        user = cur.fetchone()
 
-        cur.close()
-        conn.close()
+        if user and check_password_hash(user[1], password):
 
-        # 🔴 CRITICAL FIX: handle NULL password safely
-        if agent and agent[1] and check_password_hash(agent[1], password):
-
-            user = User(str(agent[0]), "agent")
-            login_user(user)
+            session["agent_id"] = user[0]
+            session["constituency"] = user[2]   # ✅ HERE
 
             return redirect("/agent_dashboard")
 
-        return render_template("agent_login.html", error="Invalid credentials")
+        return render_template("agent_login.html", error="Invalid login")
 
     return render_template("agent_login.html")
 
