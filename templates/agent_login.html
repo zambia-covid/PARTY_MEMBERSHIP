@@ -1,68 +1,175 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Agent Login</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Login</title>
 
-<style>
-body{
-    margin:0;
-    font-family:Arial;
-    background:#0b1f0b;
-    color:white;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    height:100vh;
-}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-.box{
-    background:#112;
-    padding:30px;
-    width:90%;
-    max-width:350px;
-    border-radius:10px;
-}
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
 
-h2{
-    text-align:center;
-    margin-bottom:20px;
-}
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #0b5d1e, #063312);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
 
-input{
-    width:100%;
-    padding:12px;
-    margin-bottom:10px;
-    border:none;
-    border-radius:6px;
-}
+        .box {
+            width: 92%;
+            max-width: 360px;
+            background: #ffffff;
+            padding: 22px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.35);
+            animation: fadeIn 0.5s ease;
+        }
 
-button{
-    width:100%;
-    padding:12px;
-    background:#00cc44;
-    border:none;
-    color:white;
-    font-weight:bold;
-    border-radius:6px;
-}
+        @keyframes fadeIn {
+            from {opacity:0; transform:translateY(10px);}
+            to {opacity:1; transform:translateY(0);}
+        }
 
-button:hover{
-    background:#009933;
-}
-</style>
+        h2 {
+            text-align: center;
+            margin-bottom: 18px;
+            color: #0b5d1e;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #0b5d1e;
+            box-shadow: 0 0 5px rgba(11,93,30,0.4);
+        }
+
+        .password-box {
+            position: relative;
+        }
+
+        .toggle {
+            position: absolute;
+            right: 10px;
+            top: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #555;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #0b5d1e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button.loading {
+            background: gray;
+        }
+
+        .error {
+            margin-top: 10px;
+            color: red;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .status {
+            text-align: center;
+            font-size: 12px;
+            margin-top: 8px;
+            color: #999;
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            margin-top: 12px;
+            color: #666;
+        }
+    </style>
 </head>
 
 <body>
 
-<form class="box" method="POST">
-    <h2>🛰 Agent Access</h2>
+<div class="box">
+    <h2>🔐 Agent Login</h2>
 
-    <input name="username" placeholder="Agent ID" required>
-    <input type="password" name="password" placeholder="Password" required>
+    <form method="POST" id="loginForm">
 
-    <button type="submit">Login</button>
-</form>
+        <input type="text" name="phone" placeholder="Phone Number" required>
+
+        <div class="password-box">
+            <input type="password" name="password" id="password" placeholder="Password" required>
+            <span class="toggle" onclick="togglePassword()">Show</span>
+        </div>
+
+        <button type="submit" id="loginBtn">Login</button>
+    </form>
+
+    {% if error %}
+    <p class="error">{{ error }}</p>
+    {% endif %}
+
+    <div class="status" id="statusText"></div>
+
+    <div class="footer">
+        Secure Agent Access Portal
+    </div>
+</div>
+
+<script>
+function togglePassword(){
+    const input = document.getElementById("password");
+    input.type = input.type === "password" ? "text" : "password";
+}
+
+/* 🔄 Prevent double submit + show loading */
+document.getElementById("loginForm").addEventListener("submit", function(){
+    const btn = document.getElementById("loginBtn");
+    btn.classList.add("loading");
+    btn.innerText = "Logging in...";
+});
+
+/* 📡 Network awareness */
+function updateStatus(){
+    const status = document.getElementById("statusText");
+    if(navigator.onLine){
+        status.innerText = "Online";
+        status.style.color = "green";
+    } else {
+        status.innerText = "Offline — check connection";
+        status.style.color = "red";
+    }
+}
+
+window.addEventListener("online", updateStatus);
+window.addEventListener("offline", updateStatus);
+updateStatus();
+</script>
 
 </body>
 </html>
