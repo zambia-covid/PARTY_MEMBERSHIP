@@ -1,6 +1,164 @@
 <!DOCTYPE html>
 <html>
 <head>
+<title>Secure Login</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+*{
+    box-sizing:border-box;
+    font-family:Arial, sans-serif;
+}
+
+body{
+    margin:0;
+    background:linear-gradient(135deg,#0b5d1e,#063312);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+}
+
+/* CARD */
+.card{
+    width:92%;
+    max-width:360px;
+    background:white;
+    padding:22px;
+    border-radius:12px;
+    box-shadow:0 10px 25px rgba(0,0,0,0.3);
+}
+
+/* TITLE */
+h2{
+    text-align:center;
+    color:#0b5d1e;
+    margin-bottom:18px;
+}
+
+/* INPUT */
+input{
+    width:100%;
+    padding:14px;
+    margin-bottom:12px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    font-size:16px;
+}
+
+/* PASSWORD WRAP */
+.password-box{
+    position:relative;
+}
+
+.toggle{
+    position:absolute;
+    right:10px;
+    top:14px;
+    cursor:pointer;
+    font-size:13px;
+    color:#555;
+}
+
+/* BUTTON */
+button{
+    width:100%;
+    padding:14px;
+    background:#0b5d1e;
+    color:white;
+    border:none;
+    border-radius:8px;
+    font-size:16px;
+    font-weight:bold;
+}
+
+/* STATES */
+button.loading{
+    background:gray;
+}
+
+.error{
+    color:red;
+    text-align:center;
+    font-size:14px;
+    margin-top:10px;
+}
+
+.status{
+    text-align:center;
+    font-size:12px;
+    margin-top:10px;
+    color:#777;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<h2>🔐 Login</h2>
+
+<form method="POST" id="loginForm">
+
+<input type="text" name="username" placeholder="Username" required>
+
+<div class="password-box">
+    <input type="password" name="password" id="password" placeholder="Password" required>
+    <span class="toggle" onclick="togglePassword()">Show</span>
+</div>
+
+<button type="submit" id="loginBtn">Login</button>
+
+</form>
+
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+
+<div class="status" id="statusText"></div>
+
+</div>
+
+<script>
+
+/* 👁 TOGGLE PASSWORD */
+function togglePassword(){
+    const input = document.getElementById("password");
+    input.type = input.type === "password" ? "text" : "password";
+}
+
+/* ⏳ LOADING STATE */
+document.getElementById("loginForm").addEventListener("submit", function(){
+    const btn = document.getElementById("loginBtn");
+    btn.classList.add("loading");
+    btn.innerText = "Logging in...";
+});
+
+/* 📡 NETWORK STATUS */
+function updateStatus(){
+    const el = document.getElementById("statusText");
+    if(navigator.onLine){
+        el.innerText = "Online";
+        el.style.color = "green";
+    } else {
+        el.innerText = "Offline — check connection";
+        el.style.color = "red";
+    }
+}
+
+window.addEventListener("online", updateStatus);
+window.addEventListener("offline", updateStatus);
+updateStatus();
+
+</script>
+
+</body>
+</html><!DOCTYPE html>
+<html>
+<head>
     <title>Login</title>
 </head>
 <body>
