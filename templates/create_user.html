@@ -5,10 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-*{
-    box-sizing:border-box;
-    font-family: Arial, sans-serif;
-}
+*{ box-sizing:border-box; font-family:Arial; }
 
 body{
     margin:0;
@@ -16,7 +13,6 @@ body{
     color:white;
 }
 
-/* HEADER */
 .header{
     padding:15px;
     text-align:center;
@@ -24,45 +20,41 @@ body{
     font-weight:bold;
 }
 
-/* CONTAINER */
 .container{
     padding:15px;
     max-width:500px;
     margin:auto;
 }
 
-/* CARD */
 .card{
     background:white;
     color:black;
     padding:18px;
     border-radius:14px;
     box-shadow:0 8px 20px rgba(0,0,0,0.25);
+    margin-bottom:15px;
 }
 
-/* LABELS */
 label{
-    display:block;
     font-size:13px;
     font-weight:bold;
-    margin-top:14px;
+    margin-top:12px;
+    display:block;
 }
 
-/* INPUTS */
 input, select{
     width:100%;
     padding:14px;
     margin-top:6px;
     border-radius:10px;
     border:1px solid #ccc;
-    font-size:16px; /* prevents zoom */
+    font-size:16px;
 }
 
-/* BUTTON */
 button{
     width:100%;
     padding:16px;
-    margin-top:18px;
+    margin-top:15px;
     border:none;
     border-radius:10px;
     background:#0b5d1e;
@@ -71,24 +63,9 @@ button{
     font-weight:bold;
 }
 
-/* BUTTON ACTIVE */
-button:active{
-    transform:scale(0.98);
-}
-
-/* STATUS */
-.status{
-    text-align:center;
-    font-size:12px;
-    margin-top:10px;
-    color:#ddd;
-}
-
-/* ROLE HELP */
 .helper{
     font-size:11px;
     color:#666;
-    margin-top:4px;
 }
 </style>
 </head>
@@ -99,12 +76,12 @@ button:active{
 
 <div class="container">
 
+<!-- 🔴 SINGLE USER -->
 <div class="card">
-
 <form method="POST" id="userForm">
 
-<label>Phone Number</label>
-<input name="phone" placeholder="e.g. 097XXXXXXX" required>
+<label>Phone</label>
+<input name="phone" required>
 
 <label>Password</label>
 <input type="password" name="password" required>
@@ -112,29 +89,38 @@ button:active{
 <label>Role</label>
 <select name="role" required>
     <option value="">Select Role</option>
-    <option value="admin">Admin (Full Access)</option>
-    <option value="manager">Manager (Oversight)</option>
-    <option value="agent">Agent (Field)</option>
-    <option value="guest">Guest (View Only)</option>
+    <option value="admin">Admin</option>
+    <option value="manager">Manager</option>
+    <option value="agent">Agent</option>
+    <option value="guest">Guest</option>
 </select>
-<div class="helper">
-Admin = full control • Manager = oversight • Agent = field ops • Guest = read-only
-</div>
 
 <label>Province</label>
-<input name="province" placeholder="e.g. Lusaka">
+<select id="provinceSelect" name="province" required></select>
 
 <label>Constituency</label>
-<input name="constituency" placeholder="e.g. Lusaka Central">
+<select id="constituencySelect" name="constituency" required></select>
 
 <label>Polling Station</label>
-<input name="polling_station" placeholder="Optional">
+<input name="polling_station">
 
-<button type="submit" id="submitBtn">Create User</button>
+<button>Create User</button>
 
 </form>
+</div>
 
-<div class="status" id="statusText"></div>
+<!-- 🔴 BULK UPLOAD -->
+<div class="card">
+<h3>📋 Bulk Upload (CSV)</h3>
+
+<form method="POST" action="/bulk_upload_users" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".csv" required>
+    <button>Upload CSV</button>
+</form>
+
+<div class="helper">
+Format: phone,password,role,province,constituency,polling_station
+</div>
 
 </div>
 
@@ -142,29 +128,45 @@ Admin = full control • Manager = oversight • Agent = field ops • Guest = r
 
 <script>
 
-/* ⏳ LOADING STATE */
-document.getElementById("userForm").addEventListener("submit", function(){
-    const btn = document.getElementById("submitBtn");
-    btn.innerText = "Creating...";
-    btn.disabled = true;
-});
+/* 🔽 LOAD PROVINCES */
+async function loadProvinces(){
+    const res = await fetch("/api/provinces_list");
+    const data = await res.json();
 
-/* 📡 NETWORK STATUS */
-function updateStatus(){
-    const el = document.getElementById("statusText");
+    let html = '<option value="">Select Province</option>';
 
-    if(navigator.onLine){
-        el.innerText = "Online";
-        el.style.color = "lightgreen";
-    } else {
-        el.innerText = "Offline — submission may fail";
-        el.style.color = "orange";
-    }
+    data.forEach(p=>{
+        html += `<option value="${p}">${p}</option>`;
+    });
+
+    document.getElementById("provinceSelect").innerHTML = html;
 }
 
-window.addEventListener("online", updateStatus);
-window.addEventListener("offline", updateStatus);
-updateStatus();
+/* 🔽 LOAD CONSTITUENCIES */
+async function loadConstituencies(province){
+
+    const res = await fetch(`/api/constituencies?province=${province}`);
+    const data = await res.json();
+
+    let html = '<option value="">Select Constituency</option>';
+
+    data.forEach(c=>{
+        html += `<option value="${c}">${c}</option>`;
+    });
+
+    document.getElementById("constituencySelect").innerHTML = html;
+}
+
+/* LISTENER */
+document.getElementById("provinceSelect").addEventListener("change", function(){
+    const province = this.value;
+    if(province){
+        loadConstituencies(province);
+    }
+});
+
+/* INIT */
+loadProvinces();
 
 </script>
 
