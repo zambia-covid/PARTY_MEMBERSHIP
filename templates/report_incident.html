@@ -5,6 +5,200 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
+body {
+    font-family: Arial;
+    background:#0b5d1e;
+    color:white;
+    margin:0;
+}
+
+/* HEADER */
+.header{
+    padding:15px;
+    background:#063312;
+    text-align:center;
+    font-size:18px;
+    font-weight:bold;
+}
+
+/* CONTAINER */
+.container{
+    padding:15px;
+}
+
+/* CARD */
+.card{
+    background:white;
+    color:black;
+    padding:15px;
+    border-radius:12px;
+}
+
+/* LABEL */
+label{
+    font-size:13px;
+    font-weight:bold;
+    margin-top:12px;
+    display:block;
+}
+
+/* INPUTS */
+input, select, textarea{
+    width:100%;
+    padding:14px;
+    margin-top:6px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    font-size:16px; /* prevents zoom */
+}
+
+/* TEXTAREA */
+textarea{
+    min-height:120px;
+}
+
+/* FILE INPUT */
+.file{
+    background:#f4f4f4;
+    padding:10px;
+}
+
+/* BUTTON */
+button{
+    width:100%;
+    padding:16px;
+    margin-top:18px;
+    border:none;
+    border-radius:10px;
+    background:red;
+    color:white;
+    font-size:16px;
+    font-weight:bold;
+}
+
+/* BUTTON ACTIVE */
+button:active{
+    transform:scale(0.98);
+}
+
+/* STATUS */
+.status{
+    text-align:center;
+    font-size:12px;
+    margin-top:10px;
+    color:#ccc;
+}
+
+/* PREVIEW IMAGE */
+#preview{
+    margin-top:10px;
+    width:100%;
+    border-radius:8px;
+    display:none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">🚨 Report Incident</div>
+
+<div class="container">
+
+<div class="card">
+<form method="POST" enctype="multipart/form-data" id="incidentForm">
+
+<label>Incident Type</label>
+<select name="type" required>
+    <option value="">Select type</option>
+    <option>Violence</option>
+    <option>Fraud</option>
+    <option>Intimidation</option>
+    <option>Logistics</option>
+</select>
+
+<label>Province</label>
+<input name="province" placeholder="Province" required>
+
+<label>Constituency</label>
+<input name="constituency" placeholder="Constituency" required>
+
+<label>Severity</label>
+<select name="severity" required>
+    <option value="">Select severity</option>
+    <option>Critical</option>
+    <option>High</option>
+    <option>Medium</option>
+    <option>Low</option>
+</select>
+
+<label>Description</label>
+<textarea name="description" placeholder="Describe incident..." required></textarea>
+
+<label>Photo (optional)</label>
+<input class="file" type="file" name="photo" accept="image/*" capture="environment" id="photoInput">
+
+<img id="preview">
+
+<button type="submit" id="submitBtn">Submit Incident</button>
+
+</form>
+
+<div class="status" id="statusText"></div>
+
+</div>
+
+</div>
+
+<script>
+
+/* 📸 IMAGE PREVIEW */
+document.getElementById("photoInput").addEventListener("change", function(e){
+    const file = e.target.files[0];
+    if(file){
+        const reader = new FileReader();
+        reader.onload = function(e){
+            const img = document.getElementById("preview");
+            img.src = e.target.result;
+            img.style.display = "block";
+        }
+        reader.readAsDataURL(file);
+    }
+});
+
+/* ⏳ LOADING STATE */
+document.getElementById("incidentForm").addEventListener("submit", function(){
+    const btn = document.getElementById("submitBtn");
+    btn.innerText = "Submitting...";
+    btn.disabled = true;
+});
+
+/* 📡 NETWORK STATUS */
+function updateStatus(){
+    const el = document.getElementById("statusText");
+    if(navigator.onLine){
+        el.innerText = "Online";
+        el.style.color = "lightgreen";
+    } else {
+        el.innerText = "Offline — will retry";
+        el.style.color = "orange";
+    }
+}
+
+window.addEventListener("online", updateStatus);
+window.addEventListener("offline", updateStatus);
+updateStatus();
+
+</script>
+
+</body>
+</html><!DOCTYPE html>
+<html>
+<head>
+<title>Report Incident</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
 body { font-family:Arial; background:#0b5d1e; color:white; padding:15px; }
 .card { background:white; color:black; padding:15px; border-radius:12px; }
 input, select, textarea { width:100%; padding:12px; margin-top:10px; border-radius:8px; }
