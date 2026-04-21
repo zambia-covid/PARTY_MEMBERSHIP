@@ -1344,11 +1344,6 @@ def live_dashboard():
 
     return jsonify(data)
 
-@app.route("/logout")
-def logout():
-    session.clear()  # 🔴 clears everything
-    return redirect(url_for("agent_login"))
-
 @app.route("/api/map_intelligence")
 @login_required
 def map_intelligence():
