@@ -499,12 +499,6 @@ def generate_member_id():
 # ==============================
 # MEMBERSHIP CARD
 # ==============================
-
-import os
-import qrcode
-from PIL import Image, ImageDraw, ImageFont
-from datetime import date
-
 def generate_membership_card(name, province, constituency, member_id):
     issue_date = str(date.today())
 
@@ -1920,17 +1914,17 @@ def report_incident():
         conn = get_db()
         cur = conn.cursor()
 
-        # 🔴 HANDLE PHOTO
+        # =========================
+        # 📸 HANDLE PHOTO
+        # =========================
         photo = request.files.get("photo")
         filename = None
 
         if photo and photo.filename != "":
             filename = secure_filename(photo.filename)
 
-            # avoid overwriting files
             filepath = os.path.join(UPLOAD_FOLDER, filename)
 
-            # if file exists, rename
             counter = 1
             while os.path.exists(filepath):
                 name, ext = os.path.splitext(filename)
@@ -1940,7 +1934,15 @@ def report_incident():
 
             photo.save(filepath)
 
-        # 🔴 INSERT DATA
+        # =========================
+        # 📍 GPS (NEW)
+        # =========================
+        latitude = request.form.get("latitude")
+        longitude = request.form.get("longitude")
+
+        # =========================
+        # 🧾 INSERT DATA (UPDATED)
+        # =========================
         cur.execute("""
             INSERT INTO incidents (
                 type,
@@ -1950,10 +1952,12 @@ def report_incident():
                 description,
                 contact,
                 photo,
+                latitude,
+                longitude,
                 status,
                 created_at
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,'Open', NOW())
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'Open', NOW())
         """, (
             request.form["type"],
             request.form["province"],
@@ -1961,7 +1965,9 @@ def report_incident():
             request.form["severity"],
             request.form["description"],
             request.form.get("contact"),
-            filename
+            filename,
+            latitude,
+            longitude
         ))
 
         conn.commit()
