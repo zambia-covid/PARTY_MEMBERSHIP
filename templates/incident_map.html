@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Incident Heat Map</title>
+<title>Incident Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-<!-- 🔥 Heat Plugin -->
+<!-- Heat Plugin -->
 <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
 <style>
@@ -47,7 +47,7 @@ body { margin:0; font-family: Arial; }
 
 <body>
 
-<div class="header">🔥 Incident Heat Map</div>
+<div class="header">🛰️ Incident Intelligence Map</div>
 <div id="map"></div>
 
 <div class="legend">
@@ -59,13 +59,33 @@ body { margin:0; font-family: Arial; }
 
 <script>
 // =======================
-// INIT MAP (Zambia focus)
+// INIT MAP
 // =======================
 var map = L.map('map').setView([-13.1339, 27.8493], 6);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap'
-}).addTo(map);
+// =======================
+// BASE LAYERS
+// =======================
+
+// 🗺️ Street Map
+var street = L.tileLayer(
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    { attribution: "&copy; OpenStreetMap" }
+);
+
+// 🛰️ Satellite Map (DEFAULT)
+var satellite = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { attribution: "Tiles &copy; Esri" }
+).addTo(map);
+
+// Layer toggle
+L.control.layers(
+    {
+        "Street": street,
+        "Satellite": satellite
+    }
+).addTo(map);
 
 // =======================
 // LOAD INCIDENT DATA
@@ -80,10 +100,9 @@ fetch("/api/incidents")
 
     data.forEach(i => {
 
-        // skip if no GPS
         if (!i.lat || !i.lng) return;
 
-        // 🔥 severity weighting
+        // 🔥 Severity weighting
         let weight = 0.2;
 
         if (i.severity === "Critical") weight = 1.0;
@@ -96,7 +115,7 @@ fetch("/api/incidents")
     // =======================
     // HEAT LAYER
     // =======================
-    L.heatLayer(heatPoints, {
+    let heatLayer = L.heatLayer(heatPoints, {
         radius: 25,
         blur: 15,
         maxZoom: 10,
@@ -107,25 +126,6 @@ fetch("/api/incidents")
             1.0: "red"
         }
     }).addTo(map);
-
-    // =======================
-    // FALLBACK MARKERS (optional)
-    // =======================
-    if (heatPoints.length === 0) {
-        alert("No GPS data found. Showing markers instead.");
-
-        data.forEach(i => {
-            if (!i.lat || !i.lng) return;
-
-            L.marker([i.lat, i.lng]).addTo(map)
-            .bindPopup(`
-                <b>${i.type}</b><br>
-                ${i.constituency}<br>
-                Severity: ${i.severity}<br>
-                ${i.description}
-            `);
-        });
-    }
 
 });
 </script>
