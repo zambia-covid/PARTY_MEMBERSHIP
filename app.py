@@ -887,7 +887,7 @@ def create_user():
             cur.execute("SELECT 1 FROM agents WHERE phone=%s", (phone,))
             if cur.fetchone():
                 flash("User already exists", "warning")
-                return redirect(url_for("create_user"))
+                return redirect(url_for("create_user")
 
             # 🔴 INSERT USER
             cur.execute("""
@@ -926,7 +926,7 @@ def create_user():
         return redirect(url_for("create_user"))
 
     # 🔵 GET REQUEST
-    return render_template("create_user.html"))
+    return render_template("create_user.html")
     
 # ==============================
 # AI INSIGHTS
