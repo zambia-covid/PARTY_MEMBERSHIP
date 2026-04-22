@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Incident Map</title>
+<title>Incident Intelligence Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <!-- Leaflet -->
@@ -38,10 +38,6 @@ body { margin:0; font-family: Arial; }
     font-size:12px;
     z-index:999;
 }
-
-.legend div {
-    margin-bottom:5px;
-}
 </style>
 </head>
 
@@ -76,14 +72,14 @@ var satellite = L.tileLayer(
     { attribution: "Tiles &copy; Esri" }
 ).addTo(map);
 
-// Toggle
+// Layer control
 L.control.layers({
     "Street": street,
     "Satellite": satellite
 }).addTo(map);
 
 // =======================
-// LOAD INCIDENTS
+// LOAD INCIDENT DATA
 // =======================
 fetch("/api/incidents")
 .then(res => res.json())
@@ -121,66 +117,28 @@ fetch("/api/incidents")
     }).addTo(map);
 
     // =======================
-    // 🗺️ LOAD GEOJSON + COLORING
+    // 🗺️ LOAD GEOJSON (DEBUG SAFE)
     // =======================
     fetch("/static/geo/zambia_constituencies.geojson")
     .then(res => res.json())
     .then(geo => {
 
-        let scores = {};
+        console.log("GEOJSON LOADED:", geo);
 
-        function normalize(name){
-            return (name || "").toLowerCase().trim();
-        }
-
-        // Build scores
-        data.forEach(i => {
-            if (!i.constituency) return;
-
-            let key = normalize(i.constituency);
-
-            let score = 1;
-            if (i.severity === "Critical") score = 3;
-            else if (i.severity === "High") score = 2;
-
-            if (!scores[key]) scores[key] = 0;
-            scores[key] += score;
-        });
-
-        function getColor(score){
-            if (score > 20) return "red";
-            if (score > 10) return "orange";
-            if (score > 5) return "yellow";
-            return "green";
-        }
-
-        L.geoJSON(geo, {
-
-            style: function(feature){
-
-                let name = normalize(feature.properties.name);
-                let score = scores[name] || 0;
-
-                return {
-                    color: "#333",
-                    weight: 1,
-                    fillColor: getColor(score),
-                    fillOpacity: 0.5
-                };
-            },
-
-            onEachFeature: function(feature, layer){
-
-                let name = normalize(feature.properties.name);
-                let score = scores[name] || 0;
-
-                layer.bindPopup(`
-                    <b>${feature.properties.name}</b><br>
-                    Incident Score: ${score}
-                `);
+        let geoLayer = L.geoJSON(geo, {
+            style: {
+                color: "#333",
+                weight: 1,
+                fillColor: "blue",
+                fillOpacity: 0.4
             }
-
         }).addTo(map);
+
+        // 🔥 CRITICAL: force map to zoom to GeoJSON
+        map.fitBounds(geoLayer.getBounds());
+
+        // 🔥 ensure visible above heat
+        geoLayer.bringToFront();
 
     });
 
