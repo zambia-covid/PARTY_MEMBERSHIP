@@ -66,43 +66,39 @@ var map = L.map('map').setView([-13.1339, 27.8493], 6);
 // =======================
 // BASE LAYERS
 // =======================
-
-// 🗺️ Street Map
 var street = L.tileLayer(
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     { attribution: "&copy; OpenStreetMap" }
 );
 
-// 🛰️ Satellite Map (DEFAULT)
 var satellite = L.tileLayer(
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     { attribution: "Tiles &copy; Esri" }
 ).addTo(map);
 
-// Layer toggle
-L.control.layers(
-    {
-        "Street": street,
-        "Satellite": satellite
-    }
-).addTo(map);
+// Toggle
+L.control.layers({
+    "Street": street,
+    "Satellite": satellite
+}).addTo(map);
 
 // =======================
-// LOAD INCIDENT DATA
+// LOAD INCIDENTS
 // =======================
 fetch("/api/incidents")
 .then(res => res.json())
 .then(data => {
 
-    console.log("INCIDENTS:", data);
+    console.log("INCIDENT DATA:", data);
 
+    // =======================
+    // 🔥 HEATMAP
+    // =======================
     let heatPoints = [];
 
     data.forEach(i => {
-
         if (!i.lat || !i.lng) return;
 
-        // 🔥 Severity weighting
         let weight = 0.2;
 
         if (i.severity === "Critical") weight = 1.0;
@@ -112,10 +108,7 @@ fetch("/api/incidents")
         heatPoints.push([i.lat, i.lng, weight]);
     });
 
-    // =======================
-    // HEAT LAYER
-    // =======================
-    let heatLayer = L.heatLayer(heatPoints, {
+    L.heatLayer(heatPoints, {
         radius: 25,
         blur: 15,
         maxZoom: 10,
@@ -126,6 +119,70 @@ fetch("/api/incidents")
             1.0: "red"
         }
     }).addTo(map);
+
+    // =======================
+    // 🗺️ LOAD GEOJSON + COLORING
+    // =======================
+    fetch("/static/geo/zambia_constituencies.geojson")
+    .then(res => res.json())
+    .then(geo => {
+
+        let scores = {};
+
+        function normalize(name){
+            return (name || "").toLowerCase().trim();
+        }
+
+        // Build scores
+        data.forEach(i => {
+            if (!i.constituency) return;
+
+            let key = normalize(i.constituency);
+
+            let score = 1;
+            if (i.severity === "Critical") score = 3;
+            else if (i.severity === "High") score = 2;
+
+            if (!scores[key]) scores[key] = 0;
+            scores[key] += score;
+        });
+
+        function getColor(score){
+            if (score > 20) return "red";
+            if (score > 10) return "orange";
+            if (score > 5) return "yellow";
+            return "green";
+        }
+
+        L.geoJSON(geo, {
+
+            style: function(feature){
+
+                let name = normalize(feature.properties.name);
+                let score = scores[name] || 0;
+
+                return {
+                    color: "#333",
+                    weight: 1,
+                    fillColor: getColor(score),
+                    fillOpacity: 0.5
+                };
+            },
+
+            onEachFeature: function(feature, layer){
+
+                let name = normalize(feature.properties.name);
+                let score = scores[name] || 0;
+
+                layer.bindPopup(`
+                    <b>${feature.properties.name}</b><br>
+                    Incident Score: ${score}
+                `);
+            }
+
+        }).addTo(map);
+
+    });
 
 });
 </script>
