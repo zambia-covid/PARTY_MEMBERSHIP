@@ -853,59 +853,80 @@ def constituencies():
 # ==============================
 # CREATE USER
 # ==============================
+from flask import request, render_template, redirect, url_for, flash
+from flask_login import login_required
+from werkzeug.security import generate_password_hash
+from db import get_db
+
 @app.route("/create_user", methods=["GET", "POST"])
-@login_required  # 🔴 restrict to logged-in admin later
+@login_required
 def create_user():
 
     if request.method == "POST":
 
-        phone = request.form.get("phone")
-        password = request.form.get("password")
-        role = request.form.get("role", "agent").lower()
+        phone = request.form.get("phone", "").strip()
+        password = request.form.get("password", "").strip()
+        role = request.form.get("role", "agent").lower().strip()
         province = request.form.get("province")
         constituency = request.form.get("constituency")
         polling_station = request.form.get("polling_station")
 
+        # 🔴 BASIC VALIDATION
         if not phone or not password:
-            return "Missing required fields", 400
+            flash("Phone and password are required", "danger")
+            return redirect(url_for("create_user"))
 
+        # 🔴 HASH PASSWORD
         hashed_password = generate_password_hash(password)
 
-        conn = get_db()
-        cur = conn.cursor()
+        try:
+            conn = get_db()
+            cur = conn.cursor()
 
-        # 🔴 CHECK DUPLICATE
-        cur.execute("SELECT 1 FROM agents WHERE phone=%s", (phone,))
-        if cur.fetchone():
-            return "User already exists", 400
+            # 🔴 CHECK DUPLICATE
+            cur.execute("SELECT 1 FROM agents WHERE phone=%s", (phone,))
+            if cur.fetchone():
+                flash("User already exists", "warning")
+                return redirect(url_for("create_user"))
 
-        # 🔴 INSERT USER
-        cur.execute("""
-            INSERT INTO agents (
+            # 🔴 INSERT USER
+            cur.execute("""
+                INSERT INTO agents (
+                    phone,
+                    password,
+                    role,
+                    province,
+                    constituency,
+                    polling_station
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (
                 phone,
-                password,
+                hashed_password,
                 role,
                 province,
                 constituency,
                 polling_station
-            )
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (
-            phone,
-            hashed_password,
-            role,
-            province,
-            constituency,
-            polling_station
-        ))
+            ))
 
-        conn.commit()
-        cur.close()
-        conn.close()
+            conn.commit()
 
-        return redirect(url_for("admin_dashboard"))  # or wherever
+            flash("User created successfully", "success")
 
-    return render_template("create_user.html")
+        except Exception as e:
+            conn.rollback()
+            print("CREATE USER ERROR:", e)
+            flash("System error while creating user", "danger")
+
+        finally:
+            cur.close()
+            conn.close()
+
+        # ✅ REDIRECT BACK TO FORM (CLEAN LOOP)
+        return redirect(url_for("create_user"))
+
+    # 🔵 GET REQUEST
+    return render_template("create_user.html"))
     
 # ==============================
 # AI INSIGHTS
