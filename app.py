@@ -1904,6 +1904,10 @@ UPLOAD_FOLDER = "static/uploads"
 # ensure folder exists (important on Render)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+@app.route("/incident_map")
+@login_required
+def incident_map():
+    return render_template("incident_map.html")
 
 @app.route("/report_incident", methods=["GET", "POST"])
 @login_required
