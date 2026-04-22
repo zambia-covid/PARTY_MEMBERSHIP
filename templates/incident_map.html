@@ -1,19 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Incident Intelligence Map</title>
+<title>Incident Map (GeoJSON Test)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-<!-- Heat Plugin -->
-<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
-
 <style>
-body { margin:0; font-family: Arial; }
-#map { height:100vh; }
+body {
+    margin:0;
+    font-family: Arial;
+}
+
+#map {
+    height:100vh;
+}
 
 .header {
     position:absolute;
@@ -27,31 +30,14 @@ body { margin:0; font-family: Arial; }
     z-index:999;
     font-weight:bold;
 }
-
-.legend {
-    position:absolute;
-    bottom:20px;
-    left:20px;
-    background:white;
-    padding:10px;
-    border-radius:8px;
-    font-size:12px;
-    z-index:999;
-}
 </style>
 </head>
 
 <body>
 
-<div class="header">🛰️ Incident Intelligence Map</div>
-<div id="map"></div>
+<div class="header">🗺️ GeoJSON Boundary Test</div>
 
-<div class="legend">
-    <div><span style="color:green">●</span> Low</div>
-    <div><span style="color:yellow">●</span> Medium</div>
-    <div><span style="color:orange">●</span> High</div>
-    <div><span style="color:red">●</span> Critical</div>
-</div>
+<div id="map"></div>
 
 <script>
 // =======================
@@ -60,88 +46,37 @@ body { margin:0; font-family: Arial; }
 var map = L.map('map').setView([-13.1339, 27.8493], 6);
 
 // =======================
-// BASE LAYERS
+// BASE MAP
 // =======================
-var street = L.tileLayer(
+L.tileLayer(
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     { attribution: "&copy; OpenStreetMap" }
-);
-
-var satellite = L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    { attribution: "Tiles &copy; Esri" }
 ).addTo(map);
 
-// Layer control
-L.control.layers({
-    "Street": street,
-    "Satellite": satellite
-}).addTo(map);
-
 // =======================
-// LOAD INCIDENT DATA
+// LOAD GEOJSON ONLY
 // =======================
-fetch("/api/incidents")
+fetch("/static/geo/zambia_constituencies.geojson")
 .then(res => res.json())
-.then(data => {
+.then(geo => {
 
-    console.log("INCIDENT DATA:", data);
+    console.log("GEOJSON:", geo);
 
-    // =======================
-    // 🔥 HEATMAP
-    // =======================
-    let heatPoints = [];
-
-    data.forEach(i => {
-        if (!i.lat || !i.lng) return;
-
-        let weight = 0.2;
-
-        if (i.severity === "Critical") weight = 1.0;
-        else if (i.severity === "High") weight = 0.7;
-        else if (i.severity === "Medium") weight = 0.4;
-
-        heatPoints.push([i.lat, i.lng, weight]);
-    });
-
-    L.heatLayer(heatPoints, {
-        radius: 25,
-        blur: 15,
-        maxZoom: 10,
-        gradient: {
-            0.2: "green",
-            0.4: "yellow",
-            0.7: "orange",
-            1.0: "red"
+    let geoLayer = L.geoJSON(geo, {
+        style: {
+            color: "red",
+            weight: 2,
+            fillColor: "blue",
+            fillOpacity: 0.5
         }
     }).addTo(map);
 
-    // =======================
-    // 🗺️ LOAD GEOJSON (DEBUG SAFE)
-    // =======================
-    fetch("/static/geo/zambia_constituencies.geojson")
-    .then(res => res.json())
-    .then(geo => {
+    // 🔥 FORCE VIEW TO BOUNDARIES
+    map.fitBounds(geoLayer.getBounds());
 
-        console.log("GEOJSON LOADED:", geo);
-
-        let geoLayer = L.geoJSON(geo, {
-            style: {
-                color: "#333",
-                weight: 1,
-                fillColor: "blue",
-                fillOpacity: 0.4
-            }
-        }).addTo(map);
-
-        // 🔥 CRITICAL: force map to zoom to GeoJSON
-        map.fitBounds(geoLayer.getBounds());
-
-        // 🔥 ensure visible above heat
-        geoLayer.bringToFront();
-
-    });
-
+})
+.catch(err => {
+    console.error("GEOJSON LOAD ERROR:", err);
 });
 </script>
 
