@@ -1,20 +1,61 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Incident Map</title>
+<title>Incident Heat Map</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
+<!-- 🔥 Heat Plugin -->
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
 <style>
-body { margin:0; }
+body { margin:0; font-family: Arial; }
 #map { height:100vh; }
+
+.header {
+    position:absolute;
+    top:10px;
+    left:50%;
+    transform:translateX(-50%);
+    background:#063312;
+    color:white;
+    padding:10px 20px;
+    border-radius:10px;
+    z-index:999;
+    font-weight:bold;
+}
+
+.legend {
+    position:absolute;
+    bottom:20px;
+    left:20px;
+    background:white;
+    padding:10px;
+    border-radius:8px;
+    font-size:12px;
+    z-index:999;
+}
+
+.legend div {
+    margin-bottom:5px;
+}
 </style>
 </head>
 
 <body>
 
+<div class="header">🔥 Incident Heat Map</div>
 <div id="map"></div>
+
+<div class="legend">
+    <div><span style="color:green">●</span> Low</div>
+    <div><span style="color:yellow">●</span> Medium</div>
+    <div><span style="color:orange">●</span> High</div>
+    <div><span style="color:red">●</span> Critical</div>
+</div>
 
 <script>
 // =======================
@@ -27,34 +68,64 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 // =======================
-// LOAD INCIDENTS
+// LOAD INCIDENT DATA
 // =======================
 fetch("/api/incidents")
 .then(res => res.json())
 .then(data => {
 
+    console.log("INCIDENTS:", data);
+
+    let heatPoints = [];
+
     data.forEach(i => {
 
-        if(!i.lat || !i.lng) return;
+        // skip if no GPS
+        if (!i.lat || !i.lng) return;
 
-        let color = "green";
+        // 🔥 severity weighting
+        let weight = 0.2;
 
-        if(i.severity === "Critical") color = "red";
-        else if(i.severity === "High") color = "orange";
-        else if(i.severity === "Medium") color = "yellow";
+        if (i.severity === "Critical") weight = 1.0;
+        else if (i.severity === "High") weight = 0.7;
+        else if (i.severity === "Medium") weight = 0.4;
 
-        let marker = L.circleMarker([i.lat, i.lng], {
-            radius: 8,
-            color: color
-        }).addTo(map);
-
-        marker.bindPopup(`
-            <b>${i.type}</b><br>
-            ${i.constituency}<br>
-            Severity: ${i.severity}<br>
-            ${i.description}
-        `);
+        heatPoints.push([i.lat, i.lng, weight]);
     });
+
+    // =======================
+    // HEAT LAYER
+    // =======================
+    L.heatLayer(heatPoints, {
+        radius: 25,
+        blur: 15,
+        maxZoom: 10,
+        gradient: {
+            0.2: "green",
+            0.4: "yellow",
+            0.7: "orange",
+            1.0: "red"
+        }
+    }).addTo(map);
+
+    // =======================
+    // FALLBACK MARKERS (optional)
+    // =======================
+    if (heatPoints.length === 0) {
+        alert("No GPS data found. Showing markers instead.");
+
+        data.forEach(i => {
+            if (!i.lat || !i.lng) return;
+
+            L.marker([i.lat, i.lng]).addTo(map)
+            .bindPopup(`
+                <b>${i.type}</b><br>
+                ${i.constituency}<br>
+                Severity: ${i.severity}<br>
+                ${i.description}
+            `);
+        });
+    }
 
 });
 </script>
