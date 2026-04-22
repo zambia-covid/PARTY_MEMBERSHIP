@@ -129,17 +129,25 @@ button:active{
 
 <img id="preview">
 
+<!-- 🔴 GPS FIELDS -->
+<input type="hidden" name="latitude" id="latitude">
+<input type="hidden" name="longitude" id="longitude">
+
 <button type="submit" id="submitBtn">Submit Incident</button>
 
 </form>
 
 <div class="status" id="statusText"></div>
+<div class="status" id="gpsStatus">📍 Getting location...</div>
 
 </div>
 
 </div>
 
 <script>
+// =====================
+// 📸 IMAGE PREVIEW
+// =====================
 document.getElementById("photoInput").addEventListener("change", function(e){
     const file = e.target.files[0];
     if(file){
@@ -153,12 +161,18 @@ document.getElementById("photoInput").addEventListener("change", function(e){
     }
 });
 
+// =====================
+// 🚀 SUBMIT STATE
+// =====================
 document.getElementById("incidentForm").addEventListener("submit", function(){
     const btn = document.getElementById("submitBtn");
     btn.innerText = "Submitting...";
     btn.disabled = true;
 });
 
+// =====================
+// 🌐 ONLINE STATUS
+// =====================
 function updateStatus(){
     const el = document.getElementById("statusText");
     if(navigator.onLine){
@@ -173,6 +187,41 @@ function updateStatus(){
 window.addEventListener("online", updateStatus);
 window.addEventListener("offline", updateStatus);
 updateStatus();
+
+// =====================
+// 📍 GPS CAPTURE (NEW)
+// =====================
+function getLocation(){
+    const gpsEl = document.getElementById("gpsStatus");
+
+    if(!navigator.geolocation){
+        gpsEl.innerText = "GPS not supported";
+        gpsEl.style.color = "orange";
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        function(position){
+            document.getElementById("latitude").value = position.coords.latitude;
+            document.getElementById("longitude").value = position.coords.longitude;
+
+            gpsEl.innerText = "📍 Location captured";
+            gpsEl.style.color = "lightgreen";
+        },
+        function(error){
+            gpsEl.innerText = "⚠️ Location denied";
+            gpsEl.style.color = "orange";
+            console.log(error);
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000
+        }
+    );
+}
+
+// run on load
+window.onload = getLocation;
 </script>
 
 </body>
