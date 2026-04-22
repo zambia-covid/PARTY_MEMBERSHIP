@@ -1982,6 +1982,41 @@ def report_incident():
 
     return render_template("report_incident.html")
 
+@app.route("/api/my_incidents")
+@login_required
+def my_incidents():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # 🔴 adjust this depending on how you track users
+    cur.execute("""
+        SELECT id, type, province, constituency, severity,
+               description, status, created_at
+        FROM incidents
+        ORDER BY created_at DESC
+        LIMIT 50
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return jsonify([
+        {
+            "id": r[0],
+            "type": r[1],
+            "province": r[2],
+            "constituency": r[3],
+            "severity": r[4],
+            "description": r[5],
+            "status": r[6],
+            "created_at": str(r[7])
+        }
+        for r in rows
+    ])
+
 # ==============================
 # VOTE TABULATION
 # ==============================
