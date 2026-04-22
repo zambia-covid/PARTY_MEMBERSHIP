@@ -853,51 +853,47 @@ def constituencies():
 # ==============================
 # CREATE USER
 # ==============================
-from flask import request, render_template, redirect, url_for, flash
-from flask_login import login_required
-from werkzeug.security import generate_password_hash
-from db import get_db
-
 @app.route("/create_user", methods=["GET", "POST"])
 @login_required
+@admin_required
 def create_user():
 
     if request.method == "POST":
 
-        phone = request.form.get("phone", "").strip()
-        password = request.form.get("password", "").strip()
-        role = request.form.get("role", "agent").lower().strip()
-        province = request.form.get("province")
-        constituency = request.form.get("constituency")
-        polling_station = request.form.get("polling_station")
+        try:
+            phone = normalize_phone(request.form.get("phone"))
+            password = request.form.get("password", "").strip()
+            role = request.form.get("role", "agent").lower().strip()
+            province = request.form.get("province")
+            constituency = request.form.get("constituency")
+            polling_station = request.form.get("polling_station")
 
-        # 🔴 BASIC VALIDATION
-        if not phone or not password:
-            flash("Phone and password are required", "danger")
+            if not password:
+                flash("Password is required", "danger")
+                return redirect(url_for("create_user"))
+
+        except ValueError as e:
+            flash(str(e), "danger")
             return redirect(url_for("create_user"))
 
-        # 🔴 HASH PASSWORD
         hashed_password = generate_password_hash(password)
+
+        conn = None
+        cur = None
 
         try:
             conn = get_db()
             cur = conn.cursor()
 
-            # 🔴 CHECK DUPLICATE
             cur.execute("SELECT 1 FROM agents WHERE phone=%s", (phone,))
             if cur.fetchone():
                 flash("User already exists", "warning")
-                return redirect(url_for("create_user")
+                return redirect(url_for("create_user"))
 
-            # 🔴 INSERT USER
             cur.execute("""
                 INSERT INTO agents (
-                    phone,
-                    password,
-                    role,
-                    province,
-                    constituency,
-                    polling_station
+                    phone, password, role,
+                    province, constituency, polling_station
                 )
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (
@@ -914,18 +910,19 @@ def create_user():
             flash("User created successfully", "success")
 
         except Exception as e:
-            conn.rollback()
+            if conn:
+                conn.rollback()
             print("CREATE USER ERROR:", e)
             flash("System error while creating user", "danger")
 
         finally:
-            cur.close()
-            conn.close()
+            if cur:
+                cur.close()
+            if conn:
+                conn.close()
 
-        # ✅ REDIRECT BACK TO FORM (CLEAN LOOP)
         return redirect(url_for("create_user"))
 
-    # 🔵 GET REQUEST
     return render_template("create_user.html")
     
 # ==============================
