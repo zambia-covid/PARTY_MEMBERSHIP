@@ -41,6 +41,73 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 
+# ==============================
+# 🗺️ CONSTITUENCY → DISTRICT MAP
+# ==============================
+CONSTITUENCY_TO_DISTRICT = {
+
+    # LUSAKA
+    "kabwata": "lusaka",
+    "kamwala": "lusaka",
+    "lusaka central": "lusaka",
+    "matero": "lusaka",
+    "munali": "lusaka",
+    "chawama": "lusaka",
+    "kanyama": "lusaka",
+    "mandevu": "lusaka",
+    "rufunsa": "rufunsa",
+    "chilanga": "chilanga",
+    "chongwe": "chongwe",
+    "kafue": "kafue",
+
+    # COPPERBELT
+    "ndola central": "ndola",
+    "kabushi": "ndola",
+    "chifubu": "ndola",
+    "kitwe central": "kitwe",
+    "nkana": "kitwe",
+    "chimwemwe": "kitwe",
+    "kwacha": "kitwe",
+
+    # EASTERN
+    "chipata central": "chipata",
+    "chadiza": "chadiza",
+    "katete": "katete",
+    "petauke central": "petauke",
+    "lundazi": "lundazi",
+
+    # SOUTHERN
+    "livingstone": "livingstone",
+    "mazabuka central": "mazabuka",
+    "monze central": "monze",
+    "choma central": "choma",
+    "kalomo central": "kalomo",
+
+    # CENTRAL
+    "kabwe central": "kabwe",
+    "bwacha": "kabwe",
+    "kapiri mposhi": "kapiri mposhi",
+    "mkushi": "mkushi",
+
+    # NORTHERN
+    "kasama central": "kasama",
+    "mpika": "mpika",
+    "mbala": "mbala",
+
+    # LUAPULA
+    "mansa central": "mansa",
+    "bahati": "mansa",
+    "samfya": "samfya",
+
+    # NORTH-WESTERN
+    "solwezi central": "solwezi",
+    "kalumbila": "kalumbila",
+
+    # WESTERN
+    "mongu central": "mongu",
+    "senanga": "senanga"
+}
+
 # ======================
 # ADMIN
 # ======================
@@ -771,6 +838,52 @@ def normalize_phone(phone):
         raise ValueError("Invalid Zambian phone number")
 
     return phone
+
+@app.route("/api/district_summary")
+@login_required
+def district_summary():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT 
+            district,
+            COUNT(*) as total,
+
+            SUM(CASE WHEN severity='Critical' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN severity='High' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN severity='Medium' THEN 1 ELSE 0 END),
+            SUM(CASE WHEN severity='Low' THEN 1 ELSE 0 END),
+
+            SUM(
+                CASE 
+                    WHEN severity='Critical' THEN 3
+                    WHEN severity='High' THEN 2
+                    ELSE 1
+                END
+            ) as score
+
+        FROM incidents
+        GROUP BY district
+    """)
+
+    rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        (r[0] or "").lower().strip(): {
+            "total": r[1],
+            "critical": r[2],
+            "high": r[3],
+            "medium": r[4],
+            "low": r[5],
+            "score": int(r[6] or 0)
+        }
+        for r in rows
+    })
 
 @app.route("/download_card/<member_id>")
 def download_card(member_id):
@@ -2023,11 +2136,21 @@ def my_incidents():
     conn = get_db()
     cur = conn.cursor()
 
-    # 🔴 adjust this depending on how you track users
     cur.execute("""
-        SELECT id, type, province, constituency, severity,
-               description, status, created_at
+        SELECT 
+            id,
+            type,
+            province,
+            constituency,
+            district,
+            severity,
+            description,
+            status,
+            created_at,
+            latitude,
+            longitude
         FROM incidents
+        WHERE COALESCE(status,'Open') != 'Deleted'
         ORDER BY created_at DESC
         LIMIT 50
     """)
@@ -2043,10 +2166,13 @@ def my_incidents():
             "type": r[1],
             "province": r[2],
             "constituency": r[3],
-            "severity": r[4],
-            "description": r[5],
-            "status": r[6],
-            "created_at": str(r[7])
+            "district": (r[4] or "").lower().strip(),  # 🔥 REQUIRED
+            "severity": r[5],
+            "description": r[6],
+            "status": r[7],
+            "created_at": str(r[8]),
+            "lat": float(r[9]) if r[9] else None,      # 🔥 MAP READY
+            "lng": float(r[10]) if r[10] else None
         }
         for r in rows
     ])
