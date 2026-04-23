@@ -1918,65 +1918,99 @@ def report_incident():
         conn = get_db()
         cur = conn.cursor()
 
-        # =========================
-        # 📸 HANDLE PHOTO
-        # =========================
-        photo = request.files.get("photo")
-        filename = None
+        try:
+            # =========================
+            # 🧾 INPUTS
+            # =========================
+            constituency = request.form.get("constituency", "").strip()
+            province = request.form.get("province")
+            incident_type = request.form.get("type")
+            severity = request.form.get("severity")
+            description = request.form.get("description")
+            contact = request.form.get("contact")
 
-        if photo and photo.filename != "":
-            filename = secure_filename(photo.filename)
+            # 🔴 NORMALIZE KEY
+            key = constituency.lower()
 
-            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            # 🔴 MAP TO DISTRICT
+            district = CONSTITUENCY_TO_DISTRICT.get(key, key)
 
-            counter = 1
-            while os.path.exists(filepath):
-                name, ext = os.path.splitext(filename)
-                filename = f"{name}_{counter}{ext}"
+            # =========================
+            # 📸 HANDLE PHOTO
+            # =========================
+            photo = request.files.get("photo")
+            filename = None
+
+            if photo and photo.filename != "":
+                filename = secure_filename(photo.filename)
+
                 filepath = os.path.join(UPLOAD_FOLDER, filename)
-                counter += 1
 
-            photo.save(filepath)
+                counter = 1
+                while os.path.exists(filepath):
+                    name, ext = os.path.splitext(filename)
+                    filename = f"{name}_{counter}{ext}"
+                    filepath = os.path.join(UPLOAD_FOLDER, filename)
+                    counter += 1
 
-        # =========================
-        # 📍 GPS (NEW)
-        # =========================
-        latitude = request.form.get("latitude")
-        longitude = request.form.get("longitude")
+                photo.save(filepath)
 
-        # =========================
-        # 🧾 INSERT DATA (UPDATED)
-        # =========================
-        cur.execute("""
-            INSERT INTO incidents (
-                type,
+            # =========================
+            # 📍 GPS
+            # =========================
+            latitude = request.form.get("latitude")
+            longitude = request.form.get("longitude")
+
+            # Convert safely
+            try:
+                latitude = float(latitude) if latitude else None
+                longitude = float(longitude) if longitude else None
+            except:
+                latitude = None
+                longitude = None
+
+            # =========================
+            # 🧾 INSERT
+            # =========================
+            cur.execute("""
+                INSERT INTO incidents (
+                    type,
+                    province,
+                    constituency,
+                    district,
+                    severity,
+                    description,
+                    contact,
+                    photo,
+                    latitude,
+                    longitude,
+                    status,
+                    created_at
+                )
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'Open', NOW())
+            """, (
+                incident_type,
                 province,
                 constituency,
+                district,   # 🔥 NEW (alignment fix)
                 severity,
                 description,
                 contact,
-                photo,
+                filename,
                 latitude,
-                longitude,
-                status,
-                created_at
-            )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'Open', NOW())
-        """, (
-            request.form["type"],
-            request.form["province"],
-            request.form["constituency"],
-            request.form["severity"],
-            request.form["description"],
-            request.form.get("contact"),
-            filename,
-            latitude,
-            longitude
-        ))
+                longitude
+            ))
 
-        conn.commit()
-        cur.close()
-        conn.close()
+            conn.commit()
+
+        except Exception as e:
+            conn.rollback()
+            print("REPORT INCIDENT ERROR:", e)
+            return "Error saving incident", 500
+
+        finally:
+            cur.close()
+            conn.close()
 
         return redirect("/agent_dashboard")
 
