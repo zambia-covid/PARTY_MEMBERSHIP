@@ -4,11 +4,8 @@
 <title>Incident Intelligence Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<!-- Heat Plugin -->
 <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
 <style>
@@ -38,10 +35,6 @@ body { margin:0; font-family: Arial; }
     font-size:12px;
     z-index:999;
 }
-
-.legend div {
-    margin-bottom:5px;
-}
 </style>
 </head>
 
@@ -67,16 +60,13 @@ var map = L.map('map').setView([-13.1339, 27.8493], 6);
 // BASE LAYERS
 // =======================
 var street = L.tileLayer(
-    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    { attribution: "&copy; OpenStreetMap" }
+    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
 );
 
 var satellite = L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    { attribution: "Tiles &copy; Esri" }
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
 ).addTo(map);
 
-// Toggle
 L.control.layers({
     "Street": street,
     "Satellite": satellite
@@ -111,29 +101,41 @@ fetch("/api/incidents")
     L.heatLayer(heatPoints, {
         radius: 25,
         blur: 15,
-        maxZoom: 10,
-        gradient: {
-            0.2: "green",
-            0.4: "yellow",
-            0.7: "orange",
-            1.0: "red"
-        }
+        maxZoom: 10
     }).addTo(map);
 
     // =======================
-    // 🗺️ LOAD GEOJSON + COLORING
+    // 🗺️ LOAD GEOJSON
     // =======================
     fetch("/static/geo/zambia_constituencies.geojson")
     .then(res => res.json())
     .then(geo => {
 
-        let scores = {};
+        console.log("GEO PROPERTIES SAMPLE:", geo.features[0].properties);
 
-        function normalize(name){
-            return (name || "").toLowerCase().trim();
+        // 🔴 AUTO-DETECT NAME FIELD
+        function getName(feature){
+            return (
+                feature.properties.name ||
+                feature.properties.ADM2_NAME ||
+                feature.properties.constituency ||
+                feature.properties.NAME ||
+                "Unknown"
+            );
         }
 
-        // Build scores
+        function normalize(name){
+            return (name || "")
+                .toLowerCase()
+                .replace("constituency", "")
+                .trim();
+        }
+
+        // =======================
+        // BUILD SCORES
+        // =======================
+        let scores = {};
+
         data.forEach(i => {
             if (!i.constituency) return;
 
@@ -154,12 +156,16 @@ fetch("/api/incidents")
             return "green";
         }
 
-        L.geoJSON(geo, {
+        // =======================
+        // DRAW MAP
+        // =======================
+        let geoLayer = L.geoJSON(geo, {
 
             style: function(feature){
 
-                let name = normalize(feature.properties.name);
-                let score = scores[name] || 0;
+                let cname = getName(feature);
+                let key = normalize(cname);
+                let score = scores[key] || 0;
 
                 return {
                     color: "#333",
@@ -171,16 +177,21 @@ fetch("/api/incidents")
 
             onEachFeature: function(feature, layer){
 
-                let name = normalize(feature.properties.name);
-                let score = scores[name] || 0;
+                let cname = getName(feature);
+                let key = normalize(cname);
+                let score = scores[key] || 0;
 
                 layer.bindPopup(`
-                    <b>${feature.properties.name}</b><br>
+                    <b>${cname}</b><br>
                     Incident Score: ${score}
                 `);
             }
 
         }).addTo(map);
+
+        // 🔥 ENSURE VISIBILITY
+        map.fitBounds(geoLayer.getBounds());
+        geoLayer.bringToFront();
 
     });
 
