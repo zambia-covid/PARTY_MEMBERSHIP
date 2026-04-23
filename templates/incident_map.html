@@ -73,7 +73,14 @@ L.control.layers({
 }).addTo(map);
 
 // =======================
-// LOAD INCIDENTS
+// NORMALIZE FUNCTION
+// =======================
+function normalize(name){
+    return (name || "").toLowerCase().trim();
+}
+
+// =======================
+// LOAD INCIDENT DATA
 // =======================
 fetch("/api/incidents")
 .then(res => res.json())
@@ -82,7 +89,7 @@ fetch("/api/incidents")
     console.log("INCIDENT DATA:", data);
 
     // =======================
-    // 🔥 HEATMAP
+    // 🔥 HEATMAP (GPS BASED)
     // =======================
     let heatPoints = [];
 
@@ -105,58 +112,46 @@ fetch("/api/incidents")
     }).addTo(map);
 
     // =======================
-    // 🗺️ LOAD GEOJSON
+    // 🧮 BUILD DISTRICT SCORES
+    // =======================
+    let scores = {};
+
+    data.forEach(i => {
+
+        if (!i.district) return;
+
+        let key = normalize(i.district);
+
+        let score = 1;
+        if (i.severity === "Critical") score = 3;
+        else if (i.severity === "High") score = 2;
+
+        if (!scores[key]) scores[key] = 0;
+        scores[key] += score;
+    });
+
+    // =======================
+    // COLOR LOGIC
+    // =======================
+    function getColor(score){
+        if (score > 20) return "red";
+        if (score > 10) return "orange";
+        if (score > 5) return "yellow";
+        return "green";
+    }
+
+    // =======================
+    // LOAD GEOJSON
     // =======================
     fetch("/static/geo/zambia_constituencies.geojson")
     .then(res => res.json())
     .then(geo => {
 
-        // 🔴 CORRECT FIELD
-        function getName(feature){
-            return feature.properties.shapeName || "Unknown";
-        }
-
-        // 🔴 NORMALIZATION (fix matching issues)
-        function normalize(name){
-            return (name || "")
-                .toLowerCase()
-                .replace("constituency", "")
-                .trim();
-        }
-
-        // =======================
-        // BUILD SCORES
-        // =======================
-        let scores = {};
-
-        data.forEach(i => {
-            if (!i.constituency) return;
-
-            let key = normalize(i.constituency);
-
-            let score = 1;
-            if (i.severity === "Critical") score = 3;
-            else if (i.severity === "High") score = 2;
-
-            if (!scores[key]) scores[key] = 0;
-            scores[key] += score;
-        });
-
-        function getColor(score){
-            if (score > 20) return "red";
-            if (score > 10) return "orange";
-            if (score > 5) return "yellow";
-            return "green";
-        }
-
-        // =======================
-        // DRAW MAP
-        // =======================
         let geoLayer = L.geoJSON(geo, {
 
             style: function(feature){
 
-                let cname = getName(feature);
+                let cname = feature.properties.shapeName;
                 let key = normalize(cname);
                 let score = scores[key] || 0;
 
@@ -164,13 +159,13 @@ fetch("/api/incidents")
                     color: "#333",
                     weight: 1,
                     fillColor: getColor(score),
-                    fillOpacity: 0.5
+                    fillOpacity: 0.6
                 };
             },
 
             onEachFeature: function(feature, layer){
 
-                let cname = getName(feature);
+                let cname = feature.properties.shapeName;
                 let key = normalize(cname);
                 let score = scores[key] || 0;
 
@@ -182,7 +177,7 @@ fetch("/api/incidents")
 
         }).addTo(map);
 
-        // 🔥 FORCE VISIBILITY
+        // 🔥 Ensure map zooms to Zambia
         map.fitBounds(geoLayer.getBounds());
         geoLayer.bringToFront();
 
