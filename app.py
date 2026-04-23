@@ -2130,13 +2130,20 @@ def api_incidents():
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT id, type, province, constituency, severity,
-               description, status, created_at,
-               latitude, longitude
+        SELECT 
+            id,
+            type,
+            province,
+            constituency,
+            district,
+            severity,
+            description,
+            status,
+            created_at,
+            latitude,
+            longitude
         FROM incidents
         WHERE COALESCE(status,'Open') != 'Deleted'
-        ORDER BY created_at DESC
-        LIMIT 500
     """)
 
     rows = cur.fetchall()
@@ -2150,12 +2157,13 @@ def api_incidents():
             "type": r[1],
             "province": r[2],
             "constituency": r[3],
-            "severity": r[4],
-            "description": r[5],
-            "status": r[6],
-            "created_at": str(r[7]),
-            "lat": float(r[8]) if r[8] else None,
-            "lng": float(r[9]) if r[9] else None
+            "district": (r[4] or "").lower().strip(),  # 🔥 KEY FIX
+            "severity": r[5],
+            "description": r[6],
+            "status": r[7],
+            "created_at": str(r[8]),
+            "lat": float(r[9]) if r[9] else None,
+            "lng": float(r[10]) if r[10] else None
         }
         for r in rows
     ])
