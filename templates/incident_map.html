@@ -111,19 +111,12 @@ fetch("/api/incidents")
     .then(res => res.json())
     .then(geo => {
 
-        console.log("GEO PROPERTIES SAMPLE:", geo.features[0].properties);
-
-        // 🔴 AUTO-DETECT NAME FIELD
+        // 🔴 CORRECT FIELD
         function getName(feature){
-            return (
-                feature.properties.name ||
-                feature.properties.ADM2_NAME ||
-                feature.properties.constituency ||
-                feature.properties.NAME ||
-                "Unknown"
-            );
+            return feature.properties.shapeName || "Unknown";
         }
 
+        // 🔴 NORMALIZATION (fix matching issues)
         function normalize(name){
             return (name || "")
                 .toLowerCase()
@@ -189,7 +182,7 @@ fetch("/api/incidents")
 
         }).addTo(map);
 
-        // 🔥 ENSURE VISIBILITY
+        // 🔥 FORCE VISIBILITY
         map.fitBounds(geoLayer.getBounds());
         geoLayer.bringToFront();
 
