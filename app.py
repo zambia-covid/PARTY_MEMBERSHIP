@@ -1590,6 +1590,7 @@ def login():
 @login_required
 def logout():
     logout_user()
+    session.clear()
     return redirect("/login")
     
 @app.route("/api/live_dashboard")
@@ -1951,7 +1952,7 @@ def submit_results():
         if total_votes == 0:
             return "Total votes cannot be zero", 400
 
-        agent_id = current_user.id.replace("agent_", "")
+        agent_id = current_user.id
 
         conn = get_db()
         cur = conn.cursor()
@@ -2580,10 +2581,9 @@ def agent_login():
 
         if user and check_password_hash(user[1], password):
 
-            session["agent_id"] = user[0]
-            session["role"] = user[2]
-            session["constituency"] = user[3]
-
+            user_obj = User(user[0], user[2])
+            login_user(user_obj)
+            
             return redirect("/agent_dashboard")
 
         return render_template("agent_login.html", error="Invalid login")
@@ -2596,7 +2596,7 @@ def agent_login():
 @app.route("/agent_dashboard")
 def agent_dashboard():
 
-    if session.get("role") not in ["agent", "admin"]:
+    if not current_user.is_authenticated or current_user.role not in ["agent", "admin"]:
         return "Forbidden", 403
 
     return render_template("agent_dashboard.html")
