@@ -17,7 +17,25 @@ body {
     padding: 15px;
     font-size: 20px;
     font-weight: bold;
+    text-align:center;
 }
+
+/* NAV */
+.navbar{
+    padding:10px;
+    background:#000;
+    display:flex;
+    justify-content:center;
+    gap:10px;
+}
+.navbar a{
+    padding:10px 16px;
+    border-radius:6px;
+    text-decoration:none;
+    font-weight:bold;
+}
+.map-btn{ background:#006400; color:white; }
+.report-btn{ background:#b30000; color:white; }
 
 /* STRATEGY PANEL */
 .strategy {
@@ -89,13 +107,6 @@ td, th {
     padding:8px;
     border-bottom:1px solid #ddd;
     text-align:left;
-    vertical-align: middle;
-}
-
-td {
-    overflow:hidden;
-    text-overflow:ellipsis;
-    word-wrap:break-word;
 }
 
 th{
@@ -125,6 +136,12 @@ button{
 
 <div class="header">🚨 Incident Command Center</div>
 
+<!-- 🔥 NAVIGATION -->
+<div class="navbar">
+    <a href="/incident_map" class="map-btn">🛰️ Map View</a>
+    <a href="/report_incident" class="report-btn">➕ Report Incident</a>
+</div>
+
 <!-- 🧠 STRATEGY -->
 <div class="strategy">
     <strong>🧠 Strategic Directive</strong>
@@ -149,22 +166,11 @@ button{
 <div class="table-wrap">
 <table>
 
-<colgroup>
-    <col style="width:6%">
-    <col style="width:10%">
-    <col style="width:14%">
-    <col style="width:28%">
-    <col style="width:10%">
-    <col style="width:10%">
-    <col style="width:12%">
-    <col style="width:10%">
-</colgroup>
-
 <thead>
 <tr>
     <th>ID</th>
     <th>Type</th>
-    <th>Location</th>
+    <th>District</th>
     <th>Description</th>
     <th>Photo</th>
     <th>Status</th>
@@ -192,8 +198,7 @@ async function loadStrategy(){
         const data = await res.json();
         document.getElementById("strategyBox").innerText = data.advice;
     } catch {
-        document.getElementById("strategyBox").innerText =
-            "Strategy unavailable.";
+        document.getElementById("strategyBox").innerText = "Strategy unavailable.";
     }
 }
 
@@ -220,7 +225,7 @@ async function loadIncidents(){
 
         if(i.status==="Critical"){
             critical++;
-            strip.innerHTML += `<span class="critical-item">${i.type} - ${i.location}</span>`;
+            strip.innerHTML += `<span class="critical-item">${i.type} - ${i.district}</span>`;
         }
         else if(i.status==="Open") open++;
         else resolved++;
@@ -229,7 +234,7 @@ async function loadIncidents(){
         <tr>
             <td>${i.id}</td>
             <td>${i.type || ""}</td>
-            <td>${i.location || ""}</td>
+            <td>${i.district || ""}</td>
             <td>${i.description || ""}</td>
             <td>${i.photo ? `<img src="/static/uploads/${i.photo}">` : ""}</td>
             <td style="color:${
