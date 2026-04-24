@@ -68,22 +68,27 @@ button{
     font-weight:bold;
 }
 
-button:active{
-    transform:scale(0.98);
-}
-
-.status{
-    text-align:center;
-    font-size:12px;
-    margin-top:10px;
-    color:#ccc;
-}
-
 #preview{
     margin-top:10px;
     width:100%;
     border-radius:8px;
     display:none;
+}
+
+/* District styling */
+#districtDisplay{
+    background:#eee;
+    font-weight:bold;
+}
+
+.hidden{
+    display:none;
+}
+
+.override-warning{
+    font-size:12px;
+    color:orange;
+    margin-top:5px;
 }
 </style>
 </head>
@@ -93,8 +98,8 @@ button:active{
 <div class="header">🚨 Report Incident</div>
 
 <div class="container">
-
 <div class="card">
+
 <form method="POST" enctype="multipart/form-data" id="incidentForm">
 
 <label>Incident Type</label>
@@ -107,10 +112,25 @@ button:active{
 </select>
 
 <label>Province</label>
-<input name="province" placeholder="Province" required>
+<input name="province" required>
 
 <label>Constituency</label>
-<input name="constituency" placeholder="Constituency" required>
+<input name="constituency" id="constituencyInput" required>
+
+<!-- AUTO DISTRICT -->
+<label>District (Auto-detected)</label>
+<input id="districtDisplay" readonly>
+
+<!-- 🔥 OVERRIDE OPTION -->
+<label>
+<input type="checkbox" id="overrideToggle"> Override district
+</label>
+
+<div id="manualDistrictGroup" class="hidden">
+    <label>Enter District</label>
+    <input name="district_manual" id="districtManual" placeholder="Type district manually">
+    <div class="override-warning">⚠️ Manual override used — ensure accuracy</div>
+</div>
 
 <label>Severity</label>
 <select name="severity" required>
@@ -122,14 +142,13 @@ button:active{
 </select>
 
 <label>Description</label>
-<textarea name="description" placeholder="Describe incident..." required></textarea>
+<textarea name="description" required></textarea>
 
 <label>Photo (optional)</label>
-<input class="file" type="file" name="photo" accept="image/*" capture="environment" id="photoInput">
+<input class="file" type="file" name="photo" accept="image/*" id="photoInput">
 
 <img id="preview">
 
-<!-- 🔴 GPS FIELDS -->
 <input type="hidden" name="latitude" id="latitude">
 <input type="hidden" name="longitude" id="longitude">
 
@@ -137,91 +156,83 @@ button:active{
 
 </form>
 
-<div class="status" id="statusText"></div>
-<div class="status" id="gpsStatus">📍 Getting location...</div>
-
 </div>
-
 </div>
 
 <script>
 // =====================
-// 📸 IMAGE PREVIEW
+// IMAGE PREVIEW
 // =====================
-document.getElementById("photoInput").addEventListener("change", function(e){
+photoInput.addEventListener("change", function(e){
     const file = e.target.files[0];
     if(file){
         const reader = new FileReader();
         reader.onload = function(e){
-            const img = document.getElementById("preview");
-            img.src = e.target.result;
-            img.style.display = "block";
+            preview.src = e.target.result;
+            preview.style.display = "block";
         }
         reader.readAsDataURL(file);
     }
 });
 
 // =====================
-// 🚀 SUBMIT STATE
+// DISTRICT MAPPING
 // =====================
-document.getElementById("incidentForm").addEventListener("submit", function(){
-    const btn = document.getElementById("submitBtn");
-    btn.innerText = "Submitting...";
-    btn.disabled = true;
+const mapping = {
+    "kabwata": "lusaka",
+    "kamwala": "lusaka",
+    "munali": "lusaka",
+    "chadiza": "chadiza",
+    "chipata central": "chipata"
+};
+
+function normalize(v){
+    return (v || "").toLowerCase().trim();
+}
+
+const constituencyInput = document.getElementById("constituencyInput");
+const districtDisplay = document.getElementById("districtDisplay");
+
+const overrideToggle = document.getElementById("overrideToggle");
+const manualGroup = document.getElementById("manualDistrictGroup");
+
+const manualInput = document.getElementById("districtManual");
+
+// Auto mapping
+constituencyInput.addEventListener("input", function(){
+    const key = normalize(this.value);
+
+    if(mapping[key]){
+        districtDisplay.value = mapping[key];
+        districtDisplay.style.color = "green";
+    } else {
+        districtDisplay.value = "Unknown";
+        districtDisplay.style.color = "orange";
+    }
+});
+
+// Toggle manual override
+overrideToggle.addEventListener("change", function(){
+
+    if(this.checked){
+        manualGroup.classList.remove("hidden");
+        districtDisplay.style.opacity = 0.5;
+    } else {
+        manualGroup.classList.add("hidden");
+        districtDisplay.style.opacity = 1;
+        manualInput.value = "";
+    }
 });
 
 // =====================
-// 🌐 ONLINE STATUS
+// GPS
 // =====================
-function updateStatus(){
-    const el = document.getElementById("statusText");
-    if(navigator.onLine){
-        el.innerText = "Online";
-        el.style.color = "lightgreen";
-    } else {
-        el.innerText = "Offline — will retry";
-        el.style.color = "orange";
+navigator.geolocation.getCurrentPosition(
+    pos => {
+        latitude.value = pos.coords.latitude;
+        longitude.value = pos.coords.longitude;
     }
-}
-
-window.addEventListener("online", updateStatus);
-window.addEventListener("offline", updateStatus);
-updateStatus();
-
-// =====================
-// 📍 GPS CAPTURE (NEW)
-// =====================
-function getLocation(){
-    const gpsEl = document.getElementById("gpsStatus");
-
-    if(!navigator.geolocation){
-        gpsEl.innerText = "GPS not supported";
-        gpsEl.style.color = "orange";
-        return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-        function(position){
-            document.getElementById("latitude").value = position.coords.latitude;
-            document.getElementById("longitude").value = position.coords.longitude;
-
-            gpsEl.innerText = "📍 Location captured";
-            gpsEl.style.color = "lightgreen";
-        },
-        function(error){
-            gpsEl.innerText = "⚠️ Location denied";
-            gpsEl.style.color = "orange";
-            console.log(error);
-        },
-        {
-            enableHighAccuracy: true,
-            timeout: 10000
-        }
-    );
-}
-
-// run on load
-window.onload = getLocation;
+);
 </script>
 
 </body>
