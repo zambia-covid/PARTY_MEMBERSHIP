@@ -5,22 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body {
-    font-family: Arial;
-    background: #111;
-    color: white;
-    margin: 0;
-}
+body { font-family: Arial; background:#111; color:white; margin:0; }
 
 .header {
-    background: #b30000;
-    padding: 15px;
-    font-size: 20px;
-    font-weight: bold;
+    background:#b30000;
+    padding:15px;
+    font-size:20px;
     text-align:center;
 }
 
-/* NAV */
 .navbar{
     padding:10px;
     background:#000;
@@ -37,76 +30,18 @@ body {
 .map-btn{ background:#006400; color:white; }
 .report-btn{ background:#b30000; color:white; }
 
-/* STRATEGY PANEL */
-.strategy {
-    background:#002b36;
-    padding:15px;
-    margin:10px;
-    border-radius:8px;
-}
-
-/* CRITICAL STRIP */
-.critical-strip{
-    background:#300;
-    padding:8px;
-    overflow-x:auto;
-    white-space:nowrap;
-}
-.critical-item{
-    display:inline-block;
-    background:red;
-    padding:5px 10px;
-    margin-right:6px;
-    border-radius:6px;
-    font-size:12px;
-}
-
-/* CONTAINER */
-.container { padding: 10px; }
-
-/* PANELS */
-.grid{
-    display:flex;
-    gap:10px;
-    margin-bottom:15px;
-}
-.panel{
-    flex:1;
-    padding:12px;
-    border-radius:6px;
-    text-align:center;
-    font-weight:bold;
-}
-.critical{ background:#8b0000; }
-.warning{ background:#cc5500; }
-.success{ background:#006400; }
-
-/* SEARCH */
-input{
-    padding:10px;
-    width:100%;
-    border-radius:6px;
-    border:none;
-    margin-bottom:10px;
-}
-
-/* TABLE */
-.table-wrap{
-    overflow-x:auto;
-}
+.container { padding:10px; }
 
 table {
     width:100%;
-    border-collapse: collapse;
     background:white;
     color:black;
-    table-layout:fixed;
+    border-collapse:collapse;
 }
 
-td, th {
+th, td {
     padding:8px;
     border-bottom:1px solid #ddd;
-    text-align:left;
 }
 
 th{
@@ -114,20 +49,15 @@ th{
     color:white;
 }
 
-/* IMAGE */
+tr:hover{
+    background:#eee;
+    cursor:pointer;
+}
+
 img{
     width:60px;
     height:60px;
     object-fit:cover;
-}
-
-/* BUTTON */
-button{
-    padding:6px;
-    border:none;
-    border-radius:4px;
-    background:green;
-    color:white;
 }
 </style>
 </head>
@@ -136,36 +66,14 @@ button{
 
 <div class="header">🚨 Incident Command Center</div>
 
-<!-- 🔥 NAVIGATION -->
 <div class="navbar">
     <a href="/incident_map" class="map-btn">🛰️ Map View</a>
     <a href="/report_incident" class="report-btn">➕ Report Incident</a>
 </div>
 
-<!-- 🧠 STRATEGY -->
-<div class="strategy">
-    <strong>🧠 Strategic Directive</strong>
-    <div id="strategyBox" style="margin-top:8px;">
-        Loading strategy...
-    </div>
-</div>
-
-<!-- 🚨 CRITICAL -->
-<div id="criticalStrip" class="critical-strip"></div>
-
 <div class="container">
 
-<div class="grid">
-    <div class="panel critical">Critical<br><span id="criticalCount">0</span></div>
-    <div class="panel warning">Open<br><span id="openCount">0</span></div>
-    <div class="panel success">Resolved<br><span id="resolvedCount">0</span></div>
-</div>
-
-<input id="searchBox" placeholder="Search incidents...">
-
-<div class="table-wrap">
 <table>
-
 <thead>
 <tr>
     <th>ID</th>
@@ -181,100 +89,53 @@ button{
 
 <tbody id="incidentFeed"></tbody>
 </table>
-</div>
 
 </div>
-
-<audio id="alertSound" src="/static/alert.mp3"></audio>
 
 <script>
 
-let lastCritical = 0;
-
-/* 🧠 LOAD STRATEGY */
-async function loadStrategy(){
-    try{
-        const res = await fetch("/api/strategy");
-        const data = await res.json();
-        document.getElementById("strategyBox").innerText = data.advice;
-    } catch {
-        document.getElementById("strategyBox").innerText = "Strategy unavailable.";
+function goToMap(lat, lng, id){
+    if(!lat || !lng){
+        alert("No GPS data for this incident");
+        return;
     }
+    window.location.href = `/incident_map?lat=${lat}&lng=${lng}&id=${id}`;
 }
 
-/* 🚨 LOAD INCIDENTS */
 async function loadIncidents(){
-
-    const q = document.getElementById("searchBox").value.toLowerCase();
 
     const res = await fetch("/api/incidents");
     const data = await res.json();
 
-    let critical=0, open=0, resolved=0;
-
     const tbody = document.getElementById("incidentFeed");
-    const strip = document.getElementById("criticalStrip");
-
     tbody.innerHTML = "";
-    strip.innerHTML = "";
 
     data.slice(0,100).forEach(i=>{
 
-        const desc = (i.description || "").toLowerCase();
-        if(q && !desc.includes(q)) return;
-
-        if(i.status==="Critical"){
-            critical++;
-            strip.innerHTML += `<span class="critical-item">${i.type} - ${i.district}</span>`;
-        }
-        else if(i.status==="Open") open++;
-        else resolved++;
-
         tbody.innerHTML += `
-        <tr>
+        <tr onclick="goToMap('${i.lat}','${i.lng}','${i.id}')">
             <td>${i.id}</td>
             <td>${i.type || ""}</td>
             <td>${i.district || ""}</td>
             <td>${i.description || ""}</td>
             <td>${i.photo ? `<img src="/static/uploads/${i.photo}">` : ""}</td>
-            <td style="color:${
-                i.status==="Critical" ? "red" :
-                i.status==="Open" ? "orange" : "green"
-            }">${i.status}</td>
+            <td>${i.status}</td>
             <td>${i.created_at}</td>
             <td>
                 ${i.status !== "Resolved"
-                    ? `<button onclick="resolveIncident('${i.id}')">Resolve</button>`
+                    ? `<button onclick="event.stopPropagation(); resolveIncident('${i.id}')">Resolve</button>`
                     : "—"}
             </td>
         </tr>`;
     });
-
-    document.getElementById("criticalCount").innerText = critical;
-    document.getElementById("openCount").innerText = open;
-    document.getElementById("resolvedCount").innerText = resolved;
-
-    if(critical > lastCritical){
-        document.getElementById("alertSound").play();
-    }
-
-    lastCritical = critical;
 }
 
-/* ACTION */
 async function resolveIncident(id){
     await fetch(`/resolve/${id}`, { method:"POST" });
     loadIncidents();
 }
 
-/* INIT */
 loadIncidents();
-loadStrategy();
-
-setInterval(loadIncidents, 5000);
-setInterval(loadStrategy, 30000);
-
-document.getElementById("searchBox").addEventListener("input", loadIncidents);
 
 </script>
 
