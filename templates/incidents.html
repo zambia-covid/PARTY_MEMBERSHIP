@@ -5,7 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body { font-family: Arial; background:#111; color:white; margin:0; }
+body {
+    font-family: Arial;
+    background:#111;
+    color:white;
+    margin:0;
+}
 
 .header {
     background:#b30000;
@@ -14,6 +19,7 @@ body { font-family: Arial; background:#111; color:white; margin:0; }
     text-align:center;
 }
 
+/* NAV */
 .navbar{
     padding:10px;
     background:#000;
@@ -30,18 +36,27 @@ body { font-family: Arial; background:#111; color:white; margin:0; }
 .map-btn{ background:#006400; color:white; }
 .report-btn{ background:#b30000; color:white; }
 
+/* CONTAINER */
 .container { padding:10px; }
+
+/* TABLE */
+.table-wrap{
+    overflow-x:auto;
+}
 
 table {
     width:100%;
+    border-collapse: collapse;
     background:white;
     color:black;
-    border-collapse:collapse;
+    table-layout: fixed; /* 🔥 KEY FIX */
 }
 
 th, td {
     padding:8px;
     border-bottom:1px solid #ddd;
+    text-align:left;
+    vertical-align: middle;
 }
 
 th{
@@ -49,15 +64,40 @@ th{
     color:white;
 }
 
-tr:hover{
-    background:#eee;
-    cursor:pointer;
+/* FIX ALIGNMENT */
+td {
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
 }
 
+/* DESCRIPTION COLUMN ONLY WRAPS */
+.desc {
+    white-space:normal;
+    word-wrap:break-word;
+}
+
+/* IMAGE */
 img{
     width:60px;
     height:60px;
     object-fit:cover;
+    display:block;
+}
+
+/* BUTTON */
+button{
+    padding:6px;
+    border:none;
+    border-radius:4px;
+    background:green;
+    color:white;
+}
+
+/* ROW INTERACTION */
+tr:hover{
+    background:#f2f2f2;
+    cursor:pointer;
 }
 </style>
 </head>
@@ -73,7 +113,21 @@ img{
 
 <div class="container">
 
+<div class="table-wrap">
 <table>
+
+<!-- 🔥 COLUMN CONTROL -->
+<colgroup>
+    <col style="width:6%">
+    <col style="width:10%">
+    <col style="width:14%">
+    <col style="width:28%">
+    <col style="width:10%">
+    <col style="width:10%">
+    <col style="width:12%">
+    <col style="width:10%">
+</colgroup>
+
 <thead>
 <tr>
     <th>ID</th>
@@ -88,12 +142,15 @@ img{
 </thead>
 
 <tbody id="incidentFeed"></tbody>
+
 </table>
+</div>
 
 </div>
 
 <script>
 
+// 🔗 CLICK → MAP
 function goToMap(lat, lng, id){
     if(!lat || !lng){
         alert("No GPS data for this incident");
@@ -102,6 +159,7 @@ function goToMap(lat, lng, id){
     window.location.href = `/incident_map?lat=${lat}&lng=${lng}&id=${id}`;
 }
 
+// 🚨 LOAD INCIDENTS
 async function loadIncidents(){
 
     const res = await fetch("/api/incidents");
@@ -117,9 +175,12 @@ async function loadIncidents(){
             <td>${i.id}</td>
             <td>${i.type || ""}</td>
             <td>${i.district || ""}</td>
-            <td>${i.description || ""}</td>
+            <td class="desc">${i.description || ""}</td>
             <td>${i.photo ? `<img src="/static/uploads/${i.photo}">` : ""}</td>
-            <td>${i.status}</td>
+            <td style="color:${
+                i.status==="Critical" ? "red" :
+                i.status==="Open" ? "orange" : "green"
+            }">${i.status}</td>
             <td>${i.created_at}</td>
             <td>
                 ${i.status !== "Resolved"
@@ -130,11 +191,13 @@ async function loadIncidents(){
     });
 }
 
+// ACTION
 async function resolveIncident(id){
     await fetch(`/resolve/${id}`, { method:"POST" });
     loadIncidents();
 }
 
+// INIT
 loadIncidents();
 
 </script>
