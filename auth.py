@@ -1,11 +1,8 @@
 import os
-print("AUTH FILE PATH:", os.path.abspath(__file__))
 from datetime import datetime
 from functools import wraps
 
-print("🔥 DEPLOY VERSION 2 — CREATE USER ACTIVE 🔥")
-
-from flask import Blueprint, request, render_template, redirect, flash
+from flask import Blueprint, request, render_template, redirect, flash, url_for
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -20,26 +17,30 @@ login_manager = LoginManager()
 login_manager.login_view = "auth.login"
 login_manager.session_protection = "strong"
 
+def init_auth(app):
+    login_manager.init_app(app)
+
 # ======================
 # USER MODEL
 # ======================
 class User(UserMixin):
-    def __init__(self, id, username, role):
+    def __init__(self, id, username, role, province=None, district=None):
         self.id = str(id)
         self.username = username
         self.role = role
+        self.province = province
+        self.district = district
 
 # ======================
 # LOAD USER
 # ======================
 @login_manager.user_loader
 def load_user(user_id):
-
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT id, username, role
+        SELECT id, username, role, province, district
         FROM users
         WHERE id=%s AND is_active=TRUE
     """, (user_id,))
@@ -50,7 +51,7 @@ def load_user(user_id):
     conn.close()
 
     if row:
-        return User(row[0], row[1], row[2])
+        return User(*row)
 
     return None
 
@@ -61,8 +62,12 @@ def role_required(*roles):
     def decorator(f):
         @wraps(f)
         def wrapper(*args, **kwargs):
-            if not current_user.is_authenticated or current_user.role not in roles:
+            if not current_user.is_authenticated:
+                return redirect(url_for("auth.login"))
+
+            if current_user.role not in roles:
                 return "Forbidden", 403
+
             return f(*args, **kwargs)
         return wrapper
     return decorator
@@ -78,11 +83,16 @@ def login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
 
+        if not username or not password:
+            flash("Username and password required")
+            return render_template("login.html")
+
         conn = get_db()
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT id, username, password_hash, role, failed_attempts
+            SELECT id, username, password_hash, role,
+                   failed_attempts, province, district
             FROM users
             WHERE username=%s AND is_active=TRUE
         """, (username,))
@@ -93,14 +103,21 @@ def login():
             flash("Invalid credentials")
             return render_template("login.html")
 
-        # 🔴 LOCKOUT (5 failed attempts)
+        # 🔴 LOCKOUT CONTROL
         if user[4] >= 5:
             flash("Account locked. Contact admin.")
             return render_template("login.html")
 
+        # ✅ PASSWORD CHECK
         if check_password_hash(user[2], password):
 
-            login_user(User(user[0], user[1], user[3]))
+            login_user(User(
+                id=user[0],
+                username=user[1],
+                role=user[3],
+                province=user[5],
+                district=user[6]
+            ))
 
             # reset attempts + update login time
             cur.execute("""
@@ -115,10 +132,21 @@ def login():
             cur.close()
             conn.close()
 
-            return redirect("/")
+            # 🔁 SMART REDIRECT (ROLE-BASED)
+            if user[3] == "admin":
+                return redirect(url_for("dashboard"))
+
+            elif user[3] == "national":
+                return redirect(url_for("war_room"))
+
+            elif user[3] == "provincial":
+                return redirect(url_for("provincial_dashboard"))
+
+            else:
+                return redirect(url_for("agent_dashboard"))
 
         else:
-            # increment failed attempts
+            # ❌ WRONG PASSWORD
             cur.execute("""
                 UPDATE users
                 SET failed_attempts = failed_attempts + 1
@@ -141,7 +169,7 @@ def login():
 @login_required
 def logout():
     logout_user()
-    return redirect("/login")
+    return redirect(url_for("auth.login"))
 
 # ======================
 # CREATE USER (ADMIN ONLY)
@@ -156,41 +184,46 @@ def create_user():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
         role = request.form.get("role", "agent")
+        province = request.form.get("province")
+        district = request.form.get("district")
 
         if not username or not password:
             flash("Username and password required")
-            return redirect("/create_user")
+            return redirect(url_for("auth.create_user"))
 
-        if role not in ["admin", "manager", "agent"]:
+        if role not in ["admin", "national", "provincial", "agent"]:
             flash("Invalid role")
-            return redirect("/create_user")
+            return redirect(url_for("auth.create_user"))
 
         conn = get_db()
         cur = conn.cursor()
 
         try:
             cur.execute("""
-                INSERT INTO users (username, password_hash, role)
-                VALUES (%s, %s, %s)
+                INSERT INTO users 
+                (username, password_hash, role, province, district)
+                VALUES (%s, %s, %s, %s, %s)
             """, (
                 username,
                 generate_password_hash(password),
-                role
+                role,
+                province,
+                district
             ))
 
             conn.commit()
-
             flash(f"User '{username}' created")
 
-        except Exception:
+        except Exception as e:
             conn.rollback()
+            print("CREATE USER ERROR:", e)
             flash("User already exists or error")
 
         finally:
             cur.close()
             conn.close()
 
-        return redirect("/create_user")
+        return redirect(url_for("auth.create_user"))
 
     return render_template("create_user.html")
 
@@ -216,7 +249,7 @@ def deactivate_user(user_id):
     cur.close()
     conn.close()
 
-    return redirect("/")
+    return redirect(url_for("dashboard"))
 
 # ======================
 # SEED ADMIN
