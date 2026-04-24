@@ -114,15 +114,9 @@ CONSTITUENCY_TO_DISTRICT = {
 def admin_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-
-        if not current_user.is_authenticated:
-            return redirect(url_for("login"))
-
-        if current_user.role != "admin":
+        if not current_user.is_authenticated or current_user.role != "admin":
             return "Forbidden", 403
-
         return f(*args, **kwargs)
-
     return wrapper
 
 # ======================
@@ -389,6 +383,30 @@ def send_sms(phone, message):
     except Exception as e:
         print(f"[SMS EXCEPTION] {phone}: {e}")
 
+# ======================
+# USER CLASS
+# ======================
+class User(UserMixin):
+    def __init__(self, id, role):
+        self.id = id
+        self.role = role
+
+# ======================
+# USER LOADER 
+# ======================
+@login_manager.user_loader
+def load_user(user_id):
+
+    # Admin
+    if user_id == "admin":
+        return User("admin", "admin")
+
+    # Agent (numeric IDs)
+    if str(user_id).isdigit():
+        return User(user_id, "agent")
+
+    return None
+
 # ==============================
 # ENVIRONMENT
 # ==============================
@@ -403,42 +421,10 @@ if not BOT_TOKEN:
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# ======================
-# USER MODEL (REAL)
-# ======================
-class User(UserMixin):
-    def __init__(self, id, username, role, province=None, constituency=None):
-        self.id = str(id)
-        self.username = username
-        self.role = role
-        self.province = province
-        self.constituency = constituency
+users = {
+    "admin": generate_password_hash(os.getenv("ADMIN_PASSWORD"))
+}
 
-
-# ======================
-# LOAD USER FROM DB
-# ======================
-@login_manager.user_loader
-def load_user(user_id):
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT id, username, role, province, constituency
-        FROM agents
-        WHERE id=%s
-    """, (user_id,))
-
-    row = cur.fetchone()
-
-    cur.close()
-    conn.close()
-
-    if row:
-        return User(*row)
-
-    return None
 # ==============================
 # DATABASE CONNECTION
 # ==============================
@@ -1572,58 +1558,17 @@ def reject(id):
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-
-    if current_user.is_authenticated:
-        return redirect(url_for("dashboard"))
-
     if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
 
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
-
-        if not username or not password:
-            flash("Enter username and password", "danger")
-            return render_template("login.html")
-
-        conn = get_db()
-        cur = conn.cursor()
-
-        # 🔥 CHECK ADMIN FIRST
-        if username == "admin":
-            if check_password_hash(generate_password_hash(os.getenv("ADMIN_PASSWORD")), password):
-                user = User("admin", "admin", "admin")
-                login_user(user)
-                return redirect(url_for("dashboard"))
-
-        # 🔥 CHECK DB USERS
-        cur.execute("""
-            SELECT id, phone, password, role, province, constituency
-            FROM agents
-            WHERE phone=%s
-        """, (username,))
-
-        row = cur.fetchone()
-
-        cur.close()
-        conn.close()
-
-        if row and check_password_hash(row[2], password):
-
-            user = User(
-                id=row[0],
-                username=row[1],
-                role=row[3],
-                province=row[4],
-                constituency=row[5]
-            )
-
+        if username in users and check_password_hash(users[username], password):
+            user = User(username, "admin")
             login_user(user)
-
-            print("LOGIN SUCCESS:", user.username, user.role)
-
             return redirect(url_for("dashboard"))
 
-        flash("Invalid credentials", "danger")
+        flash("Invalid credentials")
+        return redirect("/login")
 
     return render_template("login.html")
 
@@ -1631,8 +1576,7 @@ def login():
 @login_required
 def logout():
     logout_user()
-    session.clear()  # 🔥 prevents ghost sessions
-    return redirect(url_for("login"))
+    return redirect("/login")
     
 @app.route("/api/live_dashboard")
 @login_required
