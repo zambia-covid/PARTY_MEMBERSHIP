@@ -24,17 +24,6 @@ body { margin:0; font-family: Arial; }
     z-index:999;
     font-weight:bold;
 }
-
-.legend {
-    position:absolute;
-    bottom:20px;
-    left:20px;
-    background:white;
-    padding:10px;
-    border-radius:8px;
-    font-size:12px;
-    z-index:999;
-}
 </style>
 </head>
 
@@ -43,14 +32,8 @@ body { margin:0; font-family: Arial; }
 <div class="header">🛰️ Incident Intelligence Map</div>
 <div id="map"></div>
 
-<div class="legend">
-    <div><span style="color:green">●</span> Low</div>
-    <div><span style="color:yellow">●</span> Medium</div>
-    <div><span style="color:orange">●</span> High</div>
-    <div><span style="color:red">●</span> Critical</div>
-</div>
-
 <script>
+
 // =======================
 // INIT MAP
 // =======================
@@ -59,45 +42,37 @@ var map = L.map('map').setView([-13.1339, 27.8493], 6);
 // =======================
 // BASE LAYERS
 // =======================
-var street = L.tileLayer(
-    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-);
-
-var satellite = L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-).addTo(map);
-
-L.control.layers({
-    "Street": street,
-    "Satellite": satellite
-}).addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
 // =======================
-// NORMALIZE FUNCTION
+// URL PARAMS (🔥 NEW)
+// =======================
+const params = new URLSearchParams(window.location.search);
+const focusLat = parseFloat(params.get("lat"));
+const focusLng = parseFloat(params.get("lng"));
+const focusId = params.get("id");
+
+// =======================
+// NORMALIZE
 // =======================
 function normalize(name){
     return (name || "").toLowerCase().trim();
 }
 
 // =======================
-// LOAD INCIDENT DATA
+// LOAD INCIDENTS
 // =======================
 fetch("/api/incidents")
 .then(res => res.json())
 .then(data => {
 
-    console.log("INCIDENT DATA:", data);
-
-    // =======================
-    // 🔥 HEATMAP (GPS BASED)
-    // =======================
+    // 🔥 HEATMAP
     let heatPoints = [];
 
     data.forEach(i => {
         if (!i.lat || !i.lng) return;
 
         let weight = 0.2;
-
         if (i.severity === "Critical") weight = 1.0;
         else if (i.severity === "High") weight = 0.7;
         else if (i.severity === "Medium") weight = 0.4;
@@ -107,17 +82,13 @@ fetch("/api/incidents")
 
     L.heatLayer(heatPoints, {
         radius: 25,
-        blur: 15,
-        maxZoom: 10
+        blur: 15
     }).addTo(map);
 
-    // =======================
-    // 🧮 BUILD DISTRICT SCORES
-    // =======================
+    // 🔥 BUILD SCORES (district aligned)
     let scores = {};
 
     data.forEach(i => {
-
         if (!i.district) return;
 
         let key = normalize(i.district);
@@ -130,9 +101,6 @@ fetch("/api/incidents")
         scores[key] += score;
     });
 
-    // =======================
-    // COLOR LOGIC
-    // =======================
     function getColor(score){
         if (score > 20) return "red";
         if (score > 10) return "orange";
@@ -150,7 +118,6 @@ fetch("/api/incidents")
         let geoLayer = L.geoJSON(geo, {
 
             style: function(feature){
-
                 let cname = feature.properties.shapeName;
                 let key = normalize(cname);
                 let score = scores[key] || 0;
@@ -161,25 +128,24 @@ fetch("/api/incidents")
                     fillColor: getColor(score),
                     fillOpacity: 0.6
                 };
-            },
-
-            onEachFeature: function(feature, layer){
-
-                let cname = feature.properties.shapeName;
-                let key = normalize(cname);
-                let score = scores[key] || 0;
-
-                layer.bindPopup(`
-                    <b>${cname}</b><br>
-                    Incident Score: ${score}
-                `);
             }
 
         }).addTo(map);
 
-        // 🔥 Ensure map zooms to Zambia
         map.fitBounds(geoLayer.getBounds());
-        geoLayer.bringToFront();
+
+        // 🔥 FOCUS INCIDENT (NEW)
+        if (focusLat && focusLng) {
+
+            map.setView([focusLat, focusLng], 14);
+
+            const marker = L.marker([focusLat, focusLng]).addTo(map);
+
+            marker.bindPopup(`
+                <b>Incident #${focusId}</b><br>
+                Focused Location
+            `).openPopup();
+        }
 
     });
 
