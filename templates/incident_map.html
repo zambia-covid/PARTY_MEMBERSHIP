@@ -1,205 +1,155 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Incident Command Center</title>
+<title>Incident Intelligence Map</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
 <style>
-body {
-    font-family: Arial;
-    background:#111;
-    color:white;
-    margin:0;
-}
+body { margin:0; font-family: Arial; }
+#map { height:100vh; }
 
 .header {
-    background:#b30000;
-    padding:15px;
-    font-size:20px;
-    text-align:center;
-}
-
-/* NAV */
-.navbar{
-    padding:10px;
-    background:#000;
-    display:flex;
-    justify-content:center;
-    gap:10px;
-}
-.navbar a{
-    padding:10px 16px;
-    border-radius:6px;
-    text-decoration:none;
+    position:absolute;
+    top:10px;
+    left:50%;
+    transform:translateX(-50%);
+    background:#063312;
+    color:white;
+    padding:10px 20px;
+    border-radius:10px;
+    z-index:999;
     font-weight:bold;
-}
-.map-btn{ background:#006400; color:white; }
-.report-btn{ background:#b30000; color:white; }
-
-/* CONTAINER */
-.container { padding:10px; }
-
-/* TABLE */
-.table-wrap{
-    overflow-x:auto;
-}
-
-table {
-    width:100%;
-    border-collapse: collapse;
-    background:white;
-    color:black;
-    table-layout: fixed; /* 🔥 KEY FIX */
-}
-
-th, td {
-    padding:8px;
-    border-bottom:1px solid #ddd;
-    text-align:left;
-    vertical-align: middle;
-}
-
-th{
-    background:#b30000;
-    color:white;
-}
-
-/* FIX ALIGNMENT */
-td {
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-}
-
-/* DESCRIPTION COLUMN ONLY WRAPS */
-.desc {
-    white-space:normal;
-    word-wrap:break-word;
-}
-
-/* IMAGE */
-img{
-    width:60px;
-    height:60px;
-    object-fit:cover;
-    display:block;
-}
-
-/* BUTTON */
-button{
-    padding:6px;
-    border:none;
-    border-radius:4px;
-    background:green;
-    color:white;
-}
-
-/* ROW INTERACTION */
-tr:hover{
-    background:#f2f2f2;
-    cursor:pointer;
 }
 </style>
 </head>
 
 <body>
 
-<div class="header">🚨 Incident Command Center</div>
-
-<div class="navbar">
-    <a href="/incident_map" class="map-btn">🛰️ Map View</a>
-    <a href="/report_incident" class="report-btn">➕ Report Incident</a>
-</div>
-
-<div class="container">
-
-<div class="table-wrap">
-<table>
-
-<!-- 🔥 COLUMN CONTROL -->
-<colgroup>
-    <col style="width:6%">
-    <col style="width:10%">
-    <col style="width:14%">
-    <col style="width:28%">
-    <col style="width:10%">
-    <col style="width:10%">
-    <col style="width:12%">
-    <col style="width:10%">
-</colgroup>
-
-<thead>
-<tr>
-    <th>ID</th>
-    <th>Type</th>
-    <th>District</th>
-    <th>Description</th>
-    <th>Photo</th>
-    <th>Status</th>
-    <th>Date</th>
-    <th>Action</th>
-</tr>
-</thead>
-
-<tbody id="incidentFeed"></tbody>
-
-</table>
-</div>
-
-</div>
+<div class="header">🛰️ Incident Intelligence Map</div>
+<div id="map"></div>
 
 <script>
 
-// 🔗 CLICK → MAP
-function goToMap(lat, lng, id){
-    if(!lat || !lng){
-        alert("No GPS data for this incident");
-        return;
-    }
-    window.location.href = `/incident_map?lat=${lat}&lng=${lng}&id=${id}`;
+// =======================
+// INIT MAP
+// =======================
+var map = L.map('map').setView([-13.1339, 27.8493], 6);
+
+// =======================
+// BASE LAYERS
+// =======================
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+// =======================
+// URL PARAMS (🔥 NEW)
+// =======================
+const params = new URLSearchParams(window.location.search);
+const focusLat = parseFloat(params.get("lat"));
+const focusLng = parseFloat(params.get("lng"));
+const focusId = params.get("id");
+
+// =======================
+// NORMALIZE
+// =======================
+function normalize(name){
+    return (name || "").toLowerCase().trim();
 }
 
-// 🚨 LOAD INCIDENTS
-async function loadIncidents(){
+// =======================
+// LOAD INCIDENTS
+// =======================
+fetch("/api/incidents")
+.then(res => res.json())
+.then(data => {
 
-    const res = await fetch("/api/incidents");
-    const data = await res.json();
+    // 🔥 HEATMAP
+    let heatPoints = [];
 
-    const tbody = document.getElementById("incidentFeed");
-    tbody.innerHTML = "";
+    data.forEach(i => {
+        if (!i.lat || !i.lng) return;
 
-    data.slice(0,100).forEach(i=>{
+        let weight = 0.2;
+        if (i.severity === "Critical") weight = 1.0;
+        else if (i.severity === "High") weight = 0.7;
+        else if (i.severity === "Medium") weight = 0.4;
 
-        tbody.innerHTML += `
-        <tr onclick="goToMap('${i.lat}','${i.lng}','${i.id}')">
-            <td>${i.id}</td>
-            <td>${i.type || ""}</td>
-            <td>${i.district || ""}</td>
-            <td class="desc">${i.description || ""}</td>
-            <td>${i.photo ? `<img src="/static/uploads/${i.photo}">` : ""}</td>
-            <td style="color:${
-                i.status==="Critical" ? "red" :
-                i.status==="Open" ? "orange" : "green"
-            }">${i.status}</td>
-            <td>${i.created_at}</td>
-            <td>
-                ${i.status !== "Resolved"
-                    ? `<button onclick="event.stopPropagation(); resolveIncident('${i.id}')">Resolve</button>`
-                    : "—"}
-            </td>
-        </tr>`;
+        heatPoints.push([i.lat, i.lng, weight]);
     });
-}
 
-// ACTION
-async function resolveIncident(id){
-    await fetch(`/resolve/${id}`, { method:"POST" });
-    loadIncidents();
-}
+    L.heatLayer(heatPoints, {
+        radius: 25,
+        blur: 15
+    }).addTo(map);
 
-// INIT
-loadIncidents();
+    // 🔥 BUILD SCORES (district aligned)
+    let scores = {};
 
+    data.forEach(i => {
+        if (!i.district) return;
+
+        let key = normalize(i.district);
+
+        let score = 1;
+        if (i.severity === "Critical") score = 3;
+        else if (i.severity === "High") score = 2;
+
+        if (!scores[key]) scores[key] = 0;
+        scores[key] += score;
+    });
+
+    function getColor(score){
+        if (score > 20) return "red";
+        if (score > 10) return "orange";
+        if (score > 5) return "yellow";
+        return "green";
+    }
+
+    // =======================
+    // LOAD GEOJSON
+    // =======================
+    fetch("/static/geo/zambia_constituencies.geojson")
+    .then(res => res.json())
+    .then(geo => {
+
+        let geoLayer = L.geoJSON(geo, {
+
+            style: function(feature){
+                let cname = feature.properties.shapeName;
+                let key = normalize(cname);
+                let score = scores[key] || 0;
+
+                return {
+                    color: "#333",
+                    weight: 1,
+                    fillColor: getColor(score),
+                    fillOpacity: 0.6
+                };
+            }
+
+        }).addTo(map);
+
+        map.fitBounds(geoLayer.getBounds());
+
+        // 🔥 FOCUS INCIDENT (NEW)
+        if (focusLat && focusLng) {
+
+            map.setView([focusLat, focusLng], 14);
+
+            const marker = L.marker([focusLat, focusLng]).addTo(map);
+
+            marker.bindPopup(`
+                <b>Incident #${focusId}</b><br>
+                Focused Location
+            `).openPopup();
+        }
+
+    });
+
+});
 </script>
 
 </body>
