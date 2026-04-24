@@ -5,164 +5,175 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-*{ box-sizing:border-box; font-family:Arial; }
-
-body{
-    margin:0;
-    background:linear-gradient(135deg,#0b5d1e,#063312);
+body {
+    font-family: Arial;
+    background:#0b1f3a;
     color:white;
+    margin:0;
 }
 
-/* HEADER */
 .header{
     padding:15px;
+    background:#06132a;
     text-align:center;
-    font-size:20px;
+    font-size:18px;
     font-weight:bold;
 }
 
-/* CONTAINER */
 .container{
     padding:15px;
-    max-width:500px;
-    margin:auto;
 }
 
-/* CARD */
 .card{
     background:white;
     color:black;
-    padding:18px;
-    border-radius:14px;
-    box-shadow:0 8px 20px rgba(0,0,0,0.25);
+    padding:20px;
+    border-radius:12px;
 }
 
-/* LABEL */
 label{
-    display:block;
     font-size:13px;
     font-weight:bold;
-    margin-top:14px;
+    margin-top:12px;
+    display:block;
 }
 
-/* INPUTS */
 input, select{
     width:100%;
     padding:14px;
     margin-top:6px;
-    border-radius:10px;
+    border-radius:8px;
     border:1px solid #ccc;
-    font-size:16px;
+    font-size:15px;
 }
 
-/* BUTTON */
 button{
     width:100%;
     padding:16px;
-    margin-top:18px;
+    margin-top:20px;
     border:none;
     border-radius:10px;
-    background:#0b5d1e;
+    background:#b30000;
     color:white;
     font-size:16px;
     font-weight:bold;
 }
 
-button:active{
-    transform:scale(0.98);
+.hidden{
+    display:none;
 }
 
-/* STATUS */
-.status{
-    text-align:center;
-    font-size:12px;
+.role-info{
     margin-top:10px;
-    color:#ddd;
+    font-size:13px;
+    color:#555;
 }
 </style>
 </head>
 
 <body>
 
-<div class="header">👤 Create User</div>
+<div class="header">👤 Create System User</div>
 
 <div class="container">
-
 <div class="card">
 
-<form method="POST" id="userForm">
+<form method="POST">
 
-<label>Phone Number</label>
-<input name="phone" required>
+<label>Phone</label>
+<input name="phone" placeholder="e.g. 097xxxxxxx" required>
 
 <label>Password</label>
 <input type="password" name="password" required>
 
 <label>Role</label>
-<select name="role" required>
-    <option value="">Select Role</option>
-    <option value="admin">Admin</option>
-    <option value="manager">Manager</option>
+<select name="role" id="roleSelect" required>
+    <option value="">Select role</option>
     <option value="agent">Agent</option>
-    <option value="guest">Guest</option>
+    <option value="provincial_manager">Provincial Manager</option>
+    <option value="national_manager">National Manager</option>
+    <option value="admin">Admin</option>
 </select>
 
+<div class="role-info" id="roleInfo"></div>
+
+<!-- LOCATION FIELDS -->
+
+<div id="provinceGroup">
 <label>Province</label>
-<select name="province" required>
-    <option value="">Select Province</option>
-    <option>Lusaka</option>
-    <option>Copperbelt</option>
-    <option>Central</option>
-    <option>Eastern</option>
-    <option>Southern</option>
-    <option>Northern</option>
-    <option>Muchinga</option>
-    <option>Luapula</option>
-    <option>Western</option>
-    <option>North-Western</option>
-</select>
+<input name="province" id="province">
+</div>
 
+<div id="constituencyGroup">
 <label>Constituency</label>
-<input name="constituency" placeholder="Enter constituency">
+<input name="constituency" id="constituency">
+</div>
 
+<div id="stationGroup">
 <label>Polling Station</label>
-<input name="polling_station" placeholder="Optional">
+<input name="polling_station" id="polling_station">
+</div>
 
-<button type="submit" id="submitBtn">Create User</button>
+<button type="submit">Create User</button>
 
 </form>
 
-<div class="status" id="statusText"></div>
-
 </div>
-
 </div>
 
 <script>
 
-/* ⏳ LOADING STATE */
-document.getElementById("userForm").addEventListener("submit", function(){
-    const btn = document.getElementById("submitBtn");
-    btn.innerText = "Creating...";
-    btn.disabled = true;
-});
+// =======================
+// ROLE LOGIC
+// =======================
+const roleSelect = document.getElementById("roleSelect");
 
-/* 📡 NETWORK STATUS */
-function updateStatus(){
-    const el = document.getElementById("statusText");
+const provinceGroup = document.getElementById("provinceGroup");
+const constituencyGroup = document.getElementById("constituencyGroup");
+const stationGroup = document.getElementById("stationGroup");
 
-    if(navigator.onLine){
-        el.innerText = "Online";
-        el.style.color = "lightgreen";
-    } else {
-        el.innerText = "Offline — submission may fail";
-        el.style.color = "orange";
+const roleInfo = document.getElementById("roleInfo");
+
+function updateForm(){
+
+    const role = roleSelect.value;
+
+    // Reset
+    provinceGroup.classList.remove("hidden");
+    constituencyGroup.classList.remove("hidden");
+    stationGroup.classList.remove("hidden");
+
+    roleInfo.innerText = "";
+
+    if(role === "agent"){
+        roleInfo.innerText = "Agent: Assigned to specific constituency and station.";
+
+    } else if(role === "provincial_manager"){
+
+        constituencyGroup.classList.add("hidden");
+        stationGroup.classList.add("hidden");
+
+        roleInfo.innerText = "Provincial Manager: Access limited to one province.";
+
+    } else if(role === "national_manager"){
+
+        provinceGroup.classList.add("hidden");
+        constituencyGroup.classList.add("hidden");
+        stationGroup.classList.add("hidden");
+
+        roleInfo.innerText = "National Manager: Full system access.";
+
+    } else if(role === "admin"){
+
+        provinceGroup.classList.add("hidden");
+        constituencyGroup.classList.add("hidden");
+        stationGroup.classList.add("hidden");
+
+        roleInfo.innerText = "Admin: Full control including user management.";
     }
 }
 
-window.addEventListener("online", updateStatus);
-window.addEventListener("offline", updateStatus);
-updateStatus();
+roleSelect.addEventListener("change", updateForm);
 
 </script>
 
