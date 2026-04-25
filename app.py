@@ -2557,19 +2557,24 @@ def agent_vote_send():
 # ==============================
 # AGENT LOGIN
 # ==============================
-
-@app.route("/agent_login", methods=["GET","POST"])
+@app.route("/agent_login", methods=["GET", "POST"])
 def agent_login():
 
+    if current_user.is_authenticated:
+        return redirect(url_for("agent_dashboard"))
+
     if request.method == "POST":
-        phone = request.form["phone"]
-        password = request.form["password"]
+        phone = request.form.get("phone", "").strip()
+        password = request.form.get("password", "").strip()
+
+        if not phone or not password:
+            return render_template("agent_login.html", error="Enter phone and password")
 
         conn = get_db()
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT agent_id, password, role, constituency
+            SELECT agent_id, password, role, province, constituency, polling_station
             FROM agents
             WHERE phone=%s
         """, (phone,))
@@ -2581,10 +2586,20 @@ def agent_login():
 
         if user and check_password_hash(user[1], password):
 
-            user_obj = User(user[0], user[2])
+            user_obj = User(
+                id=user[0],
+                role=user[2]
+            )
+
+            # 🔥 attach extra context
+            user_obj.province = user[3]
+            user_obj.constituency = user[4]
+            user_obj.polling_station = user[5]
+
             login_user(user_obj)
-            
-            return redirect("/agent_dashboard")
+
+            next_page = request.args.get("next")
+            return redirect(next_page or url_for("agent_dashboard"))
 
         return render_template("agent_login.html", error="Invalid login")
 
@@ -2594,9 +2609,10 @@ def agent_login():
 # AGENT DASHBOARD
 # ==============================
 @app.route("/agent_dashboard")
+@login_required
 def agent_dashboard():
 
-    if not current_user.is_authenticated or current_user.role not in ["agent", "admin"]:
+    if current_user.role not in ["agent", "admin"]:
         return "Forbidden", 403
 
     return render_template("agent_dashboard.html")
