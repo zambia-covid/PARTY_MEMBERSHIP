@@ -397,15 +397,22 @@ class User(UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
 
+    # 🔴 HANDLE ADMIN FIRST (CRITICAL)
+    if user_id == "admin":
+        return User("admin", "admin")
+
+    # 🔵 ONLY QUERY DB FOR NUMERIC IDS
+    if not str(user_id).isdigit():
+        return None
+
     conn = get_db()
     cur = conn.cursor()
 
-    # 🔍 Check agents table
     cur.execute("""
         SELECT agent_id, role
         FROM agents
         WHERE agent_id=%s
-    """, (user_id,))
+    """, (int(user_id),))
 
     row = cur.fetchone()
 
@@ -414,10 +421,6 @@ def load_user(user_id):
 
     if row:
         return User(row[0], row[1])
-
-    # fallback admin
-    if user_id == "admin":
-        return User("admin", "admin")
 
     return None
 
