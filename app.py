@@ -405,28 +405,22 @@ class User(UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
 
-    # Ensure numeric ID
-    if not str(user_id).isdigit():
-        return None
+    conn = get_db()
+    cur = conn.cursor()
 
-    user = query_db(
-        """
-        SELECT id, username, role, province, district
-        FROM users
-        WHERE id = %s
-        """,
-        (int(user_id),),
-        fetchone=True
-    )
+    cur.execute("""
+        SELECT agent_id, role, province, constituency, polling_station
+        FROM agents
+        WHERE agent_id=%s
+    """, (user_id,))
 
-    if user:
-        return User(
-            id=user[0],
-            username=user[1],
-            role=user[2],
-            province=user[3],
-            district=user[4]
-        )
+    row = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    if row:
+        return User(*row)
 
     return None
 
