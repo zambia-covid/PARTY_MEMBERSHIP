@@ -392,12 +392,12 @@ def send_sms(phone, message):
 from flask_login import UserMixin
 
 class User(UserMixin):
-    def __init__(self, id, role, province=None, constituency=None, polling_station=None):
-        self.id = str(id)
+    def __init__(self, id, username, role, province=None, district=None):
+        self.id = id
+        self.username = username
         self.role = role
         self.province = province
-        self.constituency = constituency
-        self.polling_station = polling_station
+        self.district = district
 
 # ======================
 # USER LOADER 
@@ -405,22 +405,28 @@ class User(UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
 
-    conn = get_db()
-    cur = conn.cursor()
+    # Ensure numeric ID
+    if not str(user_id).isdigit():
+        return None
 
-    cur.execute("""
-        SELECT agent_id, role, province, constituency, polling_station
-        FROM agents
-        WHERE agent_id=%s
-    """, (user_id,))
+    user = query_db(
+        """
+        SELECT id, username, role, province, district
+        FROM users
+        WHERE id = %s
+        """,
+        (int(user_id),),
+        fetchone=True
+    )
 
-    row = cur.fetchone()
-
-    cur.close()
-    conn.close()
-
-    if row:
-        return User(*row)
+    if user:
+        return User(
+            id=user[0],
+            username=user[1],
+            role=user[2],
+            province=user[3],
+            district=user[4]
+        )
 
     return None
 
@@ -1500,55 +1506,17 @@ def reject(id):
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-
-    # already logged in → go to dashboard
-    if current_user.is_authenticated:
-        return redirect(url_for("dashboard"))
-
     if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
 
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
+        if username in users and check_password_hash(users[username], password):
+            user = User(username, "admin")
+            login_user(user)
+            return redirect(url_for("dashboard"))
 
-        if not username or not password:
-            flash("Enter username and password", "danger")
-            return render_template("login.html")
-
-        conn = get_db()
-        cur = conn.cursor()
-
-        # 🔍 unified user lookup
-        cur.execute("""
-            SELECT agent_id, password, role, province, constituency, polling_station
-            FROM agents
-            WHERE phone=%s
-        """, (username,))
-
-        row = cur.fetchone()
-
-        cur.close()
-        conn.close()
-
-        # ❌ invalid user or password
-        if not row or not check_password_hash(row[1], password):
-            flash("Invalid credentials", "danger")
-            return render_template("login.html")
-
-        # ✅ create user object
-        user = User(
-            id=row[0],
-            role=row[2],
-            province=row[3],
-            constituency=row[4],
-            polling_station=row[5]
-        )
-
-        login_user(user)
-
-        # 🔁 redirect safely
-        next_page = request.args.get("next")
-
-        return redirect(next_page or url_for("dashboard"))
+        flash("Invalid credentials")
+        return redirect("/login")
 
     return render_template("login.html")
 
