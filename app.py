@@ -389,10 +389,15 @@ def send_sms(phone, message):
 # ======================
 # USER CLASS
 # ======================
+from flask_login import UserMixin
+
 class User(UserMixin):
-    def __init__(self, id, role):
+    def __init__(self, id, username, role, province=None, district=None):
         self.id = id
+        self.username = username
         self.role = role
+        self.province = province
+        self.district = district
 
 # ======================
 # USER LOADER 
@@ -400,30 +405,28 @@ class User(UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
 
-    # 🔴 HANDLE ADMIN FIRST (CRITICAL)
-    if user_id == "admin":
-        return User("admin", "admin")
-
-    # 🔵 ONLY QUERY DB FOR NUMERIC IDS
+    # Ensure numeric ID
     if not str(user_id).isdigit():
         return None
 
-    conn = get_db()
-    cur = conn.cursor()
+    user = query_db(
+        """
+        SELECT id, username, role, province, district
+        FROM users
+        WHERE id = %s
+        """,
+        (int(user_id),),
+        fetchone=True
+    )
 
-    cur.execute("""
-        SELECT agent_id, role
-        FROM agents
-        WHERE agent_id=%s
-    """, (int(user_id),))
-
-    row = cur.fetchone()
-
-    cur.close()
-    conn.close()
-
-    if row:
-        return User(row[0], row[1])
+    if user:
+        return User(
+            id=user[0],
+            username=user[1],
+            role=user[2],
+            province=user[3],
+            district=user[4]
+        )
 
     return None
 
