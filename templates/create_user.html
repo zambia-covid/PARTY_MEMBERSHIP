@@ -7,14 +7,14 @@
 <style>
 body {
     font-family: Arial;
-    background:#0b1f3a;
+    background:#0b5d1e;
     color:white;
     margin:0;
 }
 
 .header{
     padding:15px;
-    background:#06132a;
+    background:#063312;
     text-align:center;
     font-size:18px;
     font-weight:bold;
@@ -27,7 +27,7 @@ body {
 .card{
     background:white;
     color:black;
-    padding:20px;
+    padding:15px;
     border-radius:12px;
 }
 
@@ -44,44 +44,40 @@ input, select{
     margin-top:6px;
     border-radius:8px;
     border:1px solid #ccc;
-    font-size:15px;
+    font-size:16px;
 }
 
 button{
     width:100%;
     padding:16px;
-    margin-top:20px;
+    margin-top:18px;
     border:none;
     border-radius:10px;
-    background:#b30000;
+    background:red;
     color:white;
     font-size:16px;
     font-weight:bold;
 }
 
-.hidden{
-    display:none;
-}
-
-.role-info{
-    margin-top:10px;
-    font-size:13px;
-    color:#555;
+.note{
+    font-size:12px;
+    color:gray;
+    margin-top:5px;
 }
 </style>
 </head>
 
 <body>
 
-<div class="header">👤 Create System User</div>
+<div class="header">👤 Create User</div>
 
 <div class="container">
 <div class="card">
 
-<form method="POST">
+<form method="POST" id="userForm">
 
-<label>Phone</label>
-<input name="phone" placeholder="e.g. 097xxxxxxx" required>
+<label>Username</label>
+<input name="username" required>
 
 <label>Password</label>
 <input type="password" name="password" required>
@@ -89,29 +85,33 @@ button{
 <label>Role</label>
 <select name="role" id="roleSelect" required>
     <option value="">Select role</option>
-    <option value="agent">Agent</option>
-    <option value="provincial_manager">Provincial Manager</option>
     <option value="national_manager">National Manager</option>
-    <option value="admin">Admin</option>
+    <option value="provincial_manager">Provincial Manager</option>
+    <option value="district_agent">District Agent</option>
 </select>
 
-<div class="role-info" id="roleInfo"></div>
-
-<!-- LOCATION FIELDS -->
-
-<div id="provinceGroup">
 <label>Province</label>
-<input name="province" id="province">
-</div>
+<select name="province" id="provinceSelect">
+    <option value="">Select province</option>
+    <option>Lusaka</option>
+    <option>Copperbelt</option>
+    <option>Central</option>
+    <option>Eastern</option>
+    <option>Western</option>
+    <option>Southern</option>
+    <option>Northern</option>
+    <option>Luapula</option>
+    <option>Muchinga</option>
+    <option>North-Western</option>
+</select>
 
-<div id="constituencyGroup">
-<label>Constituency</label>
-<input name="constituency" id="constituency">
-</div>
+<div class="note" id="provinceNote"></div>
 
-<div id="stationGroup">
-<label>Polling Station</label>
-<input name="polling_station" id="polling_station">
+<label>District</label>
+<input name="district" id="districtInput" placeholder="Type district (e.g. Kabwata, Chipata, Kasama)">
+
+<div class="note">
+If district is not in system, type it manually.
 </div>
 
 <button type="submit">Create User</button>
@@ -122,59 +122,62 @@ button{
 </div>
 
 <script>
-
-// =======================
-// ROLE LOGIC
-// =======================
+// ELEMENTS
 const roleSelect = document.getElementById("roleSelect");
+const provinceSelect = document.getElementById("provinceSelect");
+const provinceNote = document.getElementById("provinceNote");
+const districtInput = document.getElementById("districtInput");
 
-const provinceGroup = document.getElementById("provinceGroup");
-const constituencyGroup = document.getElementById("constituencyGroup");
-const stationGroup = document.getElementById("stationGroup");
+// ROLE CONTROL LOGIC
+roleSelect.addEventListener("change", function(){
 
-const roleInfo = document.getElementById("roleInfo");
+    const role = this.value;
 
-function updateForm(){
+    // NATIONAL MANAGER
+    if(role === "national_manager"){
+        provinceSelect.value = "";
+        provinceSelect.disabled = true;
+        provinceNote.innerText = "National managers operate across all provinces.";
+    }
+
+    // PROVINCIAL MANAGER
+    else if(role === "provincial_manager"){
+        provinceSelect.disabled = false;
+        provinceNote.innerText = "Assign a province for this manager.";
+    }
+
+    // DISTRICT AGENT
+    else if(role === "district_agent"){
+        provinceSelect.disabled = false;
+        provinceNote.innerText = "Assign province and district.";
+    }
+
+    else{
+        provinceSelect.disabled = false;
+        provinceNote.innerText = "";
+    }
+});
+
+// BASIC VALIDATION BEFORE SUBMIT
+document.getElementById("userForm").addEventListener("submit", function(e){
 
     const role = roleSelect.value;
+    const province = provinceSelect.value;
+    const district = districtInput.value;
 
-    // Reset
-    provinceGroup.classList.remove("hidden");
-    constituencyGroup.classList.remove("hidden");
-    stationGroup.classList.remove("hidden");
-
-    roleInfo.innerText = "";
-
-    if(role === "agent"){
-        roleInfo.innerText = "Agent: Assigned to specific constituency and station.";
-
-    } else if(role === "provincial_manager"){
-
-        constituencyGroup.classList.add("hidden");
-        stationGroup.classList.add("hidden");
-
-        roleInfo.innerText = "Provincial Manager: Access limited to one province.";
-
-    } else if(role === "national_manager"){
-
-        provinceGroup.classList.add("hidden");
-        constituencyGroup.classList.add("hidden");
-        stationGroup.classList.add("hidden");
-
-        roleInfo.innerText = "National Manager: Full system access.";
-
-    } else if(role === "admin"){
-
-        provinceGroup.classList.add("hidden");
-        constituencyGroup.classList.add("hidden");
-        stationGroup.classList.add("hidden");
-
-        roleInfo.innerText = "Admin: Full control including user management.";
+    if(role !== "national_manager" && !province){
+        e.preventDefault();
+        alert("Province is required for this role.");
+        return;
     }
-}
 
-roleSelect.addEventListener("change", updateForm);
+    if(role === "district_agent" && !district){
+        e.preventDefault();
+        alert("District is required for district agents.");
+        return;
+    }
 
+});
 </script>
 
 </body>
