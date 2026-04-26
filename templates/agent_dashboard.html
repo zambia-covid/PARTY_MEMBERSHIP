@@ -30,7 +30,7 @@ body {
     opacity:0.8;
 }
 
-/* LOGOUT BUTTON */
+/* LOGOUT */
 .logout-btn{
     background:red;
     color:white;
@@ -170,18 +170,18 @@ button.action{
 
 <script>
 
-/* 🔐 LOGOUT */
+// 🔐 LOGOUT
 function confirmLogout(){
     if(confirm("Are you sure you want to logout?")){
         window.location.href = "/logout";
     }
 }
 
-/* 📡 LOAD DATA */
+// 📡 LOAD DATA
 async function loadDashboard(){
 
     try{
-        const res = await fetch("/api/my_incidents"); // 🔥 scoped to agent
+        const res = await fetch("/api/my_incidents");
         const data = await res.json();
 
         let critical = 0, open = 0, resolved = 0;
@@ -196,7 +196,8 @@ async function loadDashboard(){
             html += `
             <div class="feed-item">
                 <strong>${i.type || "Incident"}</strong><br>
-                ${i.location || "Unknown"}<br>
+                ${i.district || "Unknown"} 
+                ${i.constituency ? ` • ${i.constituency}` : ""}<br>
                 <span style="color:${
                     i.status === "Critical" ? "red" :
                     i.status === "Open" ? "orange" : "green"
@@ -217,7 +218,7 @@ async function loadDashboard(){
     }
 }
 
-/* 🌐 NETWORK STATUS */
+// 🌐 NETWORK STATUS
 function updateNetwork(){
     const el = document.getElementById("networkStatus");
 
