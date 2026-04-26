@@ -1506,17 +1506,55 @@ def reject(id):
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+
+    # already logged in → go to dashboard
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+
     if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
 
-        if username in users and check_password_hash(users[username], password):
-            user = User(username, "admin")
-            login_user(user)
-            return redirect(url_for("dashboard"))
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
 
-        flash("Invalid credentials")
-        return redirect("/login")
+        if not username or not password:
+            flash("Enter username and password", "danger")
+            return render_template("login.html")
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        # 🔍 unified user lookup
+        cur.execute("""
+            SELECT agent_id, password, role, province, constituency, polling_station
+            FROM agents
+            WHERE phone=%s
+        """, (username,))
+
+        row = cur.fetchone()
+
+        cur.close()
+        conn.close()
+
+        # ❌ invalid user or password
+        if not row or not check_password_hash(row[1], password):
+            flash("Invalid credentials", "danger")
+            return render_template("login.html")
+
+        # ✅ create user object
+        user = User(
+            id=row[0],
+            role=row[2],
+            province=row[3],
+            constituency=row[4],
+            polling_station=row[5]
+        )
+
+        login_user(user)
+
+        # 🔁 redirect safely
+        next_page = request.args.get("next")
+
+        return redirect(next_page or url_for("dashboard"))
 
     return render_template("login.html")
 
