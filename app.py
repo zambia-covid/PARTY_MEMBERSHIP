@@ -392,12 +392,12 @@ def send_sms(phone, message):
 from flask_login import UserMixin
 
 class User(UserMixin):
-    def __init__(self, id, username, role, province=None, district=None):
-        self.id = id
-        self.username = username
+    def __init__(self, id, role, province=None, constituency=None, polling_station=None):
+        self.id = str(id)
         self.role = role
         self.province = province
-        self.district = district
+        self.constituency = constituency
+        self.polling_station = polling_station
 
 # ======================
 # USER LOADER 
