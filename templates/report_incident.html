@@ -75,7 +75,6 @@ button{
     display:none;
 }
 
-/* District styling */
 #districtDisplay{
     background:#eee;
     font-weight:bold;
@@ -88,6 +87,11 @@ button{
 .override-warning{
     font-size:12px;
     color:orange;
+    margin-top:5px;
+}
+
+.gps-status{
+    font-size:12px;
     margin-top:5px;
 }
 </style>
@@ -117,11 +121,9 @@ button{
 <label>Constituency</label>
 <input name="constituency" id="constituencyInput" required>
 
-<!-- AUTO DISTRICT -->
 <label>District (Auto-detected)</label>
 <input id="districtDisplay" readonly>
 
-<!-- 🔥 OVERRIDE OPTION -->
 <label>
 <input type="checkbox" id="overrideToggle"> Override district
 </label>
@@ -149,6 +151,9 @@ button{
 
 <img id="preview">
 
+<label>GPS Location</label>
+<div class="gps-status" id="gpsStatus">Detecting location...</div>
+
 <input type="hidden" name="latitude" id="latitude">
 <input type="hidden" name="longitude" id="longitude">
 
@@ -160,9 +165,10 @@ button{
 </div>
 
 <script>
-// =====================
 // IMAGE PREVIEW
-// =====================
+const photoInput = document.getElementById("photoInput");
+const preview = document.getElementById("preview");
+
 photoInput.addEventListener("change", function(e){
     const file = e.target.files[0];
     if(file){
@@ -175,9 +181,7 @@ photoInput.addEventListener("change", function(e){
     }
 });
 
-// =====================
 // DISTRICT MAPPING
-// =====================
 const mapping = {
     "kabwata": "lusaka",
     "kamwala": "lusaka",
@@ -195,10 +199,8 @@ const districtDisplay = document.getElementById("districtDisplay");
 
 const overrideToggle = document.getElementById("overrideToggle");
 const manualGroup = document.getElementById("manualDistrictGroup");
-
 const manualInput = document.getElementById("districtManual");
 
-// Auto mapping
 constituencyInput.addEventListener("input", function(){
     const key = normalize(this.value);
 
@@ -211,9 +213,7 @@ constituencyInput.addEventListener("input", function(){
     }
 });
 
-// Toggle manual override
 overrideToggle.addEventListener("change", function(){
-
     if(this.checked){
         manualGroup.classList.remove("hidden");
         districtDisplay.style.opacity = 0.5;
@@ -224,15 +224,50 @@ overrideToggle.addEventListener("change", function(){
     }
 });
 
-// =====================
 // GPS
-// =====================
-navigator.geolocation.getCurrentPosition(
-    pos => {
-        latitude.value = pos.coords.latitude;
-        longitude.value = pos.coords.longitude;
+const latInput = document.getElementById("latitude");
+const lonInput = document.getElementById("longitude");
+const gpsStatus = document.getElementById("gpsStatus");
+
+function getLocation(){
+    if (!navigator.geolocation) {
+        gpsStatus.innerText = "GPS not supported";
+        return;
     }
-);
+
+    gpsStatus.innerText = "Getting GPS location...";
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            latInput.value = pos.coords.latitude;
+            lonInput.value = pos.coords.longitude;
+
+            gpsStatus.innerText = "Location captured ✔";
+            gpsStatus.style.color = "green";
+        },
+        (err) => {
+            console.error(err);
+            gpsStatus.innerText = "GPS failed. Enable location.";
+            gpsStatus.style.color = "red";
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        }
+    );
+}
+
+window.addEventListener("load", getLocation);
+
+// FORCE GPS BEFORE SUBMIT
+document.getElementById("incidentForm").addEventListener("submit", function(e){
+    if(!latInput.value || !lonInput.value){
+        e.preventDefault();
+        alert("GPS location is required before submitting.");
+        getLocation();
+    }
+});
 </script>
 
 </body>
