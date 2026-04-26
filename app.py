@@ -346,6 +346,9 @@ STRONG, LEANING, WEAK
         print("AI classification error:", e)
         return "UNKNOWN"
 
+def hash_password(password):
+    return generate_password_hash(password)
+
 # ======================
 # AGENT
 # ======================
