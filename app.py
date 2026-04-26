@@ -982,124 +982,37 @@ def constituencies():
 @admin_required
 def create_user():
 
+    db = get_db()
+
     if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        role = request.form["role"]
+        province = request.form.get("province")
+        district = request.form.get("district")
 
-        try:
-            phone = normalize_phone(request.form.get("phone"))
-            password = request.form.get("password", "").strip()
-            role = request.form.get("role", "agent").lower().strip()
-
-            province = request.form.get("province")
-            constituency = request.form.get("constituency")
-            polling_station = request.form.get("polling_station")
-
-            if not password:
-                flash("Password is required", "danger")
-                return redirect(url_for("create_user"))
-
-            # =========================
-            # 🔴 ROLE VALIDATION
-            # =========================
-            allowed_roles = [
-                "agent",
-                "provincial_manager",
-                "national_manager",
-                "admin"
-            ]
-
-            if role not in allowed_roles:
-                flash("Invalid role selected", "danger")
-                return redirect(url_for("create_user"))
-
-            # =========================
-            # 🟢 PROVINCIAL MANAGER RULES
-            # =========================
-            if role == "provincial_manager":
-                if not province:
-                    flash("Provincial manager must have a province", "danger")
-                    return redirect(url_for("create_user"))
-
-                # lock scope
-                constituency = None
-                polling_station = None
-
-            # =========================
-            # 🔴 NATIONAL MANAGER RULES
-            # =========================
+        # 🔒 ENFORCE CONTROL
+        if current_user.role == "provincial_manager":
+            province = current_user.province  # override
             if role == "national_manager":
-                # full access → no location restriction
-                province = None
-                constituency = None
-                polling_station = None
+                flash("You cannot create a national manager")
+                return redirect(url_for("create_user"))
 
-            # =========================
-            # 🟡 AGENT RULES
-            # =========================
-            if role == "agent":
-                if not (province and constituency):
-                    flash("Agent must have province and constituency", "danger")
-                    return redirect(url_for("create_user"))
-
-        except ValueError as e:
-            flash(str(e), "danger")
+        # Basic validation
+        if not username or not password or not role:
+            flash("Missing required fields")
             return redirect(url_for("create_user"))
 
-        hashed_password = generate_password_hash(password)
+        # Save user
+        db.execute("""
+            INSERT INTO users (username, password, role, province, district)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (username, password, role, province, district))
 
-        conn = None
-        cur = None
+        db.commit()
 
-        try:
-            conn = get_db()
-            cur = conn.cursor()
-
-            # =========================
-            # 🔍 DUPLICATE CHECK
-            # =========================
-            cur.execute("SELECT 1 FROM agents WHERE phone=%s", (phone,))
-            if cur.fetchone():
-                flash("User already exists", "warning")
-                return redirect(url_for("create_user"))
-
-            # =========================
-            # 💾 INSERT USER
-            # =========================
-            cur.execute("""
-                INSERT INTO agents (
-                    phone,
-                    password,
-                    role,
-                    province,
-                    constituency,
-                    polling_station
-                )
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (
-                phone,
-                hashed_password,
-                role,
-                province,
-                constituency,
-                polling_station
-            ))
-
-            conn.commit()
-
-            flash(f"{role.replace('_',' ').title()} created successfully", "success")
-
-        except Exception as e:
-            if conn:
-                conn.rollback()
-            print("CREATE USER ERROR:", e)
-            flash("System error while creating user", "danger")
-
-        finally:
-            if cur:
-                cur.close()
-            if conn:
-                conn.close()
-
-        return redirect(url_for("create_user"))
+        flash("User created successfully")
+        return redirect(url_for("dashboard"))
 
     return render_template("create_user.html")
     
