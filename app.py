@@ -1506,49 +1506,17 @@ def reject(id):
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-
-    if current_user.is_authenticated:
-        return redirect(url_for("dashboard"))
-
     if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
 
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
+        if username in users and check_password_hash(users[username], password):
+            user = User(username, "admin")
+            login_user(user)
+            return redirect(url_for("dashboard"))
 
-        if not username or not password:
-            flash("Enter username and password", "danger")
-            return render_template("login.html")
-
-        conn = get_db()
-        cur = conn.cursor()
-
-        cur.execute("""
-            SELECT agent_id, password, role, province, constituency, polling_station
-            FROM agents
-            WHERE phone=%s
-        """, (username,))
-
-        row = cur.fetchone()
-
-        cur.close()
-        conn.close()
-
-        if not row or not check_password_hash(row[1], password):
-            flash("Invalid credentials", "danger")
-            return render_template("login.html")
-
-        user = User(
-            id=row[0],
-            role=row[2],
-            province=row[3],
-            constituency=row[4],
-            polling_station=row[5]
-        )
-
-        login_user(user)
-
-        next_page = request.args.get("next")
-        return redirect(next_page or url_for("dashboard"))
+        flash("Invalid credentials")
+        return redirect("/login")
 
     return render_template("login.html")
 
