@@ -977,12 +977,17 @@ def constituencies():
 # ==============================
 # CREATE USER
 # ==============================
+from flask import request, redirect, url_for, flash, render_template
+from flask_login import login_required, current_user
+
 @app.route("/create_user", methods=["GET", "POST"])
 @login_required
-@admin_required
 def create_user():
 
-    db = get_db()
+    # 🔒 Restrict access
+    if current_user.role not in ["admin", "national_manager", "provincial_manager"]:
+        flash("Unauthorized access")
+        return redirect(url_for("dashboard"))
 
     if request.method == "POST":
         username = request.form["username"]
@@ -991,28 +996,35 @@ def create_user():
         province = request.form.get("province")
         district = request.form.get("district")
 
-        # 🔒 ENFORCE CONTROL
+        # 🔒 Role enforcement
         if current_user.role == "provincial_manager":
-            province = current_user.province  # override
+            province = current_user.province
+
             if role == "national_manager":
                 flash("You cannot create a national manager")
                 return redirect(url_for("create_user"))
 
-        # Basic validation
+        # 🔒 Validation
         if not username or not password or not role:
             flash("Missing required fields")
             return redirect(url_for("create_user"))
 
-        # Save user
-        db.execute("""
-            INSERT INTO users (username, password, role, province, district)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (username, password, role, province, district))
+        # 🔐 Hash password
+        hashed_password = hash_password(password)
 
-        db.commit()
+        try:
+            query_db("""
+                INSERT INTO users (username, password, role, province, district)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (username, hashed_password, role, province, district))
 
-        flash("User created successfully")
-        return redirect(url_for("dashboard"))
+            flash("User created successfully")
+
+        except Exception as e:
+            print(e)
+            flash("Error creating user (possibly duplicate username)")
+
+        return redirect(url_for("create_user"))
 
     return render_template("create_user.html")
     
