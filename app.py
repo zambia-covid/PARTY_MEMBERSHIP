@@ -392,12 +392,9 @@ def send_sms(phone, message):
 from flask_login import UserMixin
 
 class User(UserMixin):
-    def __init__(self, id, username, role, province=None, district=None):
+    def __init__(self, id, role):
         self.id = id
-        self.username = username
         self.role = role
-        self.province = province
-        self.district = district
 
 # ======================
 # USER LOADER 
@@ -405,28 +402,8 @@ class User(UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
 
-    # Ensure numeric ID
-    if not str(user_id).isdigit():
-        return None
-
-    user = query_db(
-        """
-        SELECT id, username, role, province, district
-        FROM users
-        WHERE id = %s
-        """,
-        (int(user_id),),
-        fetchone=True
-    )
-
-    if user:
-        return User(
-            id=user[0],
-            username=user[1],
-            role=user[2],
-            province=user[3],
-            district=user[4]
-        )
+    if user_id == "admin":
+        return User("admin", "admin")
 
     return None
 
@@ -1506,17 +1483,22 @@ def reject(id):
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
 
-        if username in users and check_password_hash(users[username], password):
-            user = User(username, "admin")
-            login_user(user)
-            return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+
+        # 🔴 Simple admin login (old system)
+        if username == "admin":
+            admin_password = os.getenv("ADMIN_PASSWORD")
+
+            if admin_password and password == admin_password:
+                user = User("admin", "admin")
+                login_user(user)
+                return redirect(url_for("dashboard"))
 
         flash("Invalid credentials")
-        return redirect("/login")
+        return redirect(url_for("login"))
 
     return render_template("login.html")
 
