@@ -121,9 +121,12 @@
 
 // INIT MAP
 var map = L.map('map').setView([-13.1339, 27.8493], 6);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-// 🔥 STRONG NORMALIZE
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18
+}).addTo(map);
+
+// NORMALIZE
 function normalize(name){
     return (name || "")
         .toLowerCase()
@@ -132,9 +135,9 @@ function normalize(name){
         .trim();
 }
 
-// 🔥 SAFE NAME RESOLVER (CRITICAL FIX)
+// 🔥 SAFE NAME RESOLVER
 function getName(props){
-    return props.shapeName || props.name || props.NAME || "";
+    return props.shapeName || props.name || props.NAME || props.constituency || "";
 }
 
 // DATA
@@ -153,18 +156,32 @@ function getColor(status){
     return "#ffff00";
 }
 
-// LOAD GEOJSON
+// LOAD GEOJSON WITH ERROR HANDLING
 fetch("/static/geo/zambia_constituencies.geojson")
-.then(res => res.json())
+.then(res => {
+    if (!res.ok) throw new Error("GeoJSON failed to load");
+    return res.json();
+})
 .then(geo => {
 
-    console.log("GEO SAMPLE:", geo.features[0].properties);
+    console.log("GeoJSON loaded:", geo.features.length);
 
     let layer = L.geoJSON(geo, {
 
         style: function(feature){
 
             let raw = getName(feature.properties);
+
+            if (!raw) {
+                console.warn("Missing name in feature:", feature.properties);
+                return {
+                    color: "#999",
+                    weight: 1,
+                    fillColor: "#ccc",
+                    fillOpacity: 0.3
+                };
+            }
+
             let key = normalize(raw);
             let r = results[key];
 
@@ -172,9 +189,9 @@ fetch("/static/geo/zambia_constituencies.geojson")
 
             return {
                 color: getColor(status),
-                weight:2,
-                fillColor:getColor(status),
-                fillOpacity:0.6
+                weight: 2,
+                fillColor: getColor(status),
+                fillOpacity: 0.6
             };
         },
 
@@ -184,12 +201,10 @@ fetch("/static/geo/zambia_constituencies.geojson")
             let key = normalize(raw);
             let r = results[key];
 
-            console.log("MATCH:", raw, "→", key, "→", r);
-
             let status = r ? r.status : "TOSS-UP";
 
             layer.bindPopup(`
-                <b>${raw}</b><br>
+                <b>${raw || "Unknown"}</b><br>
                 Status: ${status}<br>
                 PF: ${r ? r.pf : 0}<br>
                 UPND: ${r ? r.upnd : 0}
@@ -199,12 +214,18 @@ fetch("/static/geo/zambia_constituencies.geojson")
     }).addTo(map);
 
     map.fitBounds(layer.getBounds());
+
+})
+.catch(err => {
+    console.error("MAP LOAD ERROR:", err);
+
+    alert("Map failed to load constituencies. Check GeoJSON path.");
 });
 
 </script>
 
 <script>
-setInterval(()=>location.reload(),10000);
+setInterval(()=>location.reload(),30000);
 </script>
 
 {% endblock %}
