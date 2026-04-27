@@ -38,23 +38,23 @@
     font-size: 20px;
 }
 
-/* STATUS COLORS (GLOBAL) */
+/* STATUS COLORS */
 .win {
-    color: #00ff88;
-    background: rgba(0,255,136,0.08);
-    border-left: 4px solid #00ff88;
+    color: #00ff00;
+    background: rgba(0,255,0,0.1);
+    border-left: 4px solid #00ff00;
 }
 
 .lose {
-    color: #ff4d4d;
-    background: rgba(255,77,77,0.08);
-    border-left: 4px solid #ff4d4d;
+    color: #ff0000;
+    background: rgba(255,0,0,0.1);
+    border-left: 4px solid #ff0000;
 }
 
 .tie {
-    color: #ffcc00;
-    background: rgba(255,204,0,0.08);
-    border-left: 4px solid #ffcc00;
+    color: #ffff00;
+    background: rgba(255,255,0,0.1);
+    border-left: 4px solid #ffff00;
 }
 
 /* LAYOUT */
@@ -70,13 +70,12 @@
     border-radius: 10px;
 }
 
-/* RIGHT PANEL */
+/* PANEL */
 .side {
     display: grid;
     gap: 15px;
 }
 
-/* CARDS */
 .card {
     background: #111;
     padding: 12px;
@@ -84,14 +83,7 @@
 }
 
 .card h3 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    color: #ccc;
-}
-
-/* DANGER */
-.danger {
-    background: rgba(255,0,0,0.2);
+    margin: 0 0 10px;
 }
 
 /* ROW */
@@ -109,6 +101,7 @@
     font-size: 11px;
     font-weight: bold;
     text-align: center;
+    color: white;
 }
 
 </style>
@@ -118,21 +111,19 @@
     <div class="kpi win">WIN<br><b>{{ summary.win }}</b></div>
     <div class="kpi tie">TOSS-UP<br><b>{{ summary.toss }}</b></div>
     <div class="kpi lose">LOSE<br><b>{{ summary.lose }}</b></div>
-    <div class="kpi">DANGER<br><b>{{ danger_zones|length }}</b></div>
 </div>
 
 <div class="layout">
 
-    <!-- 🗺 MAP -->
+    <!-- MAP -->
     <div id="map"></div>
 
-    <!-- SIDE PANEL -->
+    <!-- SIDE -->
     <div class="side">
 
-        <!-- 🚨 DANGER -->
-        <div class="card danger">
+        <!-- DANGER -->
+        <div class="card">
             <h3>🚨 Danger Zones</h3>
-
             {% for d in danger_zones %}
                 <div class="row lose">
                     {{ d.constituency if d.constituency else d[0] }}
@@ -143,9 +134,9 @@
             {% endfor %}
         </div>
 
-        <!-- 🗺 STATUS LIST -->
+        <!-- STATUS -->
         <div class="card">
-            <h3>🗺 Constituency Status</h3>
+            <h3>🗺 Constituencies</h3>
 
             {% for r in map_data %}
                 <div class="row 
@@ -161,10 +152,9 @@
             {% endfor %}
         </div>
 
-        <!-- ⚠️ SILENT -->
+        <!-- SILENT -->
         <div class="card">
             <h3>⚠️ No Reporting</h3>
-
             {% for s in silent_stations %}
                 <div class="row">{{ s }}</div>
             {% else %}
@@ -176,40 +166,43 @@
 
 </div>
 
-<!-- ========================= -->
-<!-- MAP SCRIPT -->
-<!-- ========================= -->
 <script>
 
-// INIT MAP
+// INIT
 var map = L.map('map').setView([-13.1339, 27.8493], 6);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-// NORMALIZE
+// NORMALIZE (fix naming mismatches)
 function normalize(name){
-    return (name || "").toLowerCase().trim();
+    return (name || "")
+        .toLowerCase()
+        .replace(" constituency", "")
+        .trim();
 }
 
-// DATA FROM FLASK
+// DATA
 let results = {};
 let mapData = {{ map_data | tojson }};
 
-// BUILD LOOKUP
 mapData.forEach(r => {
     results[normalize(r.constituency)] = r;
 });
 
-// LOAD GEOJSON
+// COLOR LOGIC (STRICT)
+function getColor(status){
+    switch(status){
+        case "WIN": return "#00ff00";
+        case "LOSE": return "#ff0000";
+        case "TOSS-UP": return "#ffff00";
+        default: return "#999999";
+    }
+}
+
+// LOAD MAP
 fetch("/static/geo/zambia_constituencies.geojson")
 .then(res => res.json())
 .then(geo => {
-
-    function getColor(status){
-        if (status === "WIN") return "#00c853";
-        if (status === "LOSE") return "#d50000";
-        return "#ffd600";
-    }
 
     let layer = L.geoJSON(geo, {
 
@@ -218,11 +211,14 @@ fetch("/static/geo/zambia_constituencies.geojson")
             let key = normalize(feature.properties.shapeName);
             let r = results[key];
 
+            let status = r ? r.status : "TOSS-UP";
+            let color = getColor(status);
+
             return {
-                color:"#222",
-                weight:1,
-                fillColor:getColor(r ? r.status : "TOSS-UP"),
-                fillOpacity:0.6
+                color: color,
+                weight: 2,
+                fillColor: color,
+                fillOpacity: 0.6
             };
         },
 
@@ -235,15 +231,13 @@ fetch("/static/geo/zambia_constituencies.geojson")
 
             let center = layer.getBounds().getCenter();
 
-            // LABEL
             L.marker(center, {
                 icon: L.divIcon({
-                    className:"label",
-                    html:`${feature.properties.shapeName}<br>${status}`
+                    className: "label",
+                    html: `${feature.properties.shapeName}<br>${status}`
                 })
             }).addTo(map);
 
-            // POPUP
             layer.bindPopup(`
                 <b>${feature.properties.shapeName}</b><br>
                 Status: ${status}<br>
@@ -260,11 +254,8 @@ fetch("/static/geo/zambia_constituencies.geojson")
 
 </script>
 
-<!-- 🔁 AUTO REFRESH -->
 <script>
-setInterval(() => {
-    location.reload()
-}, 10000)
+setInterval(() => location.reload(), 10000);
 </script>
 
 {% endblock %}
