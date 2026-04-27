@@ -1,15 +1,6 @@
-<!DOCTYPE html>
-<html>
-<head>
-<title>Incident Intelligence Map</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
-
 <style>
-body { margin:0; font-family: Arial; }
+body { margin:0; font-family: Arial; background:#000; }
+
 #map { height:100vh; }
 
 .header {
@@ -17,140 +8,36 @@ body { margin:0; font-family: Arial; }
     top:10px;
     left:50%;
     transform:translateX(-50%);
-    background:#063312;
-    color:white;
+    background:#111;
+    color:#00ff9c;
     padding:10px 20px;
-    border-radius:10px;
+    border-radius:8px;
     z-index:999;
     font-weight:bold;
+    border:1px solid #00ff9c;
+}
+
+/* 🔴 Pulsing alert */
+.pulse {
+    width:14px;
+    height:14px;
+    background:red;
+    border-radius:50%;
+    box-shadow:0 0 0 rgba(255,0,0,0.7);
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255,0,0,0.7); }
+    70% { box-shadow: 0 0 0 15px rgba(255,0,0,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,0,0,0); }
+}
+
+/* Labels */
+.label {
+    color:white;
+    font-size:11px;
+    font-weight:bold;
+    text-shadow:0 0 5px black;
 }
 </style>
-</head>
-
-<body>
-
-<div class="header">🛰️ Incident Intelligence Map</div>
-<div id="map"></div>
-
-<script>
-
-// =======================
-// INIT MAP
-// =======================
-var map = L.map('map').setView([-13.1339, 27.8493], 6);
-
-// =======================
-// BASE LAYERS
-// =======================
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
-
-// =======================
-// URL PARAMS (🔥 NEW)
-// =======================
-const params = new URLSearchParams(window.location.search);
-const focusLat = parseFloat(params.get("lat"));
-const focusLng = parseFloat(params.get("lng"));
-const focusId = params.get("id");
-
-// =======================
-// NORMALIZE
-// =======================
-function normalize(name){
-    return (name || "").toLowerCase().trim();
-}
-
-// =======================
-// LOAD INCIDENTS
-// =======================
-fetch("/api/incidents")
-.then(res => res.json())
-.then(data => {
-
-    // 🔥 HEATMAP
-    let heatPoints = [];
-
-    data.forEach(i => {
-        if (!i.lat || !i.lng) return;
-
-        let weight = 0.2;
-        if (i.severity === "Critical") weight = 1.0;
-        else if (i.severity === "High") weight = 0.7;
-        else if (i.severity === "Medium") weight = 0.4;
-
-        heatPoints.push([i.lat, i.lng, weight]);
-    });
-
-    L.heatLayer(heatPoints, {
-        radius: 25,
-        blur: 15
-    }).addTo(map);
-
-    // 🔥 BUILD SCORES (district aligned)
-    let scores = {};
-
-    data.forEach(i => {
-        if (!i.district) return;
-
-        let key = normalize(i.district);
-
-        let score = 1;
-        if (i.severity === "Critical") score = 3;
-        else if (i.severity === "High") score = 2;
-
-        if (!scores[key]) scores[key] = 0;
-        scores[key] += score;
-    });
-
-    function getColor(score){
-        if (score > 20) return "red";
-        if (score > 10) return "orange";
-        if (score > 5) return "yellow";
-        return "green";
-    }
-
-    // =======================
-    // LOAD GEOJSON
-    // =======================
-    fetch("/static/geo/zambia_constituencies.geojson")
-    .then(res => res.json())
-    .then(geo => {
-
-        let geoLayer = L.geoJSON(geo, {
-
-            style: function(feature){
-                let cname = feature.properties.shapeName;
-                let key = normalize(cname);
-                let score = scores[key] || 0;
-
-                return {
-                    color: "#333",
-                    weight: 1,
-                    fillColor: getColor(score),
-                    fillOpacity: 0.6
-                };
-            }
-
-        }).addTo(map);
-
-        map.fitBounds(geoLayer.getBounds());
-
-        // 🔥 FOCUS INCIDENT (NEW)
-        if (focusLat && focusLng) {
-
-            map.setView([focusLat, focusLng], 14);
-
-            const marker = L.marker([focusLat, focusLng]).addTo(map);
-
-            marker.bindPopup(`
-                <b>Incident #${focusId}</b><br>
-                Focused Location
-            `).openPopup();
-        }
-
-    });
-
-});
-</script>
-
-</body>
-</html>
