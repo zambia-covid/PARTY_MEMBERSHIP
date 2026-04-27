@@ -12,14 +12,8 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
+.main { background: #050505; color: white; }
 
-/* DARK THEME */
-.main {
-    background: #050505;
-    color: white;
-}
-
-/* KPI BAR */
 .kpis {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px,1fr));
@@ -34,71 +28,43 @@
     text-align: center;
 }
 
-.kpi b {
-    font-size: 20px;
-}
+.kpi b { font-size: 20px; }
 
-/* STATUS COLORS */
-.win {
-    color: #00ff00;
-    background: rgba(0,255,0,0.1);
-    border-left: 4px solid #00ff00;
-}
+/* STATUS */
+.win { color:#00ff00; background:rgba(0,255,0,0.1); border-left:4px solid #00ff00; }
+.lose { color:#ff0000; background:rgba(255,0,0,0.1); border-left:4px solid #ff0000; }
+.tie { color:#ffff00; background:rgba(255,255,0,0.1); border-left:4px solid #ffff00; }
 
-.lose {
-    color: #ff0000;
-    background: rgba(255,0,0,0.1);
-    border-left: 4px solid #ff0000;
-}
-
-.tie {
-    color: #ffff00;
-    background: rgba(255,255,0,0.1);
-    border-left: 4px solid #ffff00;
-}
-
-/* LAYOUT */
 .layout {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 15px;
+    display:grid;
+    grid-template-columns:2fr 1fr;
+    gap:15px;
 }
 
-/* MAP */
 #map {
-    height: 500px;
-    border-radius: 10px;
+    height:500px;
+    border-radius:10px;
 }
 
-/* PANEL */
-.side {
-    display: grid;
-    gap: 15px;
-}
+.side { display:grid; gap:15px; }
 
 .card {
-    background: #111;
-    padding: 12px;
-    border-radius: 10px;
+    background:#111;
+    padding:12px;
+    border-radius:10px;
 }
 
 .row {
-    padding: 6px;
-    border-bottom: 1px solid #222;
+    padding:6px;
+    border-bottom:1px solid #222;
 }
 
-.row:last-child {
-    border-bottom: none;
-}
-
-/* LABELS */
 .label {
-    font-size: 11px;
-    font-weight: bold;
-    text-align: center;
-    color: white;
+    font-size:11px;
+    font-weight:bold;
+    text-align:center;
+    color:white;
 }
-
 </style>
 
 <!-- KPI -->
@@ -116,23 +82,17 @@
     <!-- SIDE -->
     <div class="side">
 
-        <!-- DANGER -->
         <div class="card">
             <h3>🚨 Danger Zones</h3>
             {% for d in danger_zones %}
                 <div class="row lose">
                     {{ d.constituency if d.constituency else d[0] }}
-                    → Margin {{ d.margin if d.margin else d[1] }}
                 </div>
-            {% else %}
-                <div class="row">No danger zones</div>
             {% endfor %}
         </div>
 
-        <!-- STATUS -->
         <div class="card">
             <h3>🗺 Constituencies</h3>
-
             {% for r in map_data %}
                 <div class="row 
                     {% if r.status == 'WIN' %}win
@@ -141,19 +101,15 @@
                     {% endif %}
                 ">
                     <strong>{{ r.constituency }}</strong><br>
-                    PF {{ r.pf }} vs UPND {{ r.upnd }}<br>
                     {{ r.status }}
                 </div>
             {% endfor %}
         </div>
 
-        <!-- SILENT -->
         <div class="card">
             <h3>⚠️ No Reporting</h3>
             {% for s in silent_stations %}
                 <div class="row">{{ s }}</div>
-            {% else %}
-                <div class="row">All reporting</div>
             {% endfor %}
         </div>
 
@@ -165,42 +121,35 @@
 
 // INIT MAP
 var map = L.map('map').setView([-13.1339, 27.8493], 6);
-
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-// =========================
-// 🔥 STEP 2: STRONG NORMALIZE
-// =========================
+// 🔥 STRONG NORMALIZE
 function normalize(name){
     return (name || "")
         .toLowerCase()
-        .replace(" constituency", "")
-        .replace("constituency", "")
-        .replace(/\s+/g, " ")
+        .replace(" constituency","")
+        .replace(/\s+/g," ")
         .trim();
 }
 
-// =========================
+// 🔥 SAFE NAME RESOLVER (CRITICAL FIX)
+function getName(props){
+    return props.shapeName || props.name || props.NAME || "";
+}
+
 // DATA
-// =========================
 let results = {};
 let mapData = {{ map_data | tojson }};
 
 // BUILD LOOKUP
 mapData.forEach(r => {
-    let key = normalize(r.constituency);
-    results[key] = r;
+    results[normalize(r.constituency)] = r;
 });
 
-// =========================
-// 🔥 STEP 1: DEBUG OUTPUT
-// =========================
-console.log("RESULT KEYS:", Object.keys(results));
-
-// COLOR LOGIC
+// COLOR
 function getColor(status){
-    if (status === "WIN") return "#00ff00";
-    if (status === "LOSE") return "#ff0000";
+    if(status==="WIN") return "#00ff00";
+    if(status==="LOSE") return "#ff0000";
     return "#ffff00";
 }
 
@@ -209,53 +158,41 @@ fetch("/static/geo/zambia_constituencies.geojson")
 .then(res => res.json())
 .then(geo => {
 
+    console.log("GEO SAMPLE:", geo.features[0].properties);
+
     let layer = L.geoJSON(geo, {
 
         style: function(feature){
 
-            let raw = feature.properties.shapeName;
+            let raw = getName(feature.properties);
             let key = normalize(raw);
             let r = results[key];
 
             let status = r ? r.status : "TOSS-UP";
-            let color = getColor(status);
 
             return {
-                color: color,
-                weight: 2,
-                fillColor: color,
-                fillOpacity: 0.6
+                color: getColor(status),
+                weight:2,
+                fillColor:getColor(status),
+                fillOpacity:0.6
             };
         },
 
         onEachFeature: function(feature, layer){
 
-            let raw = feature.properties.shapeName;
+            let raw = getName(feature.properties);
             let key = normalize(raw);
             let r = results[key];
 
-            // 🔥 DEBUG MATCH
-            console.log("CHECK:", raw, "→", key, "→", r);
+            console.log("MATCH:", raw, "→", key, "→", r);
 
             let status = r ? r.status : "TOSS-UP";
 
-            let center = layer.getBounds().getCenter();
-
-            // LABEL
-            L.marker(center, {
-                icon: L.divIcon({
-                    className: "label",
-                    html: `${raw}<br>${status}`
-                })
-            }).addTo(map);
-
-            // POPUP
             layer.bindPopup(`
                 <b>${raw}</b><br>
                 Status: ${status}<br>
                 PF: ${r ? r.pf : 0}<br>
-                UPND: ${r ? r.upnd : 0}<br>
-                Margin: ${r ? r.margin : 0}
+                UPND: ${r ? r.upnd : 0}
             `);
         }
 
@@ -267,7 +204,7 @@ fetch("/static/geo/zambia_constituencies.geojson")
 </script>
 
 <script>
-setInterval(() => location.reload(), 10000);
+setInterval(()=>location.reload(),10000);
 </script>
 
 {% endblock %}
