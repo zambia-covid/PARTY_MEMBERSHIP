@@ -82,11 +82,6 @@
     border-radius: 10px;
 }
 
-.card h3 {
-    margin: 0 0 10px;
-}
-
-/* ROW */
 .row {
     padding: 6px;
     border-bottom: 1px solid #222;
@@ -168,38 +163,48 @@
 
 <script>
 
-// INIT
+// INIT MAP
 var map = L.map('map').setView([-13.1339, 27.8493], 6);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-// NORMALIZE (fix naming mismatches)
+// =========================
+// 🔥 STEP 2: STRONG NORMALIZE
+// =========================
 function normalize(name){
     return (name || "")
         .toLowerCase()
         .replace(" constituency", "")
+        .replace("constituency", "")
+        .replace(/\s+/g, " ")
         .trim();
 }
 
+// =========================
 // DATA
+// =========================
 let results = {};
 let mapData = {{ map_data | tojson }};
 
+// BUILD LOOKUP
 mapData.forEach(r => {
-    results[normalize(r.constituency)] = r;
+    let key = normalize(r.constituency);
+    results[key] = r;
 });
 
-// COLOR LOGIC (STRICT)
+// =========================
+// 🔥 STEP 1: DEBUG OUTPUT
+// =========================
+console.log("RESULT KEYS:", Object.keys(results));
+
+// COLOR LOGIC
 function getColor(status){
-    switch(status){
-        case "WIN": return "#00ff00";
-        case "LOSE": return "#ff0000";
-        case "TOSS-UP": return "#ffff00";
-        default: return "#999999";
-    }
+    if (status === "WIN") return "#00ff00";
+    if (status === "LOSE") return "#ff0000";
+    return "#ffff00";
 }
 
-// LOAD MAP
+// LOAD GEOJSON
 fetch("/static/geo/zambia_constituencies.geojson")
 .then(res => res.json())
 .then(geo => {
@@ -208,7 +213,8 @@ fetch("/static/geo/zambia_constituencies.geojson")
 
         style: function(feature){
 
-            let key = normalize(feature.properties.shapeName);
+            let raw = feature.properties.shapeName;
+            let key = normalize(raw);
             let r = results[key];
 
             let status = r ? r.status : "TOSS-UP";
@@ -224,22 +230,28 @@ fetch("/static/geo/zambia_constituencies.geojson")
 
         onEachFeature: function(feature, layer){
 
-            let key = normalize(feature.properties.shapeName);
+            let raw = feature.properties.shapeName;
+            let key = normalize(raw);
             let r = results[key];
+
+            // 🔥 DEBUG MATCH
+            console.log("CHECK:", raw, "→", key, "→", r);
 
             let status = r ? r.status : "TOSS-UP";
 
             let center = layer.getBounds().getCenter();
 
+            // LABEL
             L.marker(center, {
                 icon: L.divIcon({
                     className: "label",
-                    html: `${feature.properties.shapeName}<br>${status}`
+                    html: `${raw}<br>${status}`
                 })
             }).addTo(map);
 
+            // POPUP
             layer.bindPopup(`
-                <b>${feature.properties.shapeName}</b><br>
+                <b>${raw}</b><br>
                 Status: ${status}<br>
                 PF: ${r ? r.pf : 0}<br>
                 UPND: ${r ? r.upnd : 0}<br>
