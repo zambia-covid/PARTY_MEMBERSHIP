@@ -2627,6 +2627,144 @@ def war_room():
         weak_structures=weak_structures,
         high_value_targets=high_value_targets,
         silent_stations=silent_stations
+    )@app.route("/war_room")
+@login_required
+@admin_required
+def war_room():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # =========================
+    # CORE INTELLIGENCE
+    # =========================
+    stations = build_polling_intelligence(cur)
+
+    # =========================
+    # CLASSIFY ONCE (PERFORMANCE)
+    # =========================
+    secure = []
+    collapse = []
+    battleground = []
+
+    fake_wins = []
+    blind_spots = []
+    weak_structures = []
+    high_value_targets = []
+
+    for s in stations:
+
+        # STATUS GROUPING
+        if s["status"] == "SECURE":
+            secure.append(s)
+        elif s["status"] == "COLLAPSE":
+            collapse.append(s)
+        else:
+            battleground.append(s)
+
+        # FLAGS
+        if s.get("fake_win"):
+            fake_wins.append(s)
+
+        if s.get("blind_zone"):
+            blind_spots.append(s)
+
+        if s.get("weak_structure"):
+            weak_structures.append(s)
+
+        if s.get("voter_weight") == "HIGH VALUE":
+            high_value_targets.append(s)
+
+    # =========================
+    # SUMMARY
+    # =========================
+    summary = {
+        "win": len(secure),
+        "lose": len(collapse),
+        "toss": len(battleground)
+    }
+
+    # =========================
+    # PRIORITY SORTING
+    # =========================
+    fake_wins = sorted(fake_wins, key=lambda x: x["priority"], reverse=True)[:5]
+    blind_spots = sorted(blind_spots, key=lambda x: x["priority"], reverse=True)[:5]
+    weak_structures = sorted(weak_structures, key=lambda x: x["priority"], reverse=True)[:5]
+
+    high_value_targets = sorted(
+        high_value_targets,
+        key=lambda x: x["voters"],
+        reverse=True
+    )[:5]
+
+    danger_zones = sorted(
+        collapse,
+        key=lambda x: x["margin"]
+    )[:5]
+
+    # =========================
+    # SILENT STATIONS
+    # =========================
+    cur.execute("""
+        SELECT a.polling_station
+        FROM agents a
+        LEFT JOIN polling_station_results r
+            ON a.polling_station = r.polling_station
+        WHERE r.id IS NULL
+    """)
+
+    silent_stations = [r[0] for r in cur.fetchall()]
+
+    # =========================
+    # MAP DATA (🔥 NEW)
+    # =========================
+    # Aggregate constituency-level results for map
+    cur.execute("""
+        SELECT constituency,
+               COALESCE(SUM(pf_votes),0) as pf,
+               COALESCE(SUM(upnd_votes),0) as upnd
+        FROM polling_station_results
+        GROUP BY constituency
+    """)
+
+    map_data = []
+
+    for c, pf, upnd in cur.fetchall():
+
+        margin = pf - upnd
+
+        if margin > 0:
+            status = "WIN"
+        elif margin < 0:
+            status = "LOSE"
+        else:
+            status = "TOSS-UP"
+
+        map_data.append({
+            "constituency": c,
+            "pf": pf,
+            "upnd": upnd,
+            "margin": margin,
+            "status": status
+        })
+
+    cur.close()
+    conn.close()
+
+    # =========================
+    # RENDER
+    # =========================
+    return render_template(
+        "war_room.html",
+        stations=stations,
+        summary=summary,
+        danger_zones=danger_zones,
+        fake_wins=fake_wins,
+        blind_spots=blind_spots,
+        weak_structures=weak_structures,
+        high_value_targets=high_value_targets,
+        silent_stations=silent_stations,
+        map_data=map_data   # 🔥 critical for map
     )
 
 # ==============================
