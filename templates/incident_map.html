@@ -1,33 +1,78 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Incident Intelligence Map</title>
+<title>Election War Room</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 
 <style>
-body { margin:0; font-family: Arial, sans-serif; }
-#map { height:100vh; }
-
-.header {
-    position:absolute;
-    top:10px;
-    left:50%;
-    transform:translateX(-50%);
-    background:#ffffff;
-    color:#333;
-    padding:10px 20px;
-    border-radius:8px;
-    z-index:999;
-    font-weight:bold;
-    box-shadow:0 2px 6px rgba(0,0,0,0.2);
+body {
+    margin:0;
+    font-family: Arial, sans-serif;
+    display:flex;
+    flex-direction:column;
+    height:100vh;
 }
 
+/* HEADER */
+.header {
+    background:#1e2a38;
+    color:white;
+    padding:12px;
+    text-align:center;
+    font-weight:bold;
+}
+
+/* STATS BAR */
+.stats {
+    display:flex;
+    justify-content:space-around;
+    background:#f4f6f8;
+    padding:8px;
+    font-weight:bold;
+}
+
+/* LAYOUT */
+.container {
+    display:flex;
+    flex:1;
+}
+
+/* MAP */
+#map {
+    flex:3;
+}
+
+/* PANEL */
+.panel {
+    flex:1;
+    background:#ffffff;
+    padding:10px;
+    overflow-y:auto;
+    border-left:1px solid #ddd;
+}
+
+.panel h3 {
+    margin-top:0;
+}
+
+/* RESULT ITEM */
+.item {
+    padding:8px;
+    margin-bottom:6px;
+    border-left:4px solid #ccc;
+    cursor:pointer;
+    font-size:13px;
+}
+
+.win { border-color: green; }
+.lose { border-color: red; }
+.toss { border-color: orange; }
+
+/* LABELS */
 .label {
-    color:#000;
     font-size:11px;
     font-weight:bold;
     text-align:center;
@@ -37,8 +82,22 @@ body { margin:0; font-family: Arial, sans-serif; }
 
 <body>
 
-<div class="header">Incident Intelligence Map</div>
-<div id="map"></div>
+<div class="header">Election War Room</div>
+
+<div class="stats">
+    <div>🟢 WIN: <span id="win">0</span></div>
+    <div>🔴 LOSE: <span id="lose">0</span></div>
+    <div>🟡 TOSS-UP: <span id="toss">0</span></div>
+</div>
+
+<div class="container">
+    <div id="map"></div>
+
+    <div class="panel">
+        <h3>Live Results</h3>
+        <div id="results"></div>
+    </div>
+</div>
 
 <script>
 
@@ -50,116 +109,142 @@ var map = L.map('map').setView([-13.1339, 27.8493], 6);
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
 // =======================
-// NORMALIZE FUNCTION
+// NORMALIZE
 // =======================
 function normalize(name){
     return (name || "").toLowerCase().trim();
 }
 
+let geoLayer;
+
 // =======================
-// LOAD INCIDENTS
+// LOAD DATA
 // =======================
-fetch("/api/incidents")
-.then(res => res.json())
-.then(data => {
+function loadData(){
 
-    let heatPoints = [];
-    let scores = {};
-
-    data.forEach(i => {
-
-        if (!i.lat || !i.lng) return;
-
-        // 🔥 HEATMAP WEIGHT
-        let weight = 0.2;
-        if (i.severity === "Critical") weight = 1;
-        else if (i.severity === "High") weight = 0.7;
-        else if (i.severity === "Medium") weight = 0.4;
-
-        heatPoints.push([i.lat, i.lng, weight]);
-
-        // 🔢 SCORE CALCULATION
-        let key = normalize(i.district);
-        let score = i.severity === "Critical" ? 3 :
-                    i.severity === "High" ? 2 : 1;
-
-        scores[key] = (scores[key] || 0) + score;
-
-        // 🟡 INCIDENT MARKERS
-        L.circleMarker([i.lat, i.lng], {
-            radius: 5,
-            color: "#007bff",
-            fillOpacity: 0.7
-        })
-        .addTo(map)
-        .bindPopup(`
-            <b>${i.type || "Incident"}</b><br>
-            Severity: ${i.severity}<br>
-            ${i.description || ""}
-        `);
-    });
-
-    // 🔥 HEATMAP LAYER
-    L.heatLayer(heatPoints, {
-        radius: 25,
-        blur: 15
-    }).addTo(map);
-
-    // =======================
-    // LOAD GEOJSON
-    // =======================
-    fetch("/static/geo/zambia_constituencies.geojson")
+    fetch("/api/live_dashboard")
     .then(res => res.json())
-    .then(geo => {
+    .then(data => {
 
-        function getColor(score){
-            if (score > 20) return "#dc3545";   // red
-            if (score > 10) return "#fd7e14";   // orange
-            if (score > 5) return "#ffc107";    // yellow
-            return "#28a745";                   // green
-        }
+        let resultsMap = {};
+        let win = 0, lose = 0, toss = 0;
 
-        let geoLayer = L.geoJSON(geo, {
+        let panel = document.getElementById("results");
+        panel.innerHTML = "";
 
-            style: function(feature){
-                let key = normalize(feature.properties.shapeName);
-                let score = scores[key] || 0;
+        data.forEach(r => {
 
-                return {
-                    color: "#555",
-                    weight: 1,
-                    fillColor: getColor(score),
-                    fillOpacity: 0.5
-                };
-            },
+            resultsMap[normalize(r.constituency)] = r;
 
-            onEachFeature: function(feature, layer){
+            if (r.status === "WIN") win++;
+            else if (r.status === "LOSE") lose++;
+            else toss++;
 
-                let key = normalize(feature.properties.shapeName);
-                let score = scores[key] || 0;
+            // PANEL ITEM
+            let div = document.createElement("div");
+            div.className = "item " + r.status.toLowerCase();
 
-                // 🏷️ LABELS
-                let center = layer.getBounds().getCenter();
+            div.innerHTML = `
+                <b>${r.constituency}</b><br>
+                PF: ${r.pf} | UPND: ${r.upnd}<br>
+                ${r.status}
+            `;
 
-                L.marker(center, {
-                    icon: L.divIcon({
-                        className: "label",
-                        html: `${feature.properties.shapeName}<br>${score}`
-                    })
-                }).addTo(map);
+            // CLICK → FOCUS MAP
+            div.onclick = () => {
+                focusConstituency(r.constituency);
+            };
 
-                layer.bindPopup(`
-                    <b>${feature.properties.shapeName}</b><br>
-                    Incident Score: ${score}
-                `);
+            panel.appendChild(div);
+        });
+
+        document.getElementById("win").innerText = win;
+        document.getElementById("lose").innerText = lose;
+        document.getElementById("toss").innerText = toss;
+
+        // =======================
+        // GEOJSON LOAD / UPDATE
+        // =======================
+        fetch("/static/geo/zambia_constituencies.geojson")
+        .then(res => res.json())
+        .then(geo => {
+
+            if (geoLayer) map.removeLayer(geoLayer);
+
+            function getColor(status){
+                if (status === "WIN") return "#28a745";
+                if (status === "LOSE") return "#dc3545";
+                return "#ffc107";
             }
 
-        }).addTo(map);
+            geoLayer = L.geoJSON(geo, {
 
-        map.fitBounds(geoLayer.getBounds());
+                style: function(feature){
+                    let key = normalize(feature.properties.shapeName);
+                    let r = resultsMap[key];
+
+                    return {
+                        color:"#555",
+                        weight:1,
+                        fillColor:getColor(r ? r.status : "TOSS-UP"),
+                        fillOpacity:0.6
+                    };
+                },
+
+                onEachFeature: function(feature, layer){
+
+                    let key = normalize(feature.properties.shapeName);
+                    let r = resultsMap[key];
+
+                    let status = r ? r.status : "TOSS-UP";
+
+                    let center = layer.getBounds().getCenter();
+
+                    L.marker(center, {
+                        icon: L.divIcon({
+                            className:"label",
+                            html:`${feature.properties.shapeName}<br>${status}`
+                        })
+                    }).addTo(map);
+
+                    layer.bindPopup(`
+                        <b>${feature.properties.shapeName}</b><br>
+                        Status: ${status}<br>
+                        PF: ${r ? r.pf : 0}<br>
+                        UPND: ${r ? r.upnd : 0}<br>
+                        Margin: ${r ? r.margin : 0}
+                    `);
+                }
+
+            }).addTo(map);
+
+            map.fitBounds(geoLayer.getBounds());
+        });
+
     });
+}
 
-});
+// =======================
+// FOCUS FUNCTION
+// =======================
+function focusConstituency(name){
+
+    geoLayer.eachLayer(layer => {
+        let cname = normalize(layer.feature.properties.shapeName);
+
+        if (cname === normalize(name)) {
+            map.fitBounds(layer.getBounds());
+            layer.openPopup();
+        }
+    });
+}
+
+// =======================
+// AUTO REFRESH
+// =======================
+loadData();
+setInterval(loadData, 10000); // every 10 seconds
+
 </script>
 
 </body>
