@@ -2549,21 +2549,11 @@ def war_room():
     # =========================
     stations = build_polling_intelligence(cur)
 
-    # =========================
-    # CLASSIFY ONCE (PERFORMANCE)
-    # =========================
-    secure = []
-    collapse = []
-    battleground = []
-
-    fake_wins = []
-    blind_spots = []
-    weak_structures = []
-    high_value_targets = []
+    secure, collapse, battleground = [], [], []
+    fake_wins, blind_spots, weak_structures, high_value_targets = [], [], [], []
 
     for s in stations:
 
-        # STATUS GROUPING
         if s["status"] == "SECURE":
             secure.append(s)
         elif s["status"] == "COLLAPSE":
@@ -2571,7 +2561,6 @@ def war_room():
         else:
             battleground.append(s)
 
-        # FLAGS
         if s.get("fake_win"):
             fake_wins.append(s)
 
@@ -2583,15 +2572,6 @@ def war_room():
 
         if s.get("voter_weight") == "HIGH VALUE":
             high_value_targets.append(s)
-
-    # =========================
-    # SUMMARY
-    # =========================
-    summary = {
-        "win": len(secure),
-        "lose": len(collapse),
-        "toss": len(battleground)
-    }
 
     # =========================
     # PRIORITY SORTING
@@ -2625,14 +2605,14 @@ def war_room():
     silent_stations = [r[0] for r in cur.fetchall()]
 
     # =========================
-    # MAP DATA (🔥 NEW)
+    # MAP DATA (SOURCE OF TRUTH)
     # =========================
-    # Aggregate constituency-level results for map
     cur.execute("""
         SELECT constituency,
                COALESCE(SUM(pf_votes),0) as pf,
                COALESCE(SUM(upnd_votes),0) as upnd
         FROM polling_station_results
+        WHERE constituency IS NOT NULL
         GROUP BY constituency
     """)
 
@@ -2640,6 +2620,7 @@ def war_room():
 
     for c, pf, upnd in cur.fetchall():
 
+        constituency = (c or "").strip()
         margin = pf - upnd
 
         if margin > 0:
@@ -2650,19 +2631,25 @@ def war_room():
             status = "TOSS-UP"
 
         map_data.append({
-            "constituency": c,
-            "pf": pf,
-            "upnd": upnd,
-            "margin": margin,
+            "constituency": constituency,
+            "pf": int(pf),
+            "upnd": int(upnd),
+            "margin": int(margin),
             "status": status
         })
+
+    # =========================
+    # SUMMARY (🔥 FIXED)
+    # =========================
+    summary = {
+        "win": sum(1 for r in map_data if r["status"] == "WIN"),
+        "lose": sum(1 for r in map_data if r["status"] == "LOSE"),
+        "toss": sum(1 for r in map_data if r["status"] == "TOSS-UP")
+    }
 
     cur.close()
     conn.close()
 
-    # =========================
-    # RENDER
-    # =========================
     return render_template(
         "war_room.html",
         stations=stations,
@@ -2673,7 +2660,7 @@ def war_room():
         weak_structures=weak_structures,
         high_value_targets=high_value_targets,
         silent_stations=silent_stations,
-        map_data=map_data   # 🔥 critical for map
+        map_data=map_data
     )
 
 # ==============================
