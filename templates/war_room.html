@@ -38,6 +38,25 @@
     font-size: 20px;
 }
 
+/* STATUS COLORS (GLOBAL) */
+.win {
+    color: #00ff88;
+    background: rgba(0,255,136,0.08);
+    border-left: 4px solid #00ff88;
+}
+
+.lose {
+    color: #ff4d4d;
+    background: rgba(255,77,77,0.08);
+    border-left: 4px solid #ff4d4d;
+}
+
+.tie {
+    color: #ffcc00;
+    background: rgba(255,204,0,0.08);
+    border-left: 4px solid #ffcc00;
+}
+
 /* LAYOUT */
 .layout {
     display: grid;
@@ -70,11 +89,6 @@
     color: #ccc;
 }
 
-/* STATUS */
-.win { color: #00ff88; }
-.lose { color: #ff4d4d; }
-.tie { color: #ffcc00; }
-
 /* DANGER */
 .danger {
     background: rgba(255,0,0,0.2);
@@ -101,9 +115,9 @@
 
 <!-- KPI -->
 <div class="kpis">
-    <div class="kpi">WIN<br><b>{{ summary.win }}</b></div>
-    <div class="kpi">TOSS-UP<br><b>{{ summary.toss }}</b></div>
-    <div class="kpi">LOSE<br><b>{{ summary.lose }}</b></div>
+    <div class="kpi win">WIN<br><b>{{ summary.win }}</b></div>
+    <div class="kpi tie">TOSS-UP<br><b>{{ summary.toss }}</b></div>
+    <div class="kpi lose">LOSE<br><b>{{ summary.lose }}</b></div>
     <div class="kpi">DANGER<br><b>{{ danger_zones|length }}</b></div>
 </div>
 
@@ -126,6 +140,24 @@
                 </div>
             {% else %}
                 <div class="row">No danger zones</div>
+            {% endfor %}
+        </div>
+
+        <!-- 🗺 STATUS LIST -->
+        <div class="card">
+            <h3>🗺 Constituency Status</h3>
+
+            {% for r in map_data %}
+                <div class="row 
+                    {% if r.status == 'WIN' %}win
+                    {% elif r.status == 'LOSE' %}lose
+                    {% else %}tie
+                    {% endif %}
+                ">
+                    <strong>{{ r.constituency }}</strong><br>
+                    PF {{ r.pf }} vs UPND {{ r.upnd }}<br>
+                    {{ r.status }}
+                </div>
             {% endfor %}
         </div>
 
@@ -174,9 +206,9 @@ fetch("/static/geo/zambia_constituencies.geojson")
 .then(geo => {
 
     function getColor(status){
-        if (status === "WIN") return "#00ff88";
-        if (status === "LOSE") return "#ff4d4d";
-        return "#ffcc00";
+        if (status === "WIN") return "#00c853";
+        if (status === "LOSE") return "#d50000";
+        return "#ffd600";
     }
 
     let layer = L.geoJSON(geo, {
@@ -228,7 +260,7 @@ fetch("/static/geo/zambia_constituencies.geojson")
 
 </script>
 
-<!-- 🔁 REFRESH -->
+<!-- 🔁 AUTO REFRESH -->
 <script>
 setInterval(() => {
     location.reload()
