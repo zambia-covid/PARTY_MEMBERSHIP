@@ -12,6 +12,7 @@
 body { margin:0; font-family: Arial, sans-serif; }
 #map { height:100vh; }
 
+/* HEADER */
 .header {
     position:absolute;
     top:10px;
@@ -26,6 +27,28 @@ body { margin:0; font-family: Arial, sans-serif; }
     box-shadow:0 2px 6px rgba(0,0,0,0.2);
 }
 
+/* 🔙 RETURN BUTTON */
+.back-btn {
+    position:absolute;
+    top:10px;
+    left:10px;
+    z-index:1000;
+    background:#ffffff;
+    color:#333;
+    padding:8px 14px;
+    border-radius:8px;
+    text-decoration:none;
+    font-weight:bold;
+    box-shadow:0 2px 6px rgba(0,0,0,0.2);
+    transition:0.2s;
+}
+
+.back-btn:hover {
+    background:#007bff;
+    color:#fff;
+}
+
+/* LABELS */
 .label {
     color:#000;
     font-size:11px;
@@ -38,6 +61,8 @@ body { margin:0; font-family: Arial, sans-serif; }
 <body>
 
 <div class="header">Incident Intelligence Map</div>
+<a href="/dashboard" class="back-btn">⬅ Dashboard</a>
+
 <div id="map"></div>
 
 <script>
@@ -47,20 +72,34 @@ body { margin:0; font-family: Arial, sans-serif; }
 // =======================
 var map = L.map('map').setView([-13.1339, 27.8493], 6);
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18
+}).addTo(map);
 
 // =======================
-// NORMALIZE FUNCTION
+// NORMALIZE
 // =======================
 function normalize(name){
-    return (name || "").toLowerCase().trim();
+    return (name || "")
+        .toLowerCase()
+        .replace(" constituency","")
+        .replace(/\s+/g," ")
+        .trim();
+}
+
+// 🔥 SAFE NAME RESOLVER (CRITICAL)
+function getName(props){
+    return props.shapeName || props.name || props.NAME || props.constituency || "";
 }
 
 // =======================
 // LOAD INCIDENTS
 // =======================
 fetch("/api/incidents")
-.then(res => res.json())
+.then(res => {
+    if (!res.ok) throw new Error("Failed to load incidents");
+    return res.json();
+})
 .then(data => {
 
     let heatPoints = [];
@@ -70,7 +109,7 @@ fetch("/api/incidents")
 
         if (!i.lat || !i.lng) return;
 
-        // 🔥 HEATMAP WEIGHT
+        // HEAT WEIGHT
         let weight = 0.2;
         if (i.severity === "Critical") weight = 1;
         else if (i.severity === "High") weight = 0.7;
@@ -78,14 +117,14 @@ fetch("/api/incidents")
 
         heatPoints.push([i.lat, i.lng, weight]);
 
-        // 🔢 SCORE CALCULATION
+        // SCORE
         let key = normalize(i.district);
         let score = i.severity === "Critical" ? 3 :
                     i.severity === "High" ? 2 : 1;
 
         scores[key] = (scores[key] || 0) + score;
 
-        // 🟡 INCIDENT MARKERS
+        // MARKER
         L.circleMarker([i.lat, i.lng], {
             radius: 5,
             color: "#007bff",
@@ -99,7 +138,7 @@ fetch("/api/incidents")
         `);
     });
 
-    // 🔥 HEATMAP LAYER
+    // HEATMAP
     L.heatLayer(heatPoints, {
         radius: 25,
         blur: 15
@@ -109,47 +148,66 @@ fetch("/api/incidents")
     // LOAD GEOJSON
     // =======================
     fetch("/static/geo/zambia_constituencies.geojson")
-    .then(res => res.json())
+    .then(res => {
+        if (!res.ok) throw new Error("GeoJSON failed to load");
+        return res.json();
+    })
     .then(geo => {
 
+        console.log("GeoJSON loaded:", geo.features.length);
+
         function getColor(score){
-            if (score > 20) return "#dc3545";   // red
-            if (score > 10) return "#fd7e14";   // orange
-            if (score > 5) return "#ffc107";    // yellow
-            return "#28a745";                   // green
+            if (score > 20) return "#dc3545";
+            if (score > 10) return "#fd7e14";
+            if (score > 5) return "#ffc107";
+            return "#28a745";
         }
 
         let geoLayer = L.geoJSON(geo, {
 
             style: function(feature){
-                let key = normalize(feature.properties.shapeName);
+
+                let raw = getName(feature.properties);
+
+                if (!raw) {
+                    console.warn("Missing name:", feature.properties);
+                    return {
+                        color:"#999",
+                        weight:1,
+                        fillColor:"#ccc",
+                        fillOpacity:0.3
+                    };
+                }
+
+                let key = normalize(raw);
                 let score = scores[key] || 0;
 
                 return {
-                    color: "#555",
-                    weight: 1,
-                    fillColor: getColor(score),
-                    fillOpacity: 0.5
+                    color:"#555",
+                    weight:1,
+                    fillColor:getColor(score),
+                    fillOpacity:0.5
                 };
             },
 
             onEachFeature: function(feature, layer){
 
-                let key = normalize(feature.properties.shapeName);
+                let raw = getName(feature.properties);
+                let key = normalize(raw);
                 let score = scores[key] || 0;
 
-                // 🏷️ LABELS
                 let center = layer.getBounds().getCenter();
 
+                // LABEL
                 L.marker(center, {
                     icon: L.divIcon({
-                        className: "label",
-                        html: `${feature.properties.shapeName}<br>${score}`
+                        className:"label",
+                        html:`${raw}<br>${score}`
                     })
                 }).addTo(map);
 
                 layer.bindPopup(`
-                    <b>${feature.properties.shapeName}</b><br>
+                    <b>${raw}</b><br>
                     Incident Score: ${score}
                 `);
             }
@@ -157,9 +215,18 @@ fetch("/api/incidents")
         }).addTo(map);
 
         map.fitBounds(geoLayer.getBounds());
+    })
+    .catch(err => {
+        console.error("GeoJSON ERROR:", err);
+        alert("Failed to load map boundaries.");
     });
 
+})
+.catch(err => {
+    console.error("Incident ERROR:", err);
+    alert("Failed to load incidents.");
 });
+
 </script>
 
 </body>
