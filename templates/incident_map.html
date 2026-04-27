@@ -1,6 +1,15 @@
-<style>
-body { margin:0; font-family: Arial; background:#000; }
+<!DOCTYPE html>
+<html>
+<head>
+<title>Incident Intelligence Map</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+<style>
+body { margin:0; font-family: Arial, sans-serif; }
 #map { height:100vh; }
 
 .header {
@@ -8,36 +17,150 @@ body { margin:0; font-family: Arial; background:#000; }
     top:10px;
     left:50%;
     transform:translateX(-50%);
-    background:#111;
-    color:#00ff9c;
+    background:#ffffff;
+    color:#333;
     padding:10px 20px;
     border-radius:8px;
     z-index:999;
     font-weight:bold;
-    border:1px solid #00ff9c;
+    box-shadow:0 2px 6px rgba(0,0,0,0.2);
 }
 
-/* 🔴 Pulsing alert */
-.pulse {
-    width:14px;
-    height:14px;
-    background:red;
-    border-radius:50%;
-    box-shadow:0 0 0 rgba(255,0,0,0.7);
-    animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(255,0,0,0.7); }
-    70% { box-shadow: 0 0 0 15px rgba(255,0,0,0); }
-    100% { box-shadow: 0 0 0 0 rgba(255,0,0,0); }
-}
-
-/* Labels */
 .label {
-    color:white;
+    color:#000;
     font-size:11px;
     font-weight:bold;
-    text-shadow:0 0 5px black;
+    text-align:center;
 }
 </style>
+</head>
+
+<body>
+
+<div class="header">Incident Intelligence Map</div>
+<div id="map"></div>
+
+<script>
+
+// =======================
+// INIT MAP
+// =======================
+var map = L.map('map').setView([-13.1339, 27.8493], 6);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+// =======================
+// NORMALIZE FUNCTION
+// =======================
+function normalize(name){
+    return (name || "").toLowerCase().trim();
+}
+
+// =======================
+// LOAD INCIDENTS
+// =======================
+fetch("/api/incidents")
+.then(res => res.json())
+.then(data => {
+
+    let heatPoints = [];
+    let scores = {};
+
+    data.forEach(i => {
+
+        if (!i.lat || !i.lng) return;
+
+        // 🔥 HEATMAP WEIGHT
+        let weight = 0.2;
+        if (i.severity === "Critical") weight = 1;
+        else if (i.severity === "High") weight = 0.7;
+        else if (i.severity === "Medium") weight = 0.4;
+
+        heatPoints.push([i.lat, i.lng, weight]);
+
+        // 🔢 SCORE CALCULATION
+        let key = normalize(i.district);
+        let score = i.severity === "Critical" ? 3 :
+                    i.severity === "High" ? 2 : 1;
+
+        scores[key] = (scores[key] || 0) + score;
+
+        // 🟡 INCIDENT MARKERS
+        L.circleMarker([i.lat, i.lng], {
+            radius: 5,
+            color: "#007bff",
+            fillOpacity: 0.7
+        })
+        .addTo(map)
+        .bindPopup(`
+            <b>${i.type || "Incident"}</b><br>
+            Severity: ${i.severity}<br>
+            ${i.description || ""}
+        `);
+    });
+
+    // 🔥 HEATMAP LAYER
+    L.heatLayer(heatPoints, {
+        radius: 25,
+        blur: 15
+    }).addTo(map);
+
+    // =======================
+    // LOAD GEOJSON
+    // =======================
+    fetch("/static/geo/zambia_constituencies.geojson")
+    .then(res => res.json())
+    .then(geo => {
+
+        function getColor(score){
+            if (score > 20) return "#dc3545";   // red
+            if (score > 10) return "#fd7e14";   // orange
+            if (score > 5) return "#ffc107";    // yellow
+            return "#28a745";                   // green
+        }
+
+        let geoLayer = L.geoJSON(geo, {
+
+            style: function(feature){
+                let key = normalize(feature.properties.shapeName);
+                let score = scores[key] || 0;
+
+                return {
+                    color: "#555",
+                    weight: 1,
+                    fillColor: getColor(score),
+                    fillOpacity: 0.5
+                };
+            },
+
+            onEachFeature: function(feature, layer){
+
+                let key = normalize(feature.properties.shapeName);
+                let score = scores[key] || 0;
+
+                // 🏷️ LABELS
+                let center = layer.getBounds().getCenter();
+
+                L.marker(center, {
+                    icon: L.divIcon({
+                        className: "label",
+                        html: `${feature.properties.shapeName}<br>${score}`
+                    })
+                }).addTo(map);
+
+                layer.bindPopup(`
+                    <b>${feature.properties.shapeName}</b><br>
+                    Incident Score: ${score}
+                `);
+            }
+
+        }).addTo(map);
+
+        map.fitBounds(geoLayer.getBounds());
+    });
+
+});
+</script>
+
+</body>
+</html>
