@@ -8,9 +8,12 @@
 ⚔️ WAR ROOM
 </h2>
 
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
 <style>
 
-/* override main area to dark */
+/* DARK THEME */
 .main {
     background: #050505;
     color: white;
@@ -35,13 +38,26 @@
     font-size: 20px;
 }
 
-/* GRID */
-.grid {
+/* LAYOUT */
+.layout {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px,1fr));
+    grid-template-columns: 2fr 1fr;
     gap: 15px;
 }
 
+/* MAP */
+#map {
+    height: 500px;
+    border-radius: 10px;
+}
+
+/* RIGHT PANEL */
+.side {
+    display: grid;
+    gap: 15px;
+}
+
+/* CARDS */
 .card {
     background: #111;
     padding: 12px;
@@ -64,7 +80,7 @@
     background: rgba(255,0,0,0.2);
 }
 
-/* ROWS */
+/* ROW */
 .row {
     padding: 6px;
     border-bottom: 1px solid #222;
@@ -74,15 +90,16 @@
     border-bottom: none;
 }
 
-/* silent */
-.silent {
-    background: #1a1a1a;
-    font-size: 13px;
+/* LABELS */
+.label {
+    font-size: 11px;
+    font-weight: bold;
+    text-align: center;
 }
 
 </style>
 
-<!-- KPI BAR -->
+<!-- KPI -->
 <div class="kpis">
     <div class="kpi">WIN<br><b>{{ summary.win }}</b></div>
     <div class="kpi">TOSS-UP<br><b>{{ summary.toss }}</b></div>
@@ -90,57 +107,132 @@
     <div class="kpi">DANGER<br><b>{{ danger_zones|length }}</b></div>
 </div>
 
-<div class="grid">
+<div class="layout">
 
-    <!-- 🚨 DANGER -->
-    <div class="card danger">
-        <h3>🚨 Danger Zones</h3>
+    <!-- 🗺 MAP -->
+    <div id="map"></div>
 
-        {% for d in danger_zones %}
-            <div class="row lose">
-                {{ d[0] }} → Losing by {{ d[1] }}
-            </div>
-        {% else %}
-            <div class="row">No danger zones</div>
-        {% endfor %}
-    </div>
+    <!-- SIDE PANEL -->
+    <div class="side">
 
-    <!-- 🗺 BATTLEGROUND -->
-    <div class="card">
-        <h3>🗺 Constituency Status</h3>
+        <!-- 🚨 DANGER -->
+        <div class="card danger">
+            <h3>🚨 Danger Zones</h3>
 
-        {% for b in battleground %}
-            <div class="row 
-                {% if b[3]=='WIN' %}win
-                {% elif b[3]=='LOSE' %}lose
-                {% else %}tie
-                {% endif %}
-            ">
-                <strong>{{ b[0] }}</strong><br>
-                PF {{ b[1] }} vs UPND {{ b[2] }}
-                ({{ b[3] }})
-            </div>
-        {% endfor %}
-    </div>
+            {% for d in danger_zones %}
+                <div class="row lose">
+                    {{ d.constituency if d.constituency else d[0] }}
+                    → Margin {{ d.margin if d.margin else d[1] }}
+                </div>
+            {% else %}
+                <div class="row">No danger zones</div>
+            {% endfor %}
+        </div>
 
-    <!-- ⚠️ SILENT -->
-    <div class="card silent">
-        <h3>⚠️ No Reporting Stations</h3>
+        <!-- ⚠️ SILENT -->
+        <div class="card">
+            <h3>⚠️ No Reporting</h3>
 
-        {% for s in silent_stations %}
-            <div class="row">{{ s }}</div>
-        {% else %}
-            <div class="row">All stations reporting</div>
-        {% endfor %}
+            {% for s in silent_stations %}
+                <div class="row">{{ s }}</div>
+            {% else %}
+                <div class="row">All reporting</div>
+            {% endfor %}
+        </div>
+
     </div>
 
 </div>
 
-<!-- 🔁 SOFT REFRESH -->
+<!-- ========================= -->
+<!-- MAP SCRIPT -->
+<!-- ========================= -->
+<script>
+
+// INIT MAP
+var map = L.map('map').setView([-13.1339, 27.8493], 6);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
+
+// NORMALIZE
+function normalize(name){
+    return (name || "").toLowerCase().trim();
+}
+
+// DATA FROM FLASK
+let results = {};
+let mapData = {{ map_data | tojson }};
+
+// BUILD LOOKUP
+mapData.forEach(r => {
+    results[normalize(r.constituency)] = r;
+});
+
+// LOAD GEOJSON
+fetch("/static/geo/zambia_constituencies.geojson")
+.then(res => res.json())
+.then(geo => {
+
+    function getColor(status){
+        if (status === "WIN") return "#00ff88";
+        if (status === "LOSE") return "#ff4d4d";
+        return "#ffcc00";
+    }
+
+    let layer = L.geoJSON(geo, {
+
+        style: function(feature){
+
+            let key = normalize(feature.properties.shapeName);
+            let r = results[key];
+
+            return {
+                color:"#222",
+                weight:1,
+                fillColor:getColor(r ? r.status : "TOSS-UP"),
+                fillOpacity:0.6
+            };
+        },
+
+        onEachFeature: function(feature, layer){
+
+            let key = normalize(feature.properties.shapeName);
+            let r = results[key];
+
+            let status = r ? r.status : "TOSS-UP";
+
+            let center = layer.getBounds().getCenter();
+
+            // LABEL
+            L.marker(center, {
+                icon: L.divIcon({
+                    className:"label",
+                    html:`${feature.properties.shapeName}<br>${status}`
+                })
+            }).addTo(map);
+
+            // POPUP
+            layer.bindPopup(`
+                <b>${feature.properties.shapeName}</b><br>
+                Status: ${status}<br>
+                PF: ${r ? r.pf : 0}<br>
+                UPND: ${r ? r.upnd : 0}<br>
+                Margin: ${r ? r.margin : 0}
+            `);
+        }
+
+    }).addTo(map);
+
+    map.fitBounds(layer.getBounds());
+});
+
+</script>
+
+<!-- 🔁 REFRESH -->
 <script>
 setInterval(() => {
     location.reload()
-}, 5000)
+}, 10000)
 </script>
 
 {% endblock %}
