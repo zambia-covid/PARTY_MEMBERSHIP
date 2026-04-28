@@ -405,6 +405,26 @@ def load_user(user_id):
     if user_id == "admin":
         return User("admin", "admin")
 
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT username, role, province, district
+        FROM users
+        WHERE username=%s
+    """, (user_id,))
+
+    user = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    if user:
+        u = User(user[0], user[1])
+        u.province = user[2]
+        u.district = user[3]
+        return u
+
     return None
 
 # ==============================
@@ -1484,18 +1504,52 @@ def reject(id):
 @app.route("/login", methods=["GET", "POST"])
 def login():
 
+    if current_user.is_authenticated:
+        return redirect(url_for("dashboard"))
+
     if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
 
-        # 🔴 Simple admin login (old system)
-        if username == "admin":
-            admin_password = os.getenv("ADMIN_PASSWORD")
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
 
-            if admin_password and password == admin_password:
-                user = User("admin", "admin")
-                login_user(user)
+        if not username or not password:
+            flash("Enter username and password")
+            return redirect(url_for("login"))
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        # 🔥 USE USERS TABLE (NOT ENV)
+        cur.execute("""
+            SELECT username, password, role, province, district
+            FROM users
+            WHERE username=%s
+        """, (username,))
+
+        user = cur.fetchone()
+
+        cur.close()
+        conn.close()
+
+        if user and check_password_hash(user[1], password):
+
+            user_obj = User(id=user[0], role=user[2])
+
+            # attach context
+            user_obj.province = user[3]
+            user_obj.district = user[4]
+
+            login_user(user_obj)
+
+            # 🔥 ROLE-BASED REDIRECT
+            if user[2] == "national_manager":
                 return redirect(url_for("dashboard"))
+
+            elif user[2] == "provincial_manager":
+                return redirect("/provincial_dashboard")
+
+            else:
+                return redirect("/agent_dashboard")
 
         flash("Invalid credentials")
         return redirect(url_for("login"))
