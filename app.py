@@ -1501,9 +1501,14 @@ def reject(id):
 
     return '', 204
 
+from werkzeug.security import check_password_hash
+from flask import request, redirect, render_template, url_for, flash
+from flask_login import login_user, current_user
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
 
+    # 🔒 Already logged in
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
 
@@ -1513,45 +1518,52 @@ def login():
         password = request.form.get("password", "").strip()
 
         if not username or not password:
-            flash("Enter username and password")
+            flash("Enter username and password", "danger")
             return redirect(url_for("login"))
 
         conn = get_db()
         cur = conn.cursor()
 
-        # 🔥 USE USERS TABLE (NOT ENV)
-        cur.execute("""
-            SELECT username, password, role, province, district
-            FROM users
-            WHERE username=%s
-        """, (username,))
+        try:
+            # ✅ MATCH YOUR ACTUAL USERS TABLE
+            cur.execute("""
+                SELECT username, password, role
+                FROM users
+                WHERE username=%s
+            """, (username,))
 
-        user = cur.fetchone()
+            user = cur.fetchone()
 
-        cur.close()
-        conn.close()
+        except Exception as e:
+            print("LOGIN ERROR:", e)
+            flash("System error during login", "danger")
+            return redirect(url_for("login"))
 
+        finally:
+            cur.close()
+            conn.close()
+
+        # 🔐 PASSWORD CHECK
         if user and check_password_hash(user[1], password):
 
             user_obj = User(id=user[0], role=user[2])
-
-            # attach context
-            user_obj.province = user[3]
-            user_obj.district = user[4]
-
             login_user(user_obj)
 
-            # 🔥 ROLE-BASED REDIRECT
+            # 🎯 ROLE-BASED REDIRECT
             if user[2] == "national_manager":
                 return redirect(url_for("dashboard"))
 
             elif user[2] == "provincial_manager":
                 return redirect("/provincial_dashboard")
 
-            else:
+            elif user[2] == "agent":
                 return redirect("/agent_dashboard")
 
-        flash("Invalid credentials")
+            else:
+                return redirect("/")
+
+        # ❌ FAIL
+        flash("Invalid username or password", "danger")
         return redirect(url_for("login"))
 
     return render_template("login.html")
