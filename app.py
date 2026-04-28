@@ -1505,10 +1505,13 @@ from werkzeug.security import check_password_hash
 from flask import request, redirect, render_template, url_for, flash
 from flask_login import login_user, current_user
 
+from werkzeug.security import check_password_hash
+from flask import request, redirect, render_template, url_for, flash
+from flask_login import login_user, current_user
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
 
-    # 🔒 Already logged in
     if current_user.is_authenticated:
         return redirect(url_for("dashboard"))
 
@@ -1517,15 +1520,19 @@ def login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
 
+        print("\n========== LOGIN ATTEMPT ==========")
+        print("USERNAME ENTERED:", username)
+        print("PASSWORD ENTERED:", password)
+
         if not username or not password:
             flash("Enter username and password", "danger")
+            print("❌ Missing username or password")
             return redirect(url_for("login"))
 
         conn = get_db()
         cur = conn.cursor()
 
         try:
-            # ✅ MATCH YOUR ACTUAL USERS TABLE
             cur.execute("""
                 SELECT username, password, role
                 FROM users
@@ -1534,8 +1541,10 @@ def login():
 
             user = cur.fetchone()
 
+            print("DB RESULT:", user)
+
         except Exception as e:
-            print("LOGIN ERROR:", e)
+            print("🔥 LOGIN QUERY ERROR:", e)
             flash("System error during login", "danger")
             return redirect(url_for("login"))
 
@@ -1543,13 +1552,34 @@ def login():
             cur.close()
             conn.close()
 
-        # 🔐 PASSWORD CHECK
-        if user and check_password_hash(user[1], password):
+        # =========================
+        # 🔍 DEBUG BLOCK
+        # =========================
+        if user:
+            print("✅ USER FOUND")
+            print("HASH IN DB:", user[1])
+
+            try:
+                match = check_password_hash(user[1], password)
+                print("PASSWORD MATCH:", match)
+            except Exception as e:
+                print("🔥 HASH CHECK ERROR:", e)
+                match = False
+        else:
+            print("❌ NO USER FOUND")
+            match = False
+
+        # =========================
+        # 🔐 LOGIN LOGIC
+        # =========================
+        if user and match:
+
+            print("🎯 LOGIN SUCCESS")
 
             user_obj = User(id=user[0], role=user[2])
             login_user(user_obj)
 
-            # 🎯 ROLE-BASED REDIRECT
+            # Role-based redirect
             if user[2] == "national_manager":
                 return redirect(url_for("dashboard"))
 
@@ -1562,7 +1592,7 @@ def login():
             else:
                 return redirect("/")
 
-        # ❌ FAIL
+        print("❌ LOGIN FAILED")
         flash("Invalid username or password", "danger")
         return redirect(url_for("login"))
 
