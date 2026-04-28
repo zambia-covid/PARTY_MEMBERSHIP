@@ -4,193 +4,256 @@
 
 {% block content %}
 
-<h2 style="margin-bottom:15px;">📡 Polling Intelligence</h2>
+<h2 style="margin-bottom:15px; color:#00ff88;">
+📡 Polling Intelligence
+</h2>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 
-/* ===== PAGE WRAPPER ===== */
-.section {
-    margin-bottom: 20px;
-}
-
-/* ===== KPI ===== */
-.kpi {
-    background: white;
-    padding: 15px;
-    border-radius: 10px;
-    text-align: center;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
-
-.kpi h2 {
-    margin: 5px 0;
-    color: #0B5D1E;
-}
+/* ===== PAGE ===== */
+.main { background:#050505; color:white; }
 
 /* ===== GRID ===== */
 .grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    display:grid;
+    grid-template-columns: 2fr 1fr;
+    gap:15px;
 }
 
 /* ===== CARD ===== */
 .card {
-    background: white;
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    background:#111;
+    padding:15px;
+    border-radius:10px;
 }
+
+/* ===== KPI ===== */
+.kpis {
+    display:grid;
+    grid-template-columns: repeat(3,1fr);
+    gap:10px;
+    margin-bottom:15px;
+}
+
+.kpi {
+    background:#111;
+    padding:10px;
+    text-align:center;
+    border-radius:8px;
+}
+
+.kpi b { font-size:18px; }
+
+/* ===== STATUS ===== */
+.secure { color:#00ff88; }
+.collapse { color:#ff4d4d; }
+.battle { color:#ffcc00; }
 
 /* ===== TABLE ===== */
 table {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed;
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
 }
 
 th, td {
-    padding: 10px;
-    border-bottom: 1px solid #eee;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    padding:8px;
+    border-bottom:1px solid #222;
 }
 
 th {
-    background: #0B5D1E;
-    color: white;
-    text-align: left;
+    background:#063312;
+    color:#a3d9a5;
 }
 
-.num {
-    text-align: center;
+tr:hover { background:#0a4d1f; }
+
+/* ===== SEARCH ===== */
+.search {
+    margin-bottom:10px;
 }
 
-/* ===== STATUS COLORS ===== */
-.secure { color: green; font-weight: bold; }
-.battle { color: orange; font-weight: bold; }
-.collapse { color: red; font-weight: bold; }
-
-/* ===== RISK ===== */
-.risk {
-    font-size: 12px;
-    color: #666;
+.search input {
+    width:100%;
+    padding:8px;
+    background:#000;
+    border:1px solid #333;
+    color:white;
+    border-radius:6px;
 }
 
-/* ===== ACTION ===== */
-.action {
-    font-size: 12px;
-    color: #0B5D1E;
+/* ===== ALERT ===== */
+.alert {
+    background:rgba(255,0,0,0.15);
+    padding:8px;
+    margin-bottom:6px;
+    border-left:3px solid red;
 }
 
 </style>
 
 <!-- KPI -->
-<div class="section">
-    <div class="kpi">
-        <h4>Total Constituencies</h4>
-        <h2>{{ stations|length }}</h2>
-    </div>
+<div class="kpis">
+    <div class="kpi secure">SECURE<br><b id="k-secure"></b></div>
+    <div class="kpi battle">BATTLEGROUND<br><b id="k-battle"></b></div>
+    <div class="kpi collapse">COLLAPSE<br><b id="k-collapse"></b></div>
 </div>
 
 <div class="grid">
 
-    <!-- CHART -->
-    <div class="card">
-        <h3>Membership Strength</h3>
-        <canvas id="stationChart"></canvas>
+    <!-- LEFT -->
+    <div>
+
+        <!-- SEARCH -->
+        <div class="search">
+            <input type="text" id="searchBox" placeholder="Search constituency...">
+        </div>
+
+        <!-- TABLE -->
+        <div class="card">
+            <table id="intelTable">
+                <thead>
+                    <tr>
+                        <th>Constituency</th>
+                        <th>Province</th>
+                        <th>Members</th>
+                        <th>Coverage</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+
     </div>
 
-    <!-- TABLE -->
-    <div class="card">
-        <h3>Constituency Intelligence</h3>
+    <!-- RIGHT -->
+    <div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Constituency</th>
-                    <th>Province</th>
-                    <th class="num">Members</th>
-                    <th class="num">Coverage</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
+        <!-- 🔴 TOP THREATS -->
+        <div class="card">
+            <h3 style="color:#ff4d4d;">🚨 Top Collapse Zones</h3>
+            <div id="collapseList"></div>
+        </div>
 
-            <tbody>
+        <!-- 🟡 BATTLEGROUND -->
+        <div class="card">
+            <h3 style="color:#ffcc00;">⚔️ Battleground</h3>
+            <div id="battleList"></div>
+        </div>
 
-            {% for s in stations %}
+        <!-- 📊 CHART -->
+        <div class="card">
+            <h3>Membership Strength</h3>
+            <canvas id="chart"></canvas>
+        </div>
 
-            <tr>
-                <td>
-                    <b>{{ s.constituency }}</b><br>
-                    <span class="action">{{ s.action }}</span><br>
-                    <span class="risk">{{ s.risk }}</span>
-                </td>
-
-                <td>{{ s.province }}</td>
-
-                <td class="num">{{ s.members }}</td>
-
-                <td class="num">{{ s.coverage }}%</td>
-
-                <td>
-                    {% if s.status == "SECURE" %}
-                        <span class="secure">SECURE</span>
-                    {% elif s.status == "COLLAPSE" %}
-                        <span class="collapse">COLLAPSE</span>
-                    {% else %}
-                        <span class="battle">BATTLEGROUND</span>
-                    {% endif %}
-                </td>
-
-            </tr>
-
-            {% endfor %}
-
-            </tbody>
-        </table>
     </div>
 
 </div>
 
 <script>
 
-/* SAFE DATA LOAD */
 let stations = {{ stations | tojson | safe }};
 
-/* LIMIT chart size (top 15 for clarity) */
-let topStations = stations.slice(0, 15);
+// ======================
+// SORT BY PRIORITY
+// ======================
+stations.sort((a,b) => {
+    if (a.status === "COLLAPSE" && b.status !== "COLLAPSE") return -1;
+    if (a.status !== "COLLAPSE" && b.status === "COLLAPSE") return 1;
+    return b.members - a.members;
+});
 
-let labels = topStations.map(s => s.constituency);
-let data = topStations.map(s => s.members);
+// ======================
+// KPI
+// ======================
+let secure = stations.filter(s => s.status==="SECURE").length;
+let collapse = stations.filter(s => s.status==="COLLAPSE").length;
+let battle = stations.filter(s => s.status==="BATTLEGROUND").length;
 
-new Chart(document.getElementById("stationChart"), {
+document.getElementById("k-secure").innerText = secure;
+document.getElementById("k-collapse").innerText = collapse;
+document.getElementById("k-battle").innerText = battle;
 
-    type: "bar",
+// ======================
+// TABLE RENDER
+// ======================
+function renderTable(data){
+    let body = document.getElementById("tableBody");
+    body.innerHTML = "";
 
-    data: {
-        labels: labels,
-        datasets: [{
-            label: "Members",
-            data: data
+    data.forEach(s => {
+
+        let cls = s.status==="SECURE" ? "secure" :
+                  s.status==="COLLAPSE" ? "collapse" : "battle";
+
+        body.innerHTML += `
+        <tr>
+            <td><b>${s.constituency}</b></td>
+            <td>${s.province}</td>
+            <td>${s.members}</td>
+            <td>${s.coverage}%</td>
+            <td class="${cls}">${s.status}</td>
+        </tr>`;
+    });
+}
+
+renderTable(stations);
+
+// ======================
+// SEARCH
+// ======================
+document.getElementById("searchBox").addEventListener("input", e => {
+    let val = e.target.value.toLowerCase();
+
+    let filtered = stations.filter(s =>
+        s.constituency.toLowerCase().includes(val)
+    );
+
+    renderTable(filtered);
+});
+
+// ======================
+// TOP COLLAPSE
+// ======================
+let collapseTop = stations.filter(s => s.status==="COLLAPSE").slice(0,5);
+collapseTop.forEach(s => {
+    document.getElementById("collapseList").innerHTML +=
+        `<div class="alert">${s.constituency} (${s.coverage}%)</div>`;
+});
+
+// ======================
+// BATTLEGROUND
+// ======================
+let battleTop = stations.filter(s => s.status==="BATTLEGROUND").slice(0,5);
+battleTop.forEach(s => {
+    document.getElementById("battleList").innerHTML +=
+        `<div class="alert" style="border-color:#ffcc00;">${s.constituency}</div>`;
+});
+
+// ======================
+// CHART
+// ======================
+let top = stations.slice(0,10);
+
+new Chart(document.getElementById("chart"), {
+    type:"bar",
+    data:{
+        labels: top.map(s=>s.constituency),
+        datasets:[{
+            data: top.map(s=>s.members),
+            backgroundColor:"#00ff88"
         }]
     },
-
-    options: {
-        responsive: true,
-        plugins: {
-            legend: { display: false }
-        },
-        scales: {
-            x: {
-                ticks: {
-                    maxRotation: 90,
-                    minRotation: 45
-                }
-            }
+    options:{
+        plugins:{ legend:{display:false} },
+        scales:{
+            x:{ ticks:{ color:"#ccc"} },
+            y:{ ticks:{ color:"#ccc"} }
         }
     }
 });
