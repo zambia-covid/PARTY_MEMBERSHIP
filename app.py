@@ -3043,8 +3043,7 @@ def dashboard():
 @app.route("/polling_intelligence")
 @login_required
 def polling_intelligence():
-
-```
+    
 conn = None
 cur = None
 
