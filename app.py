@@ -1951,7 +1951,7 @@ def api_constituency_intelligence():
         c.province,
         c.total_voters,
         c.total_polling_stations
-""")
+    """)
 
     rows = cur.fetchall()
 
@@ -1964,25 +1964,23 @@ def api_constituency_intelligence():
         # ======================
         # CORE METRICS
         # ======================
-        penetration = (members / voters * 100) if voters else 0
-        margin = pf - upnd
-
-        # 🔥 SCORE
-        score = margin
+        score = pf - upnd
+        margin = score
+        margin_pct = (score / voters * 100) if voters else 0
 
         # ======================
         # STATUS LOGIC
         # ======================
-        if score > 0 and penetration >= 40:
+        if margin_pct > 5:
             status = "STRONGHOLD"
-        elif score > 0:
+        elif margin_pct > 0:
             status = "LEANING WIN"
-        elif score < 0 and penetration < 30:
-            status = "LOST"
-        elif score < 0:
+        elif margin_pct == 0:
+            status = "TOSS-UP"
+        elif margin_pct > -5:
             status = "LEANING LOSS"
         else:
-            status = "TOSS-UP"
+            status = "LOST"
 
         results.append({
             "constituency": constituency,
