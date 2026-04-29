@@ -941,6 +941,27 @@ def provinces_api():
 
 from flask import jsonify
 
+@app.route("/command_dashboard")
+@login_required
+def command_dashboard():
+
+    if current_user.role not in ["national_manager", "admin"]:
+        return "Forbidden", 403
+
+    return render_template("command_dashboard.html")
+
+@app.route("/provincial_dashboard")
+@login_required
+def provincial_dashboard():
+
+    if current_user.role not in ["provincial_manager", "admin"]:
+        return "Forbidden", 403
+
+    return render_template(
+        "provincial_dashboard.html",
+        province=getattr(current_user, "province", None)
+    )
+
 @app.route("/api/provinces_list")
 def provinces_list():
 
@@ -1509,14 +1530,6 @@ def reject(id):
     conn.close()
 
     return '', 204
-
-from werkzeug.security import check_password_hash
-from flask import request, redirect, render_template, url_for, flash
-from flask_login import login_user, current_user
-
-from werkzeug.security import check_password_hash
-from flask import request, redirect, render_template, url_for, flash
-from flask_login import login_user, current_user
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -2812,7 +2825,7 @@ def map_data():
 # ==============================
 @app.route("/")
 @login_required
-@admin_required
+@role_required("admin", "national_manager")
 def dashboard():
 
     conn = get_db()
@@ -2837,7 +2850,7 @@ def dashboard():
     provinces = cur.fetchall()
 
     # ==============================
-    # NATIONAL BASELINE (CRITICAL)
+    # NATIONAL BASELINE
     # ==============================
     cur.execute("""
         SELECT 
@@ -2848,7 +2861,7 @@ def dashboard():
     total_voters, national_stations = cur.fetchone()
 
     # ==============================
-    # REAL VOTES (LIVE DATA)
+    # LIVE VOTES
     # ==============================
     cur.execute("""
         SELECT 
@@ -2859,9 +2872,6 @@ def dashboard():
     """)
     pf_total, upnd_total, other_total = cur.fetchone()
 
-    # ==============================
-    # STATUS + MARGIN
-    # ==============================
     margin = pf_total - upnd_total
 
     if pf_total > upnd_total:
@@ -2872,7 +2882,7 @@ def dashboard():
         status = "TIED"
 
     # ==============================
-    # COVERAGE (FIELD CONTROL)
+    # COVERAGE
     # ==============================
     cur.execute("""
         SELECT COUNT(DISTINCT polling_station)
@@ -2891,30 +2901,20 @@ def dashboard():
         coverage = round((reporting_stations / total_stations) * 100, 1)
 
     # ==============================
-    # EXPECTED TURNOUT MODEL
+    # STRATEGIC METRICS
     # ==============================
     expected_votes = int(total_members * 0.65)
-
-    # ==============================
-    # TURNOUT GAP (CRITICAL SIGNAL)
-    # ==============================
     vote_gap = expected_votes - pf_total
 
-    # ==============================
-    # WIN THRESHOLD (REAL POWER)
-    # ==============================
     votes_needed_to_win = int((total_voters * 0.5) + 1)
     distance_to_majority = votes_needed_to_win - pf_total
 
-    # ==============================
-    # TURNOUT EFFICIENCY
-    # ==============================
     turnout_efficiency = 0
     if expected_votes > 0:
         turnout_efficiency = round((pf_total / expected_votes) * 100, 1)
 
     # ==============================
-    # RECENT RESULTS (LIVE FEED)
+    # RECENT RESULTS
     # ==============================
     cur.execute("""
         SELECT polling_station, pf_votes, upnd_votes, other_votes
@@ -2925,7 +2925,7 @@ def dashboard():
     recent_results = cur.fetchall()
 
     # ==============================
-    # 🔥 TOP LOSING CONSTITUENCIES
+    # DANGER ZONES
     # ==============================
     cur.execute("""
         SELECT constituency,
@@ -2939,7 +2939,7 @@ def dashboard():
     danger_zones = cur.fetchall()
 
     # ==============================
-    # 🔥 STRONGHOLDS
+    # STRONGHOLDS
     # ==============================
     cur.execute("""
         SELECT constituency,
@@ -2955,9 +2955,6 @@ def dashboard():
     cur.close()
     conn.close()
 
-    # ==============================
-    # SYSTEM STATUS
-    # ==============================
     system_status = {
         "telegram": "OK",
         "database": "Connected",
@@ -2966,24 +2963,16 @@ def dashboard():
 
     return render_template(
         "index.html",
-
-        # BASIC
         total_members=total_members,
         provinces=provinces,
-
-        # VOTES
         pf_total=pf_total,
         upnd_total=upnd_total,
         other_total=other_total,
         margin=margin,
         status=status,
-
-        # FIELD CONTROL
         coverage=coverage,
         reporting_stations=reporting_stations,
         total_stations=total_stations,
-
-        # NATIONAL POWER METRICS
         total_voters=total_voters,
         national_stations=national_stations,
         expected_votes=expected_votes,
@@ -2991,13 +2980,9 @@ def dashboard():
         votes_needed_to_win=votes_needed_to_win,
         distance_to_majority=distance_to_majority,
         turnout_efficiency=turnout_efficiency,
-
-        # INTELLIGENCE
         recent_results=recent_results,
         danger_zones=danger_zones,
         strongholds=strongholds,
-
-        # SYSTEM
         system_status=system_status
     )
 
