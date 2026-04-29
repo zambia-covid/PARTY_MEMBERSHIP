@@ -3043,61 +3043,60 @@ def dashboard():
 @app.route("/polling_intelligence")
 @login_required
 def polling_intelligence():
-    
-conn = None
-cur = None
 
-try:
-    # ======================
-    # DB CONNECTION
-    # ======================
-    conn = get_db()
-    cur = conn.cursor()
+    conn = None
+    cur = None
 
-    # ======================
-    # BUILD INTELLIGENCE
-    # ======================
-    stations = build_polling_intelligence(cur)
+    try:
+        # ======================
+        # DB CONNECTION
+        # ======================
+        conn = get_db()
+        cur = conn.cursor()
 
-    # ======================
-    # EMPTY STATE HANDLING
-    # ======================
-    if not stations:
+        # ======================
+        # BUILD INTELLIGENCE
+        # ======================
+        stations = build_polling_intelligence(cur)
+
+        # ======================
+        # EMPTY STATE HANDLING
+        # ======================
+        if not stations:
+            return render_template(
+                "polling_intelligence.html",
+                stations=[],
+                message="No polling data available yet."
+            )
+
+        # ======================
+        # SUCCESS RESPONSE
+        # ======================
+        return render_template(
+            "polling_intelligence.html",
+            stations=stations
+        )
+
+    except Exception as e:
+        print("POLLING INTELLIGENCE ERROR:", e)
+
+        # ======================
+        # FAIL SAFE UI
+        # ======================
         return render_template(
             "polling_intelligence.html",
             stations=[],
-            message="No polling data available yet."
+            error="Failed to load polling intelligence."
         )
 
-    # ======================
-    # SUCCESS RESPONSE
-    # ======================
-    return render_template(
-        "polling_intelligence.html",
-        stations=stations
-    )
-
-except Exception as e:
-    print("POLLING INTELLIGENCE ERROR:", e)
-
-    # ======================
-    # FAIL SAFE UI
-    # ======================
-    return render_template(
-        "polling_intelligence.html",
-        stations=[],
-        error="Failed to load polling intelligence."
-    )
-
-finally:
-    # ======================
-    # CLEANUP (CRITICAL)
-    # ======================
-    if cur:
-        cur.close()
-    if conn:
-        conn.close()
-```
+    finally:
+        # ======================
+        # CLEANUP (CRITICAL)
+        # ======================
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 
 # ==============================
