@@ -1,103 +1,145 @@
-<style>
+<!-- ===== SIDEBAR COMPONENT (STYLE + HTML) ===== -->
 
-/* SIDEBAR BASE (GREEN THEME) */
+<style>
+/* ===== SIDEBAR BASE ===== */
 .sidebar {
     width: 240px;
     height: 100vh;
-    background: #063312;   /* deep green */
-    color: #e6ffe6;
     position: fixed;
-    left: 0;
     top: 0;
+    left: 0;
+    background: linear-gradient(180deg, #04250d, #063312);
+    color: #e6ffe6;
     display: flex;
     flex-direction: column;
-    padding-top: 10px;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.4);
+    font-family: Arial, sans-serif;
+    z-index: 1000;
 }
 
-/* LOGO */
+/* ===== LOGO ===== */
 .sidebar .logo {
-    width: 100%;
     text-align: center;
     font-weight: bold;
-    padding: 15px 10px;
+    padding: 18px 10px;
+    font-size: 14px;
+    letter-spacing: 1px;
     color: #ffffff;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 
-/* SECTION LABELS */
+/* ===== MENU (SCROLLABLE) ===== */
+.sidebar .menu {
+    flex: 1;
+    overflow-y: auto;
+}
+
+/* ===== SECTION LABEL ===== */
 .menu-section {
-    padding: 8px 15px;
-    font-size: 11px;
-    color: #a3d9a5;
-    margin-top: 10px;
+    padding: 12px 15px 6px;
+    font-size: 10px;
+    color: #7fbf8f;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
-/* LINKS */
+/* ===== LINKS ===== */
 .sidebar a {
     display: block;
-    padding: 8px 15px;
-    text-decoration: none;
-    color: #e6ffe6;
+    padding: 10px 15px;
     font-size: 13px;
-    transition: 0.2s;
+    color: #e6ffe6;
+    text-decoration: none;
+    border-left: 3px solid transparent;
+    transition: all 0.2s ease;
 }
 
-/* HOVER */
 .sidebar a:hover {
     background: #0a4d1f;
-    color: #ffffff;
 }
 
-/* ACTIVE */
 .sidebar a.active {
     background: #0a4d1f;
     color: #00ff88;
     border-left: 3px solid #00ff88;
 }
 
-/* LOGOUT */
+/* ===== DIVIDER ===== */
+.divider {
+    height: 1px;
+    margin: 10px 0;
+    background: rgba(255,255,255,0.08);
+}
+
+/* ===== LOGOUT (BOTTOM LOCKED) ===== */
 .sidebar .logout {
     margin-top: auto;
+    padding: 12px 15px;
+    font-size: 13px;
     color: #ff6b6b;
+    text-decoration: none;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    background: rgba(0,0,0,0.2);
 }
 
 .sidebar .logout:hover {
     background: #4d0a0a;
-    color: #ff6b6b;
+    color: #ff4d4d;
 }
 
+/* ===== CONTENT OFFSET (IMPORTANT) ===== */
+.main-content {
+    margin-left: 240px;
+    padding: 20px;
+}
 </style>
+
+<!-- ===== SIDEBAR ===== -->
 
 <div class="sidebar">
 
-    <!-- LOGO -->
-    <div class="logo">PAMODZI ALLIANCE COMMAND</div>
+```
+<!-- LOGO -->
+<div class="logo">PAMODZI ALLIANCE COMMAND</div>
+
+<!-- MENU -->
+<div class="menu">
 
     <!-- CORE -->
-    <div class="menu-section">CORE</div>
+    <div class="menu-section">Core</div>
     <a href="/" class="{% if request.path == '/' %}active{% endif %}">Dashboard</a>
     <a href="/war_room" class="{% if request.path.startswith('/war_room') %}active{% endif %}">War Room</a>
 
+    <div class="divider"></div>
+
     <!-- INTELLIGENCE -->
-    <div class="menu-section">INTELLIGENCE</div>
+    <div class="menu-section">Intelligence</div>
     <a href="/polling_intelligence" class="{% if 'polling_intelligence' in request.path %}active{% endif %}">Polling Intelligence</a>
     <a href="/constituency_intelligence" class="{% if 'constituency_intelligence' in request.path %}active{% endif %}">Constituency Intel</a>
 
+    <div class="divider"></div>
+
     <!-- FIELD OPS -->
-    <div class="menu-section">FIELD OPS</div>
+    <div class="menu-section">Field Ops</div>
     <a href="/agents" class="{% if 'agents' in request.path %}active{% endif %}">Agents</a>
     <a href="/agent_results" class="{% if 'agent_results' in request.path %}active{% endif %}">Agent Results</a>
 
+    <div class="divider"></div>
+
     <!-- INCIDENTS -->
-    <div class="menu-section">INCIDENTS</div>
+    <div class="menu-section">Incidents</div>
     <a href="/incidents" class="{% if 'incidents' in request.path %}active{% endif %}">Incident Feed</a>
 
+    <div class="divider"></div>
+
     <!-- MEMBERS -->
-    <div class="menu-section">MEMBERS</div>
+    <div class="menu-section">Members</div>
     <a href="/members?key={{config.ADMIN_KEY}}" class="{% if 'members' in request.path %}active{% endif %}">Members</a>
 
-    <!-- SYSTEM -->
-    <div class="menu-section">SYSTEM</div>
-    <a href="/logout" class="logout">Logout</a>
+</div>
+
+<!-- LOGOUT -->
+<a href="/logout" class="logout">⬅ Logout</a>
+```
 
 </div>
