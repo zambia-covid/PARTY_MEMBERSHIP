@@ -431,12 +431,13 @@ def load_user(user_id):
 # SAFE CONSTITUENCY JOIN (HYBRID FIX)
 # ======================
 def resolve_constituency_id(cur, constituency_name):
-cur.execute("""
-SELECT id FROM constituencies
-WHERE LOWER(constituency_name) = LOWER(%s)
-""", (constituency_name,))
-row = cur.fetchone()
-return row[0] if row else None
+    cur.execute("""
+        SELECT id FROM constituencies
+        WHERE LOWER(constituency_name) = LOWER(%s)
+    """, (constituency_name,))
+
+    row = cur.fetchone()
+    return row[0] if row else None
 
 # ==============================
 # ENVIRONMENT
