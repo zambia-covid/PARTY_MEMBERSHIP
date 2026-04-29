@@ -1921,14 +1921,20 @@ def api_constituency_intelligence():
     cur.execute("""
     SELECT
         m.constituency,
+        m.province,
         COUNT(*) AS members,
         c.total_voters,
-        c.total_polling_stations
+        c.total_polling_stations,
+        COALESCE(SUM(psr.pf_votes), 0) AS pf_votes,
+        COALESCE(SUM(psr.upnd_votes), 0) AS upnd_votes
     FROM members m
     LEFT JOIN constituency_stats c
         ON LOWER(TRIM(m.constituency)) = LOWER(TRIM(c.constituency))
+    LEFT JOIN polling_station_results psr
+        ON LOWER(TRIM(psr.constituency)) = LOWER(TRIM(m.constituency))
     GROUP BY
         m.constituency,
+        m.province,
         c.total_voters,
         c.total_polling_stations
     ORDER BY members DESC
