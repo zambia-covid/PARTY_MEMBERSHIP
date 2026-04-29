@@ -1911,40 +1911,33 @@ Focus on:
 def constituency_intelligence():
     return render_template("constituency_intelligence.html")
 
-@app.route("/api/constituency_intelligence")
-@login_required
-def api_constituency_intelligence():
+cur.execute("""
+    SELECT 
+        c.constituency_name AS constituency,
+        c.province,
 
-    conn = get_db()
-    cur = conn.cursor()
+        COUNT(DISTINCT m.membership_id) AS members,
+        c.total_voters,
+        c.polling_stations,
 
-    cur.execute("""
-        SELECT 
-            c.constituency,
-            c.province,
+        COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+        COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
 
-            COUNT(DISTINCT m.membership_id) AS members,
-            c.total_voters,
-            c.total_polling_stations,
+    FROM constituencies c
 
-            COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
-            COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+    LEFT JOIN members m
+        ON LOWER(TRIM(m.constituency)) = LOWER(TRIM(c.constituency_name))
+        AND m.status = 'Active'
 
-        FROM constituencies c
+    LEFT JOIN polling_station_results r
+        ON LOWER(TRIM(r.constituency)) = LOWER(TRIM(c.constituency_name))
 
-        LEFT JOIN members m
-            ON LOWER(TRIM(m.constituency)) = LOWER(TRIM(c.constituency))
-            AND m.status = 'Active'
-
-        LEFT JOIN polling_station_results r
-            ON LOWER(TRIM(r.constituency)) = LOWER(TRIM(c.constituency))
-
-        GROUP BY 
-            c.constituency,
-            c.province,
-            c.total_voters,
-            c.total_polling_stations
-    """)
+    GROUP BY 
+        c.constituency_name,
+        c.province,
+        c.total_voters,
+        c.polling_stations
+""")
 
     rows = cur.fetchall()
 
