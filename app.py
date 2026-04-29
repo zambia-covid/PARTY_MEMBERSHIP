@@ -1919,32 +1919,20 @@ def api_constituency_intelligence():
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT 
-            c.constituency,
-            c.province,
-
-            COUNT(DISTINCT m.membership_id) AS members,
-            c.total_voters,
-            c.total_polling_stations,
-
-            COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
-            COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
-
-        FROM constituencies c
-
-        LEFT JOIN members m
-            ON m.constituency = c.constituency
-            AND m.status = 'Active'
-
-        LEFT JOIN polling_station_results r
-            ON r.constituency = c.constituency
-
-        GROUP BY 
-            c.constituency,
-            c.province,
-            c.total_voters,
-            c.total_polling_stations
-    """)
+    SELECT
+        m.constituency,
+        COUNT(*) AS members,
+        c.total_voters,
+        c.total_polling_stations
+    FROM members m
+    LEFT JOIN constituency_stats c
+        ON LOWER(TRIM(m.constituency)) = LOWER(TRIM(c.constituency))
+    GROUP BY
+        m.constituency,
+        c.total_voters,
+        c.total_polling_stations
+    ORDER BY members DESC
+""")
 
     rows = cur.fetchall()
 
