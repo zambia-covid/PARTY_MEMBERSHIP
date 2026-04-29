@@ -1534,9 +1534,27 @@ def reject(id):
 @app.route("/login", methods=["GET", "POST"])
 def login():
 
+    # =========================
+    # 🔁 ALREADY LOGGED IN
+    # =========================
     if current_user.is_authenticated:
-        return redirect(url_for("dashboard"))
 
+        role = current_user.role
+
+        if role in ["admin", "national_manager"]:
+            return redirect("/dashboard")
+
+        elif role == "provincial_manager":
+            return redirect("/provincial_dashboard")
+
+        elif role == "agent":
+            return redirect("/agent_dashboard")
+
+        return redirect("/")
+
+    # =========================
+    # 🔐 HANDLE LOGIN
+    # =========================
     if request.method == "POST":
 
         username = request.form.get("username", "").strip()
@@ -1544,11 +1562,10 @@ def login():
 
         print("\n========== LOGIN ATTEMPT ==========")
         print("USERNAME ENTERED:", username)
-        print("PASSWORD ENTERED:", password)
 
         if not username or not password:
             flash("Enter username and password", "danger")
-            print("❌ Missing username or password")
+            print("❌ Missing credentials")
             return redirect(url_for("login"))
 
         conn = get_db()
@@ -1562,7 +1579,6 @@ def login():
             """, (username,))
 
             user = cur.fetchone()
-
             print("DB RESULT:", user)
 
         except Exception as e:
@@ -1575,11 +1591,10 @@ def login():
             conn.close()
 
         # =========================
-        # 🔍 DEBUG BLOCK
+        # 🔍 PASSWORD CHECK
         # =========================
         if user:
             print("✅ USER FOUND")
-            print("HASH IN DB:", user[1])
 
             try:
                 match = check_password_hash(user[1], password)
@@ -1592,7 +1607,7 @@ def login():
             match = False
 
         # =========================
-        # 🔐 LOGIN LOGIC
+        # 🎯 LOGIN SUCCESS
         # =========================
         if user and match:
 
@@ -1601,23 +1616,30 @@ def login():
             user_obj = User(id=user[0], role=user[2])
             login_user(user_obj)
 
-            # Role-based redirect
-            if user[2] == "national_manager":
-                return redirect(url_for("dashboard"))
+            role = user[2]
 
-            elif user[2] == "provincial_manager":
+            # 🔥 ROLE-BASED REDIRECT
+            if role in ["admin", "national_manager"]:
+                return redirect("/dashboard")
+
+            elif role == "provincial_manager":
                 return redirect("/provincial_dashboard")
 
-            elif user[2] == "agent":
+            elif role == "agent":
                 return redirect("/agent_dashboard")
 
-            else:
-                return redirect("/")
+            return redirect("/")
 
+        # =========================
+        # ❌ LOGIN FAILED
+        # =========================
         print("❌ LOGIN FAILED")
         flash("Invalid username or password", "danger")
         return redirect(url_for("login"))
 
+    # =========================
+    # 📄 SHOW LOGIN PAGE
+    # =========================
     return render_template("login.html")
 
 @app.route("/logout")
@@ -2819,11 +2841,28 @@ def map_data():
 
     return jsonify(data)
 
+@app.route("/")
+@login_required
+def home():
+
+    print("USER ROLE:", current_user.role)  # debug
+
+    if current_user.role in ["admin", "national_manager"]:
+        return redirect("/dashboard")
+
+    elif current_user.role == "provincial_manager":
+        return redirect("/provincial_dashboard")
+
+    elif current_user.role == "agent":
+        return redirect("/agent_dashboard")
+
+    # fallback (should never happen)
+    return "No dashboard assigned", 403
 
 # ==============================
 # DASHBOARD
 # ==============================
-@app.route("/")
+@app.route("/dashboard")
 @login_required
 @role_required("admin", "national_manager")
 def dashboard():
