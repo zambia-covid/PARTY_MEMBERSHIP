@@ -427,6 +427,17 @@ def load_user(user_id):
 
     return None
 
+# ======================
+# SAFE CONSTITUENCY JOIN (HYBRID FIX)
+# ======================
+def resolve_constituency_id(cur, constituency_name):
+cur.execute("""
+SELECT id FROM constituencies
+WHERE LOWER(constituency_name) = LOWER(%s)
+""", (constituency_name,))
+row = cur.fetchone()
+return row[0] if row else None
+
 # ==============================
 # ENVIRONMENT
 # ==============================
@@ -3032,18 +3043,62 @@ def dashboard():
 @login_required
 def polling_intelligence():
 
+```
+conn = None
+cur = None
+
+try:
+    # ======================
+    # DB CONNECTION
+    # ======================
     conn = get_db()
     cur = conn.cursor()
 
+    # ======================
+    # BUILD INTELLIGENCE
+    # ======================
     stations = build_polling_intelligence(cur)
 
-    cur.close()
-    conn.close()
+    # ======================
+    # EMPTY STATE HANDLING
+    # ======================
+    if not stations:
+        return render_template(
+            "polling_intelligence.html",
+            stations=[],
+            message="No polling data available yet."
+        )
 
+    # ======================
+    # SUCCESS RESPONSE
+    # ======================
     return render_template(
         "polling_intelligence.html",
         stations=stations
     )
+
+except Exception as e:
+    print("POLLING INTELLIGENCE ERROR:", e)
+
+    # ======================
+    # FAIL SAFE UI
+    # ======================
+    return render_template(
+        "polling_intelligence.html",
+        stations=[],
+        error="Failed to load polling intelligence."
+    )
+
+finally:
+    # ======================
+    # CLEANUP (CRITICAL)
+    # ======================
+    if cur:
+        cur.close()
+    if conn:
+        conn.close()
+```
+
 
 # ==============================
 # ANALYTICS ROUTE
