@@ -1919,26 +1919,32 @@ def api_constituency_intelligence():
     cur = conn.cursor()
 
     cur.execute("""
-    SELECT
-        m.constituency,
-        m.province,
-        COUNT(*) AS members,
-        c.total_voters,
-        c.total_polling_stations,
-        COALESCE(SUM(psr.pf_votes), 0) AS pf_votes,
-        COALESCE(SUM(psr.upnd_votes), 0) AS upnd_votes
-    FROM members m
-    LEFT JOIN constituency_stats c
-        ON LOWER(TRIM(m.constituency)) = LOWER(TRIM(c.constituency))
-    LEFT JOIN polling_station_results psr
-        ON LOWER(TRIM(psr.constituency)) = LOWER(TRIM(m.constituency))
-    GROUP BY
-        m.constituency,
-        m.province,
-        c.total_voters,
-        c.total_polling_stations
-    ORDER BY members DESC
-""")
+        SELECT 
+            c.constituency,
+            c.province,
+
+            COUNT(DISTINCT m.membership_id) AS members,
+            c.total_voters,
+            c.total_polling_stations,
+
+            COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+            COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+
+        FROM constituencies c
+
+        LEFT JOIN members m
+            ON LOWER(TRIM(m.constituency)) = LOWER(TRIM(c.constituency))
+            AND m.status = 'Active'
+
+        LEFT JOIN polling_station_results r
+            ON LOWER(TRIM(r.constituency)) = LOWER(TRIM(c.constituency))
+
+        GROUP BY 
+            c.constituency,
+            c.province,
+            c.total_voters,
+            c.total_polling_stations
+    """)
 
     rows = cur.fetchall()
 
@@ -1948,16 +1954,36 @@ def api_constituency_intelligence():
 
         constituency, province, members, voters, stations, pf, upnd = r
 
+        # ======================
+        # CORE METRICS
+        # ======================
         penetration = (members / voters * 100) if voters else 0
         margin = pf - upnd
 
-        if margin > 0 and penetration >= 40:
-            status = "WIN"
-        elif margin < 0 and penetration < 30:
-            status = "LOSE"
+        # 🔥 SCORE (PRIMARY DRIVER FOR MAP)
+        score = margin
+
+        # ======================
+        # STATUS LOGIC (SMARTER)
+        # ======================
+        if score > 0 and penetration >= 40:
+            status = "STRONGHOLD"
+
+        elif score > 0:
+            status = "LEANING WIN"
+
+        elif score < 0 and penetration < 30:
+            status = "LOST"
+
+        elif score < 0:
+            status = "LEANING LOSS"
+
         else:
             status = "TOSS-UP"
 
+        # ======================
+        # RESPONSE
+        # ======================
         results.append({
             "constituency": constituency,
             "province": province,
@@ -1968,6 +1994,7 @@ def api_constituency_intelligence():
             "upnd_votes": upnd,
             "penetration": round(penetration, 2),
             "margin": margin,
+            "score": score,        # 🔥 NEW
             "status": status
         })
 
