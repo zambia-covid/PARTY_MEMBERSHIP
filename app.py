@@ -983,23 +983,25 @@ def constituencies():
 from flask import request, redirect, url_for, flash, render_template
 from flask_login import login_required, current_user
 
+from werkzeug.security import generate_password_hash
+
 @app.route("/create_user", methods=["GET", "POST"])
 @login_required
 def create_user():
 
-    # 🔒 Restrict access
     if current_user.role not in ["admin", "national_manager", "provincial_manager"]:
         flash("Unauthorized access")
         return redirect(url_for("dashboard"))
 
     if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
+
+        username = request.form["username"].strip()
+        password = request.form["password"].strip()
         role = request.form["role"]
         province = request.form.get("province")
         district = request.form.get("district")
 
-        # 🔒 Role enforcement
+        # Role enforcement
         if current_user.role == "provincial_manager":
             province = current_user.province
 
@@ -1007,25 +1009,32 @@ def create_user():
                 flash("You cannot create a national manager")
                 return redirect(url_for("create_user"))
 
-        # 🔒 Validation
+        # Validation
         if not username or not password or not role:
             flash("Missing required fields")
             return redirect(url_for("create_user"))
 
-        # 🔐 Hash password
-        hashed_password = hash_password(password)
+        hashed_password = generate_password_hash(password)
 
         try:
-            query_db("""
-                INSERT INTO users (username, password, role, province, district)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (username, hashed_password, role, province, district))
+            conn = get_db()
+            cur = conn.cursor()
+
+            cur.execute("""
+                INSERT INTO users (username, password, role)
+                VALUES (%s, %s, %s)
+            """, (username, hashed_password, role))
+
+            conn.commit()
+
+            cur.close()
+            conn.close()
 
             flash("User created successfully")
 
         except Exception as e:
-            print(e)
-            flash("Error creating user (possibly duplicate username)")
+            print("CREATE USER ERROR:", e)
+            flash(str(e))
 
         return redirect(url_for("create_user"))
 
