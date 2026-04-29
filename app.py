@@ -1906,38 +1906,52 @@ Focus on:
 # ==============================
 # CONSTITUENCY INTELLIGENCE
 # ==============================
+# ======================
+# PAGE (HTML)
+# ======================
 @app.route("/constituency_intelligence")
 @login_required
 def constituency_intelligence():
     return render_template("constituency_intelligence.html")
 
-cur.execute("""
-    SELECT 
-        c.constituency_name AS constituency,
-        c.province,
 
-        COUNT(DISTINCT m.membership_id) AS members,
-        c.total_voters,
-        c.polling_stations,
+# ======================
+# API (DATA FOR MAP / UI)
+# ======================
+@app.route("/api/constituency_intelligence")
+@login_required
+def api_constituency_intelligence():
 
-        COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
-        COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+    conn = get_db()
+    cur = conn.cursor()
 
-    FROM constituencies c
+    cur.execute("""
+        SELECT 
+            c.constituency_name AS constituency,
+            c.province,
 
-    LEFT JOIN members m
-        ON LOWER(TRIM(m.constituency)) = LOWER(TRIM(c.constituency_name))
-        AND m.status = 'Active'
+            COUNT(DISTINCT m.membership_id) AS members,
+            c.total_voters,
+            c.polling_stations,
 
-    LEFT JOIN polling_station_results r
-        ON LOWER(TRIM(r.constituency)) = LOWER(TRIM(c.constituency_name))
+            COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+            COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
 
-    GROUP BY 
-        c.constituency_name,
-        c.province,
-        c.total_voters,
-        c.polling_stations
-""")
+        FROM constituencies c
+
+        LEFT JOIN members m
+            ON LOWER(TRIM(m.constituency)) = LOWER(TRIM(c.constituency_name))
+            AND m.status = 'Active'
+
+        LEFT JOIN polling_station_results r
+            ON LOWER(TRIM(r.constituency)) = LOWER(TRIM(c.constituency_name))
+
+        GROUP BY 
+            c.constituency_name,
+            c.province,
+            c.total_voters,
+            c.polling_stations
+    """)
 
     rows = cur.fetchall()
 
@@ -1953,30 +1967,23 @@ cur.execute("""
         penetration = (members / voters * 100) if voters else 0
         margin = pf - upnd
 
-        # 🔥 SCORE (PRIMARY DRIVER FOR MAP)
+        # 🔥 SCORE
         score = margin
 
         # ======================
-        # STATUS LOGIC (SMARTER)
+        # STATUS LOGIC
         # ======================
         if score > 0 and penetration >= 40:
             status = "STRONGHOLD"
-
         elif score > 0:
             status = "LEANING WIN"
-
         elif score < 0 and penetration < 30:
             status = "LOST"
-
         elif score < 0:
             status = "LEANING LOSS"
-
         else:
             status = "TOSS-UP"
 
-        # ======================
-        # RESPONSE
-        # ======================
         results.append({
             "constituency": constituency,
             "province": province,
@@ -1987,7 +1994,7 @@ cur.execute("""
             "upnd_votes": upnd,
             "penetration": round(penetration, 2),
             "margin": margin,
-            "score": score,        # 🔥 NEW
+            "score": score,
             "status": status
         })
 
