@@ -1506,12 +1506,6 @@ def constituency_detail(constituency):
     conn.close()
 
     return jsonify([
-        {
-            "station": r[0],
-            "pf": r[1],
-            "upnd": r[2]
-        } for r in rows
-    ])
 
 @app.route("/approve/<int:id>", methods=['POST'])
 @login_required
