@@ -1926,32 +1926,32 @@ def api_constituency_intelligence():
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT 
-            c.constituency_name AS constituency,
-            c.province,
+    SELECT 
+        c.constituency_name AS constituency,
+        c.province,
 
-            COUNT(DISTINCT m.membership_id) AS members,
-            c.total_voters,
-            c.polling_stations,
+        COUNT(DISTINCT m.membership_id) AS members,
+        c.total_voters,
+        c.total_polling_stations,
 
-            COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
-            COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+        COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+        COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
 
-        FROM constituencies c
+    FROM constituencies c
 
-        LEFT JOIN members m
-            ON LOWER(TRIM(m.constituency)) = LOWER(TRIM(c.constituency_name))
-            AND m.status = 'Active'
+    LEFT JOIN members m
+        ON LOWER(TRIM(m.constituency)) = LOWER(TRIM(c.constituency_name))
+        AND m.status = 'Active'
 
-        LEFT JOIN polling_station_results r
-            ON LOWER(TRIM(r.constituency)) = LOWER(TRIM(c.constituency_name))
+    LEFT JOIN polling_station_results r
+        ON LOWER(TRIM(r.constituency)) = LOWER(TRIM(c.constituency_name))
 
-        GROUP BY 
-            c.constituency_name,
-            c.province,
-            c.total_voters,
-            c.polling_stations
-    """)
+    GROUP BY 
+        c.constituency_name,
+        c.province,
+        c.total_voters,
+        c.total_polling_stations
+""")
 
     rows = cur.fetchall()
 
