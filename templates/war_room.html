@@ -30,7 +30,7 @@
 
 .kpi b { font-size: 20px; }
 
-/* STATUS */
+/* STATUS COLORS */
 .win { color:#00ff00; background:rgba(0,255,0,0.1); border-left:4px solid #00ff00; }
 .lose { color:#ff0000; background:rgba(255,0,0,0.1); border-left:4px solid #ff0000; }
 .tie { color:#ffff00; background:rgba(255,255,0,0.1); border-left:4px solid #ffff00; }
@@ -57,13 +57,6 @@
 .row {
     padding:6px;
     border-bottom:1px solid #222;
-}
-
-.label {
-    font-size:11px;
-    font-weight:bold;
-    text-align:center;
-    color:white;
 }
 </style>
 
@@ -95,8 +88,8 @@
             <h3>🗺 Constituencies</h3>
             {% for r in map_data %}
                 <div class="row 
-                    {% if r.status == 'WIN' %}win
-                    {% elif r.status == 'LOSE' %}lose
+                    {% if r.status in ['STRONGHOLD','LEANING WIN'] %}win
+                    {% elif r.status in ['LOST','LEANING LOSS'] %}lose
                     {% else %}tie
                     {% endif %}
                 ">
@@ -135,91 +128,85 @@ function normalize(name){
         .trim();
 }
 
-// 🔥 SAFE NAME RESOLVER
+// SAFE NAME
 function getName(props){
     return props.shapeName || props.name || props.NAME || props.constituency || "";
 }
 
-// DATA
-let results = {};
-let mapData = {{ map_data | tojson }};
+// 🔥 LOAD LIVE INTELLIGENCE
+fetch("/api/constituency_intelligence")
+.then(res => res.json())
+.then(data => {
 
-// BUILD LOOKUP
-mapData.forEach(r => {
-    results[normalize(r.constituency)] = r;
-});
+    let results = {};
 
-// COLOR
-function getColor(status){
-    if(status==="WIN") return "#00ff00";
-    if(status==="LOSE") return "#ff0000";
-    return "#ffff00";
-}
+    data.forEach(r => {
+        results[normalize(r.constituency)] = r;
+    });
 
-// LOAD GEOJSON WITH ERROR HANDLING
-fetch("/static/geo/zambia_constituencies.geojson")
-.then(res => {
-    if (!res.ok) throw new Error("GeoJSON failed to load");
-    return res.json();
-})
-.then(geo => {
+    // COLOR LOGIC
+    function getColor(status){
+        if(status==="STRONGHOLD") return "#006400";
+        if(status==="LEANING WIN") return "#00ff00";
+        if(status==="TOSS-UP") return "#ffff00";
+        if(status==="LEANING LOSS") return "#ff9900";
+        if(status==="LOST") return "#ff0000";
+        return "#999";
+    }
 
-    console.log("GeoJSON loaded:", geo.features.length);
+    function getOpacity(score){
+        if(Math.abs(score) > 1000) return 0.9;
+        if(Math.abs(score) > 300) return 0.7;
+        return 0.5;
+    }
 
-    let layer = L.geoJSON(geo, {
+    // LOAD GEOJSON
+    fetch("/static/geo/zambia_constituencies.geojson")
+    .then(res => res.json())
+    .then(geo => {
 
-        style: function(feature){
+        let layer = L.geoJSON(geo, {
 
-            let raw = getName(feature.properties);
+            style: function(feature){
 
-            if (!raw) {
-                console.warn("Missing name in feature:", feature.properties);
+                let raw = getName(feature.properties);
+                let key = normalize(raw);
+                let r = results[key];
+
+                let status = r ? r.status : "TOSS-UP";
+                let score = r ? r.score : 0;
+
                 return {
-                    color: "#999",
+                    color: "#333",
                     weight: 1,
-                    fillColor: "#ccc",
-                    fillOpacity: 0.3
+                    fillColor: getColor(status),
+                    fillOpacity: getOpacity(score)
                 };
+            },
+
+            onEachFeature: function(feature, layer){
+
+                let raw = getName(feature.properties);
+                let key = normalize(raw);
+                let r = results[key];
+
+                let status = r ? r.status : "TOSS-UP";
+
+                layer.bindPopup(`
+                    <b>${raw}</b><br>
+                    Status: ${status}<br>
+                    Score: ${r ? r.score : 0}<br>
+                    PF: ${r ? r.pf_votes : 0}<br>
+                    UPND: ${r ? r.upnd_votes : 0}
+                `);
             }
 
-            let key = normalize(raw);
-            let r = results[key];
+        }).addTo(map);
 
-            let status = r ? r.status : "TOSS-UP";
+        map.fitBounds(layer.getBounds());
 
-            return {
-                color: getColor(status),
-                weight: 2,
-                fillColor: getColor(status),
-                fillOpacity: 0.6
-            };
-        },
+    });
 
-        onEachFeature: function(feature, layer){
-
-            let raw = getName(feature.properties);
-            let key = normalize(raw);
-            let r = results[key];
-
-            let status = r ? r.status : "TOSS-UP";
-
-            layer.bindPopup(`
-                <b>${raw || "Unknown"}</b><br>
-                Status: ${status}<br>
-                PF: ${r ? r.pf : 0}<br>
-                UPND: ${r ? r.upnd : 0}
-            `);
-        }
-
-    }).addTo(map);
-
-    map.fitBounds(layer.getBounds());
-
-})
-.catch(err => {
-    console.error("MAP LOAD ERROR:", err);
-
-    alert("Map failed to load constituencies. Check GeoJSON path.");
 });
 
 </script>
