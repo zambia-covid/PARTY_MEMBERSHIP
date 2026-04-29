@@ -1966,6 +1966,7 @@ def api_constituency_intelligence():
         # ======================
         score = pf - upnd
         margin = score
+        penetration = (members / voters * 100) if voters else 0
         margin_pct = (score / voters * 100) if voters else 0
 
         # ======================
