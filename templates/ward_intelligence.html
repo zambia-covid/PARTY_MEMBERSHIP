@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Ward Intelligence{% endblock %}
+
+{% block content %}
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<h2>🧭 Ward Intelligence</h2>
+
+<!-- ================= SELECT ================= -->
+<div class="selector">
+    <select id="constituencySelect"></select>
+</div>
+
+<style>
+body {
+    background:#0b0b0b;
+    color:white;
+    font-family:Arial;
+}
+
+.selector select {
+    width:100%;
+    padding:10px;
+    margin-bottom:10px;
+    border-radius:6px;
+}
+
+/* GRID */
+.grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:10px;
+}
+
+/* CARD */
+.card {
+    background:#111;
+    padding:10px;
+    border-radius:8px;
+}
+
+/* LIST */
+.scroll-box {
+    max-height:300px;
+    overflow-y:auto;
+}
+
+.list-item {
+    padding:8px;
+    border-bottom:1px solid #222;
+    font-size:13px;
+}
+
+/* COLORS */
+.green { color:#00ff00; }
+.red { color:#ff4444; }
+.orange { color:#ffaa00; }
+
+/* MOBILE */
+@media(max-width:600px){
+    .grid { grid-template-columns:1fr; }
+}
+</style>
+
+<!-- ================= KPI ================= -->
+<div class="grid">
+
+    <div class="card">
+        <h4>Total Wards</h4>
+        <p id="totalWards">0</p>
+    </div>
+
+    <div class="card">
+        <h4>Strongholds</h4>
+        <p id="strongholds">0</p>
+    </div>
+
+    <div class="card">
+        <h4>Risk Wards</h4>
+        <p id="risk">0</p>
+    </div>
+
+    <div class="card">
+        <h4>Coverage</h4>
+        <p id="coverage">0%</p>
+    </div>
+
+</div>
+
+<!-- ================= WARD LIST ================= -->
+<div class="card">
+    <h4>Ward Breakdown</h4>
+    <div id="wardList" class="scroll-box">Loading...</div>
+</div>
+
+<script>
+
+let currentConstituency = "";
+
+/* ================= LOAD CONSTITUENCIES ================= */
+async function loadConstituencies(){
+
+    const res = await fetch("/api/constituencies");
+    const data = await res.json();
+
+    const select = document.getElementById("constituencySelect");
+
+    select.innerHTML = data.map(c =>
+        `<option value="${c}">${c}</option>`
+    ).join("");
+
+    currentConstituency = data[0];
+
+    select.addEventListener("change", () => {
+        currentConstituency = select.value;
+        loadWardIntelligence();
+    });
+
+    loadWardIntelligence();
+}
+
+/* ================= LOAD WARDS ================= */
+async function loadWardIntelligence(){
+
+    try {
+        const res = await fetch(`/api/ward_intelligence/${currentConstituency}`);
+
+        if (!res.ok) throw new Error("API failed");
+
+        const data = await res.json();
+
+        console.log("WARD DATA:", data);
+
+        if (!Array.isArray(data)) {
+            document.getElementById("wardList").innerHTML = "Invalid data";
+            return;
+        }
+
+        if (data.length === 0) {
+            document.getElementById("wardList").innerHTML = "No ward data available";
+            return;
+        }
+
+        let html = "";
+        let total = data.length;
+        let strong = 0;
+        let risk = 0;
+        let totalCoverage = 0;
+
+        data.forEach(w => {
+
+            const pf = w.pf_votes || 0;
+            const upnd = w.upnd_votes || 0;
+            const margin = w.margin || 0;
+            const stations = w.stations || 0;
+            const reporting = w.reporting || 0;
+            const coverage = w.coverage || 0;
+            const status = w.status || "";
+
+            totalCoverage += coverage;
+
+            let color = "orange";
+
+            if (status === "STRONGHOLD") {
+                color = "green";
+                strong++;
+            } else if (status.includes("LOSS")) {
+                color = "red";
+                risk++;
+            }
+
+            html += `
+            <div class="list-item ${color}">
+                <strong>${w.ward}</strong><br>
+                PF: ${pf} | UPND: ${upnd}<br>
+                Margin: ${margin}<br>
+                Stations: ${reporting}/${stations} (${coverage}%)
+            </div>`;
+        });
+
+        // KPI
+        document.getElementById("totalWards").innerText = total;
+        document.getElementById("strongholds").innerText = strong;
+        document.getElementById("risk").innerText = risk;
+
+        let avgCoverage = (totalCoverage / total).toFixed(1);
+        document.getElementById("coverage").innerText = avgCoverage + "%";
+
+        document.getElementById("wardList").innerHTML = html;
+
+    } catch (err) {
+        console.error("WARD ERROR:", err);
+        document.getElementById("wardList").innerHTML = "Failed to load ward intelligence";
+    }
+}
+
+/* ================= INIT ================= */
+loadConstituencies();
+
+</script>
+
+{% endblock %}
