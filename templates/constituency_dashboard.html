@@ -10,37 +10,33 @@
 
 <!-- ================= SELECTOR ================= -->
 <div class="selector">
-    <select id="constituencySelect" onchange="changeConstituency()"></select>
+    <select id="constituencySelect"></select>
+    <small id="selectorNote" style="opacity:0.6;"></small>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-
-/* ===== BASE ===== */
 body {
     background:#0b0b0b;
     color:white;
     font-family:Arial, sans-serif;
 }
 
-/* ===== SELECT ===== */
 .selector select {
     width:100%;
     padding:10px;
     font-size:16px;
     border-radius:6px;
-    margin-bottom:10px;
+    margin-bottom:4px;
 }
 
-/* ===== GRID ===== */
 .grid {
     display:grid;
     grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
     gap:10px;
 }
 
-/* ===== CARD ===== */
 .card {
     background:#111;
     padding:10px;
@@ -48,26 +44,12 @@ body {
     text-align:center;
 }
 
-.card h4 {
-    font-size:13px;
-    margin-bottom:5px;
-}
-
-.card p {
-    font-size:14px;
-}
-
-/* ===== STATUS COLORS ===== */
 .win { color:#00ff00; }
 .lose { color:#ff4444; }
 .tie { color:#ffaa00; }
 
-/* ===== SECTION ===== */
-.section {
-    margin-top:12px;
-}
+.section { margin-top:12px; }
 
-/* ===== LIST ===== */
 .scroll-box {
     max-height:250px;
     overflow-y:auto;
@@ -79,25 +61,21 @@ body {
     font-size:13px;
 }
 
-/* ===== MOBILE LAYOUT ===== */
 .split {
     display:grid;
     grid-template-columns:1fr;
     gap:10px;
 }
 
-/* ===== DESKTOP ENHANCEMENT ===== */
 @media(min-width:768px){
     .split {
         grid-template-columns:2fr 1fr;
     }
 }
-
 </style>
 
 <!-- ================= KPI ================= -->
 <div class="grid">
-
     <div class="card">
         <h4>Presidential</h4>
         <p>PF: <b id="pf_pres"></b></p>
@@ -125,7 +103,6 @@ body {
         <h4>Turnout</h4>
         <p><b id="turnout"></b>%</p>
     </div>
-
 </div>
 
 <!-- ================= CHART ================= -->
@@ -136,44 +113,66 @@ body {
 
 <!-- ================= CONTENT ================= -->
 <div class="section split">
-
-    <!-- WARDS -->
     <div class="card">
         <h4>Ward Breakdown</h4>
         <div id="wards" class="scroll-box"></div>
     </div>
 
-    <!-- DANGER -->
     <div class="card">
         <h4>🚨 Risk Zones</h4>
         <div id="danger" class="scroll-box"></div>
     </div>
-
 </div>
 
 <script>
 
 let chart;
 let currentConstituency = "";
+let lastLoaded = "";
 
 /* ================= LOAD CONSTITUENCIES ================= */
 async function loadConstituencies(){
+
     const res = await fetch("/api/constituencies");
     const data = await res.json();
 
-    let select = document.getElementById("constituencySelect");
+    const select = document.getElementById("constituencySelect");
+    const note = document.getElementById("selectorNote");
+
+    if(!data || data.length === 0){
+        select.innerHTML = `<option>No constituencies</option>`;
+        select.disabled = true;
+        note.innerText = "No access assigned";
+        return;
+    }
 
     select.innerHTML = data.map(c =>
         `<option value="${c}">${c}</option>`
     ).join("");
 
     currentConstituency = data[0];
+
+    // 🔒 LOCK LOGIC
+    if(data.length === 1){
+        select.disabled = true;
+        note.innerText = "Locked to your constituency";
+    } else {
+        select.disabled = false;
+        note.innerText = "";
+        select.addEventListener("change", changeConstituency);
+    }
+
     loadDashboard();
 }
 
 /* ================= CHANGE ================= */
 function changeConstituency(){
-    currentConstituency = document.getElementById("constituencySelect").value;
+    const newVal = document.getElementById("constituencySelect").value;
+
+    // Prevent unnecessary reload
+    if(newVal === currentConstituency) return;
+
+    currentConstituency = newVal;
     loadDashboard();
 }
 
@@ -182,10 +181,14 @@ async function loadDashboard(){
 
     if(!currentConstituency) return;
 
+    // Prevent duplicate refresh loops
+    if(currentConstituency === lastLoaded) return;
+
+    lastLoaded = currentConstituency;
+
     const res = await fetch(`/api/constituency_dashboard/${currentConstituency}`);
     const data = await res.json();
 
-    // KPI
     pf_pres.innerText = data.presidential.pf;
     upnd_pres.innerText = data.presidential.upnd;
 
@@ -202,7 +205,6 @@ async function loadDashboard(){
     coverage.innerText = data.coverage;
     turnout.innerText = data.turnout;
 
-    // WARDS
     let labels=[], pfData=[], upndData=[];
     let wardsHTML="";
 
@@ -225,12 +227,10 @@ async function loadDashboard(){
 
     wards.innerHTML = wardsHTML;
 
-    // DANGER
     danger.innerHTML = data.danger_zones.map(d =>
         `<div class="list-item" style="color:red;">${d.ward} (${d.margin})</div>`
     ).join("") || "None";
 
-    // CHART
     if(chart) chart.destroy();
 
     chart = new Chart(wardChart, {
@@ -251,7 +251,6 @@ async function loadDashboard(){
             }
         }
     });
-
 }
 
 /* ================= INIT ================= */
