@@ -114,8 +114,8 @@
 
     <!-- INTELLIGENCE -->
     <div class="menu-section">Intelligence</div>
-    <a href="/polling_intelligence" class="{% if 'polling_intelligence' in request.path %}active{% endif %}">Polling Intelligence</a>
     <a href="/constituency_intelligence" class="{% if 'constituency_intelligence' in request.path %}active{% endif %}">Constituency Intel</a>
+    <a href="{{ url_for('ward_intelligence_page') }}">🧭 Ward Intelligence</a>
 
     <div class="divider"></div>
 
