@@ -26,17 +26,8 @@ body {
     box-shadow: 0 8px 20px rgba(0,0,0,0.4);
 }
 
-h2 {
-    text-align: center;
-    margin-bottom: 5px;
-}
-
-p {
-    text-align: center;
-    font-size: 13px;
-    margin-bottom: 20px;
-    color: #c8e6c9;
-}
+h2 { text-align: center; }
+p { text-align:center;font-size:13px;color:#c8e6c9; }
 
 input, select {
     width: 100%;
@@ -62,8 +53,8 @@ button {
     cursor: pointer;
 }
 
-button:active {
-    transform: scale(0.98);
+button:disabled {
+    background: #999;
 }
 
 .success {
@@ -74,11 +65,12 @@ button:active {
     display:none;
 }
 
-.footer {
-    text-align: center;
-    margin-top: 15px;
-    font-size: 12px;
-    color: #aaa;
+.error {
+    background:#660000;
+    padding:10px;
+    margin-bottom:10px;
+    border-radius:6px;
+    display:none;
 }
 </style>
 </head>
@@ -86,48 +78,124 @@ button:active {
 <body>
 
 <div class="container">
-    <div class="card">
+<div class="card">
 
-        <h2>PF Pamodzi Alliance</h2>
-        <p>Join the MZ8 Movement</p>
+<h2>PF Pamodzi Alliance</h2>
+<p>Join the MZ8 Movement</p>
 
-        <div id="successBox" class="success">
-            Registration successful!
-        </div>
+<div id="successBox" class="success"></div>
+<div id="errorBox" class="error"></div>
 
-        <form method="POST" action="/register">
+<form id="regForm">
 
-            <input type="text" name="full_name" placeholder="Full Name" required>
+<input type="text" name="full_name" placeholder="Full Name" required>
 
-            <select name="province" required>
-                <option value="">Select Province</option>
-                <option>Lusaka</option>
-                <option>Copperbelt</option>
-                <option>Central</option>
-                <option>Eastern</option>
-                <option>Southern</option>
-                <option>Western</option>
-                <option>North-Western</option>
-                <option>Northern</option>
-                <option>Luapula</option>
-                <option>Muchinga</option>
-            </select>
+<select id="province" name="province" required></select>
+<select id="district" name="district" required></select>
+<select id="constituency" name="constituency" required></select>
+<select id="ward" name="ward" required></select>
 
-            <input type="text" name="district" placeholder="District" required>
-            <input type="text" name="constituency" placeholder="Constituency" required>
-            <input type="text" name="ward" placeholder="Ward" required>
-            <input type="text" name="phone" placeholder="+260XXXXXXXXX" required>
+<input type="text" name="phone" placeholder="+260XXXXXXXXX" required>
 
-            <button type="submit">Register Now</button>
+<button id="submitBtn">Register Now</button>
 
-        </form>
+</form>
 
-        <div class="footer">
-            Secure Digital Membership System
-        </div>
-
-    </div>
 </div>
+</div>
+
+<script>
+
+/* ================= LOAD HIERARCHY ================= */
+
+async function loadProvinces(){
+    let res = await fetch("/api/provinces_list");
+    let data = await res.json();
+
+    let select = document.getElementById("province");
+    select.innerHTML = `<option value="">Select Province</option>` +
+        data.map(p=>`<option>${p}</option>`).join("");
+}
+
+async function loadDistricts(){
+    let province = provinceEl.value;
+
+    let res = await fetch(`/api/districts/${province}`);
+    let data = await res.json();
+
+    districtEl.innerHTML = `<option value="">Select District</option>` +
+        data.map(d=>`<option>${d}</option>`).join("");
+}
+
+async function loadConstituencies(){
+    let district = districtEl.value;
+
+    let res = await fetch(`/api/constituencies/${district}`);
+    let data = await res.json();
+
+    constituencyEl.innerHTML = `<option value="">Select Constituency</option>` +
+        data.map(c=>`<option>${c}</option>`).join("");
+}
+
+async function loadWards(){
+    let constituency = constituencyEl.value;
+
+    let res = await fetch(`/api/wards/${constituency}`);
+    let data = await res.json();
+
+    wardEl.innerHTML = `<option value="">Select Ward</option>` +
+        data.map(w=>`<option>${w}</option>`).join("");
+}
+
+/* ================= REFERENCES ================= */
+const provinceEl = document.getElementById("province");
+const districtEl = document.getElementById("district");
+const constituencyEl = document.getElementById("constituency");
+const wardEl = document.getElementById("ward");
+
+/* ================= CASCADE ================= */
+provinceEl.onchange = loadDistricts;
+districtEl.onchange = loadConstituencies;
+constituencyEl.onchange = loadWards;
+
+/* ================= SUBMIT ================= */
+document.getElementById("regForm").onsubmit = async (e)=>{
+    e.preventDefault();
+
+    const btn = document.getElementById("submitBtn");
+    btn.disabled = true;
+    btn.innerText = "Registering...";
+
+    let formData = new FormData(e.target);
+
+    try{
+        let res = await fetch("/register", {
+            method:"POST",
+            body: formData
+        });
+
+        let text = await res.text();
+
+        document.getElementById("successBox").style.display = "block";
+        document.getElementById("successBox").innerText = text;
+
+        document.getElementById("errorBox").style.display = "none";
+
+        e.target.reset();
+
+    } catch(err){
+        document.getElementById("errorBox").style.display = "block";
+        document.getElementById("errorBox").innerText = "Registration failed";
+    }
+
+    btn.disabled = false;
+    btn.innerText = "Register Now";
+}
+
+/* INIT */
+loadProvinces();
+
+</script>
 
 </body>
 </html>
