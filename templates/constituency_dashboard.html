@@ -8,7 +8,6 @@
 
 <h2 style="margin-bottom:10px;">⚔️ War Room</h2>
 
-<!-- ================= SELECTOR ================= -->
 <div class="selector">
     <select id="constituencySelect"></select>
     <small id="selectorNote" style="opacity:0.6;"></small>
@@ -17,18 +16,10 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body {
-    background:#0b0b0b;
-    color:white;
-    font-family:Arial, sans-serif;
-}
+body { background:#0b0b0b; color:white; font-family:Arial; }
 
 .selector select {
-    width:100%;
-    padding:10px;
-    font-size:16px;
-    border-radius:6px;
-    margin-bottom:4px;
+    width:100%; padding:10px; font-size:16px; border-radius:6px;
 }
 
 .grid {
@@ -37,12 +28,7 @@ body {
     gap:10px;
 }
 
-.card {
-    background:#111;
-    padding:10px;
-    border-radius:8px;
-    text-align:center;
-}
+.card { background:#111; padding:10px; border-radius:8px; text-align:center; }
 
 .win { color:#00ff00; }
 .lose { color:#ff4444; }
@@ -50,16 +36,9 @@ body {
 
 .section { margin-top:12px; }
 
-.scroll-box {
-    max-height:250px;
-    overflow-y:auto;
-}
+.scroll-box { max-height:250px; overflow-y:auto; }
 
-.list-item {
-    padding:6px;
-    border-bottom:1px solid #222;
-    font-size:13px;
-}
+.list-item { padding:6px; border-bottom:1px solid #222; font-size:13px; }
 
 .split {
     display:grid;
@@ -68,13 +47,11 @@ body {
 }
 
 @media(min-width:768px){
-    .split {
-        grid-template-columns:2fr 1fr;
-    }
+    .split { grid-template-columns:2fr 1fr; }
 }
 </style>
 
-<!-- ================= KPI ================= -->
+<!-- KPI -->
 <div class="grid">
     <div class="card">
         <h4>Presidential</h4>
@@ -105,16 +82,16 @@ body {
     </div>
 </div>
 
-<!-- ================= CHART ================= -->
+<!-- CHART -->
 <div class="section card">
     <h4>Ward Performance</h4>
     <canvas id="wardChart" style="max-height:250px;"></canvas>
 </div>
 
-<!-- ================= CONTENT ================= -->
+<!-- CONTENT -->
 <div class="section split">
     <div class="card">
-        <h4>Ward Breakdown</h4>
+        <h4>Ward Intelligence</h4>
         <div id="wards" class="scroll-box"></div>
     </div>
 
@@ -128,7 +105,6 @@ body {
 
 let chart;
 let currentConstituency = "";
-let lastLoaded = "";
 
 /* ================= LOAD CONSTITUENCIES ================= */
 async function loadConstituencies(){
@@ -152,39 +128,23 @@ async function loadConstituencies(){
 
     currentConstituency = data[0];
 
-    // 🔒 LOCK LOGIC
     if(data.length === 1){
         select.disabled = true;
         note.innerText = "Locked to your constituency";
     } else {
-        select.disabled = false;
-        note.innerText = "";
-        select.addEventListener("change", changeConstituency);
+        select.addEventListener("change", () => {
+            currentConstituency = select.value;
+            loadDashboard();
+        });
     }
 
     loadDashboard();
 }
 
-/* ================= CHANGE ================= */
-function changeConstituency(){
-    const newVal = document.getElementById("constituencySelect").value;
-
-    // Prevent unnecessary reload
-    if(newVal === currentConstituency) return;
-
-    currentConstituency = newVal;
-    loadDashboard();
-}
-
-/* ================= LOAD DASHBOARD ================= */
+/* ================= MAIN DASHBOARD ================= */
 async function loadDashboard(){
 
     if(!currentConstituency) return;
-
-    // Prevent duplicate refresh loops
-    if(currentConstituency === lastLoaded) return;
-
-    lastLoaded = currentConstituency;
 
     const res = await fetch(`/api/constituency_dashboard/${currentConstituency}`);
     const data = await res.json();
@@ -205,32 +165,51 @@ async function loadDashboard(){
     coverage.innerText = data.coverage;
     turnout.innerText = data.turnout;
 
-    let labels=[], pfData=[], upndData=[];
-    let wardsHTML="";
+    // 🔥 LOAD WARD INTELLIGENCE (NEW)
+    loadWardIntelligence();
+}
 
-    data.wards.forEach(w=>{
+/* ================= WARD INTELLIGENCE ================= */
+async function loadWardIntelligence(){
+
+    const res = await fetch(`/api/ward_intelligence/${currentConstituency}`);
+    const data = await res.json();
+
+    let labels=[], pfData=[], upndData=[];
+    let html = "";
+    let dangerHTML = "";
+
+    data.forEach(w => {
+
         labels.push(w.ward);
-        pfData.push(w.pf);
-        upndData.push(w.upnd);
+        pfData.push(w.pf_votes);
+        upndData.push(w.upnd_votes);
 
         let color =
-            w.status.includes("WIN") || w.status==="STRONGHOLD" ? "#00ff00" :
-            w.status.includes("LOSS") || w.status==="LOST" ? "#ff4444" :
+            w.status === "STRONGHOLD" ? "#00ff00" :
+            w.status.includes("LOSS") ? "#ff4444" :
             "#ffaa00";
 
-        wardsHTML += `
+        html += `
         <div class="list-item" style="color:${color}">
-            ${w.ward}<br>
-            PF:${w.pf} | UPND:${w.upnd}
+            <strong>${w.ward}</strong><br>
+            PF: ${w.pf_votes} | UPND: ${w.upnd_votes}<br>
+            Margin: ${w.margin}<br>
+            Stations: ${w.reporting}/${w.stations} (${w.coverage}%)
         </div>`;
+
+        if(w.status.includes("LOSS")){
+            dangerHTML += `
+            <div class="list-item" style="color:red;">
+                ${w.ward} (${w.margin})
+            </div>`;
+        }
     });
 
-    wards.innerHTML = wardsHTML;
+    document.getElementById("wards").innerHTML = html;
+    document.getElementById("danger").innerHTML = dangerHTML || "None";
 
-    danger.innerHTML = data.danger_zones.map(d =>
-        `<div class="list-item" style="color:red;">${d.ward} (${d.margin})</div>`
-    ).join("") || "None";
-
+    // CHART
     if(chart) chart.destroy();
 
     chart = new Chart(wardChart, {
