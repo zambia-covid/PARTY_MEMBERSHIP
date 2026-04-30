@@ -880,6 +880,11 @@ def normalize_phone(phone):
 def ward_intelligence(constituency):
     return jsonify([])
     
+@app.route("/ward_intelligence")
+@login_required
+def ward_intelligence_page():
+    return render_template("ward_intelligence.html")
+
 # ==============================
 # CONSTITUENCY DASHBOARD
 # ==============================    
