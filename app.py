@@ -1523,7 +1523,6 @@ def ai_insights():
 # ==============================
 # REGISTER
 # ==============================
-
 @app.route('/register', methods=['GET', 'POST'])
 def register():
 
@@ -1550,6 +1549,7 @@ def register():
         return str(e), 400
 
     conn = None
+    cur = None
 
     try:
         conn = get_db()
@@ -1558,28 +1558,41 @@ def register():
         # =========================
         # CHECK EXISTING MEMBER
         # =========================
-        cur.execute(
-            "SELECT membership_id FROM members WHERE phone=%s",
-            (phone,)
-        )
+        cur.execute("""
+            SELECT membership_id 
+            FROM members 
+            WHERE phone = %s
+            LIMIT 1
+        """, (phone,))
         existing = cur.fetchone()
 
         if existing:
             member_id = existing[0]
-            card_url = f"/download_card/{member_id}"
-
             return render_template(
                 "success.html",
                 member_id=member_id,
-                card_url=card_url,
+                card_url=f"/download_card/{member_id}",
                 message="You are already registered"
             )
+
+        # =========================
+        # GET constituency_id (FOR CONSISTENCY)
+        # =========================
+        cur.execute("""
+            SELECT id FROM constituencies
+            WHERE LOWER(TRIM(constituency_name)) = LOWER(TRIM(%s))
+        """, (constituency,))
+        row = cur.fetchone()
+
+        if not row:
+            return "Invalid constituency", 400
+
+        constituency_id = row[0]
 
         # =========================
         # GENERATE MEMBER ID
         # =========================
         member_id = generate_member_id()
-        card_url = f"/download_card/{member_id}"
 
         # =========================
         # ASSIGN POLLING STATION
@@ -1601,18 +1614,32 @@ def register():
         })
 
         # =========================
-        # INSERT MEMBER
+        # INSERT MEMBER (STRICT)
         # =========================
         cur.execute("""
             INSERT INTO members
-            (membership_id, full_name, province, district, constituency, ward, phone, polling_station, status, ai_support)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'Active',%s)
+            (
+                membership_id,
+                full_name,
+                province,
+                district,
+                constituency,
+                constituency_id,
+                ward,
+                phone,
+                polling_station,
+                status,
+                ai_support,
+                created_at
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'Active',%s,NOW())
         """, (
             member_id,
             full_name,
             province,
             district,
             constituency,
+            constituency_id,
             ward,
             phone,
             polling_station,
@@ -1624,14 +1651,18 @@ def register():
     except Exception as e:
         if conn:
             conn.rollback()
-        return f"Error: {str(e)}", 500
+
+        print("REGISTER ERROR:", e)
+        return "Registration failed", 500
 
     finally:
+        if cur:
+            cur.close()
         if conn:
             conn.close()
 
     # =========================
-    # GENERATE ASSETS (SAFE MODE)
+    # BACKGROUND TASKS
     # =========================
     try:
         generate_assets_async(full_name, province, constituency, member_id)
@@ -1644,10 +1675,9 @@ def register():
     return render_template(
         "success.html",
         member_id=member_id,
-        card_url=card_url,
+        card_url=f"/download_card/{member_id}",
         message="Registration successful. Your card is ready."
     )
-
 
 # ==============================
 # TELEGRAM WEBHOOK
