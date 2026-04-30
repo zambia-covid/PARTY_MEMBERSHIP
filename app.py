@@ -871,6 +871,183 @@ def normalize_phone(phone):
 
     return phone
 
+# ==============================
+# API CONSTITUENCIES
+# ==============================
+@app.route("/api/constituencies")
+@login_required
+def get_constituencies():
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("SELECT constituency_name FROM constituencies ORDER BY constituency_name")
+
+    rows = [r[0] for r in cur.fetchall()]
+
+    cur.close()
+    conn.close()
+
+    return jsonify(rows)
+
+@app.route("/api/constituency_dashboard/<constituency>")
+@login_required
+def constituency_dashboard(constituency):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # ======================
+    # PRESIDENTIAL TOTALS
+    # ======================
+    cur.execute("""
+        SELECT 
+            COALESCE(SUM(pf_votes),0),
+            COALESCE(SUM(upnd_votes),0)
+        FROM polling_station_results
+        WHERE constituency = %s
+    """, (constituency,))
+    pf_pres, upnd_pres = cur.fetchone()
+
+    # ======================
+    # PARLIAMENTARY TOTALS
+    # ======================
+    cur.execute("""
+        SELECT 
+            COALESCE(SUM(pf_parliamentary),0),
+            COALESCE(SUM(upnd_parliamentary),0)
+        FROM polling_station_results
+        WHERE constituency = %s
+    """, (constituency,))
+    pf_parl, upnd_parl = cur.fetchone()
+
+    # ======================
+    # MEMBERS (TURNOUT BASE)
+    # ======================
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM members
+        WHERE constituency = %s AND status='Active'
+    """, (constituency,))
+    members = cur.fetchone()[0]
+
+    # ======================
+    # TOTAL VOTES (TURNOUT)
+    # ======================
+    total_votes = pf_pres + upnd_pres
+
+    turnout = (total_votes / members * 100) if members else 0
+
+    # ======================
+    # COVERAGE
+    # ======================
+    cur.execute("""
+        SELECT COUNT(DISTINCT polling_station)
+        FROM polling_station_results
+        WHERE constituency = %s
+    """, (constituency,))
+    reporting = cur.fetchone()[0]
+
+    cur.execute("""
+        SELECT COUNT(*)
+        FROM polling_stations
+        WHERE constituency = %s
+    """, (constituency,))
+    total_stations = cur.fetchone()[0]
+
+    coverage = (reporting / total_stations * 100) if total_stations else 0
+
+    # ======================
+    # WARD BREAKDOWN
+    # ======================
+    cur.execute("""
+        SELECT 
+            w.ward_name,
+            COALESCE(SUM(r.pf_votes),0),
+            COALESCE(SUM(r.upnd_votes),0)
+
+        FROM wards w
+
+        LEFT JOIN polling_stations ps
+            ON ps.ward_id = w.ward_id
+
+        LEFT JOIN polling_station_results r
+            ON r.polling_station = ps.station_name
+
+        WHERE w.constituency_id = (
+            SELECT id FROM constituencies WHERE constituency_name = %s
+        )
+
+        GROUP BY w.ward_name
+    """, (constituency,))
+
+    wards = []
+    danger_zones = []
+
+    for w in cur.fetchall():
+        name, pf, upnd = w
+        margin = pf - upnd
+
+        if margin > 1000:
+            status = "STRONGHOLD"
+        elif margin > 0:
+            status = "LEANING WIN"
+        elif margin == 0:
+            status = "TOSS-UP"
+        elif margin > -1000:
+            status = "LEANING LOSS"
+        else:
+            status = "LOST"
+
+        if status in ["LOST", "LEANING LOSS"]:
+            danger_zones.append({"ward": name, "margin": margin})
+
+        wards.append({
+            "ward": name,
+            "pf": pf,
+            "upnd": upnd,
+            "margin": margin,
+            "status": status
+        })
+
+    # ======================
+    # OVERALL STATUS
+    # ======================
+    margin_total = pf_pres - upnd_pres
+
+    if margin_total > 0:
+        overall_status = "WINNING"
+    elif margin_total < 0:
+        overall_status = "LOSING"
+    else:
+        overall_status = "TIED"
+
+    cur.close()
+    conn.close()
+
+    return jsonify({
+        "constituency": constituency,
+
+        "presidential": {
+            "pf": pf_pres,
+            "upnd": upnd_pres
+        },
+
+        "parliamentary": {
+            "pf": pf_parl,
+            "upnd": upnd_parl
+        },
+
+        "margin": margin_total,
+        "status": overall_status,
+
+        "coverage": round(coverage, 2),
+        "turnout": round(turnout, 2),
+
+        "wards": wards,
+        "danger_zones": danger_zones
+    })
+
 @app.route("/api/district_summary")
 @login_required
 def district_summary():
