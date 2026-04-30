@@ -872,6 +872,14 @@ def normalize_phone(phone):
     return phone
 
 # ==============================
+# CONSTITUENCY DASHBOARD
+# ==============================
+@app.route("/constituency_dashboard")
+@login_required
+def constituency_dashboard_page():
+    return render_template("constituency_dashboard.html")
+
+# ==============================
 # API CONSTITUENCIES
 # ==============================
 @app.route("/api/constituencies")
