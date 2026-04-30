@@ -3199,163 +3199,188 @@ def home():
 @role_required("admin", "national_manager")
 def dashboard():
 
-    conn = get_db()
-    cur = conn.cursor()
+    conn = None
+    cur = None
 
-    # ==============================
-    # TOTAL MEMBERS
-    # ==============================
-    cur.execute("SELECT COUNT(*) FROM members WHERE status='Active'")
-    total_members = cur.fetchone()[0]
+    try:
+        conn = get_db()
+        cur = conn.cursor()
 
-    # ==============================
-    # MEMBERS BY PROVINCE
-    # ==============================
-    cur.execute("""
-        SELECT province, COUNT(*)
-        FROM members
-        WHERE status='Active'
-        GROUP BY province
-        ORDER BY COUNT(*) DESC
-    """)
-    provinces = cur.fetchall()
+        # ==============================
+        # TOTAL MEMBERS
+        # ==============================
+        cur.execute("""
+            SELECT COUNT(*) 
+            FROM members 
+            WHERE status='Active'
+        """)
+        total_members = cur.fetchone()[0] or 0
 
-    # ==============================
-    # NATIONAL BASELINE
-    # ==============================
-    cur.execute("""
-        SELECT 
-            COALESCE(SUM(total_voters),0),
-            COALESCE(SUM(total_polling_stations),0)
-        FROM constituency_stats
-    """)
-    total_voters, national_stations = cur.fetchone()
+        # ==============================
+        # MEMBERS BY PROVINCE
+        # ==============================
+        cur.execute("""
+            SELECT province, COUNT(*)
+            FROM members
+            WHERE status='Active'
+            GROUP BY province
+            ORDER BY COUNT(*) DESC
+        """)
+        provinces = cur.fetchall()
 
-    # ==============================
-    # LIVE VOTES
-    # ==============================
-    cur.execute("""
-        SELECT 
-            COALESCE(SUM(pf_votes),0),
-            COALESCE(SUM(upnd_votes),0),
-            COALESCE(SUM(other_votes),0)
-        FROM polling_station_results
-    """)
-    pf_total, upnd_total, other_total = cur.fetchone()
+        # ==============================
+        # NATIONAL BASELINE
+        # ==============================
+        cur.execute("""
+            SELECT 
+                COALESCE(SUM(total_voters),0),
+                COALESCE(SUM(total_polling_stations),0)
+            FROM constituency_stats
+        """)
+        total_voters, national_stations = cur.fetchone()
 
-    margin = pf_total - upnd_total
+        # ==============================
+        # LIVE VOTES (NEW SCHEMA)
+        # ==============================
+        cur.execute("""
+            SELECT 
+                COALESCE(SUM(pf_presidential),0),
+                COALESCE(SUM(upnd_presidential),0),
+                COALESCE(SUM(other_presidential),0)
+            FROM polling_station_results
+        """)
+        pf_total, upnd_total, other_total = cur.fetchone()
 
-    if pf_total > upnd_total:
-        status = "WINNING"
-    elif pf_total < upnd_total:
-        status = "LOSING"
-    else:
-        status = "TIED"
+        margin = pf_total - upnd_total
 
-    # ==============================
-    # COVERAGE
-    # ==============================
-    cur.execute("""
-        SELECT COUNT(DISTINCT polling_station)
-        FROM polling_station_results
-    """)
-    reporting_stations = cur.fetchone()[0]
+        if margin > 0:
+            status = "WINNING"
+        elif margin < 0:
+            status = "LOSING"
+        else:
+            status = "TIED"
 
-    cur.execute("""
-        SELECT COUNT(DISTINCT polling_station)
-        FROM agents
-    """)
-    total_stations = cur.fetchone()[0]
+        # ==============================
+        # COVERAGE (FIXED)
+        # ==============================
+        cur.execute("""
+            SELECT COUNT(DISTINCT polling_station)
+            FROM polling_station_results
+        """)
+        reporting_stations = cur.fetchone()[0] or 0
 
-    coverage = 0
-    if total_stations > 0:
-        coverage = round((reporting_stations / total_stations) * 100, 1)
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM polling_stations
+        """)
+        total_stations = cur.fetchone()[0] or 0
 
-    # ==============================
-    # STRATEGIC METRICS
-    # ==============================
-    expected_votes = int(total_members * 0.65)
-    vote_gap = expected_votes - pf_total
+        coverage = round((reporting_stations / total_stations) * 100, 1) if total_stations else 0
 
-    votes_needed_to_win = int((total_voters * 0.5) + 1)
-    distance_to_majority = votes_needed_to_win - pf_total
+        # ==============================
+        # STRATEGIC METRICS
+        # ==============================
+        expected_votes = int(total_members * 0.65)
+        vote_gap = expected_votes - pf_total
 
-    turnout_efficiency = 0
-    if expected_votes > 0:
-        turnout_efficiency = round((pf_total / expected_votes) * 100, 1)
+        votes_needed_to_win = int((total_voters * 0.5) + 1) if total_voters else 0
+        distance_to_majority = votes_needed_to_win - pf_total
 
-    # ==============================
-    # RECENT RESULTS
-    # ==============================
-    cur.execute("""
-        SELECT polling_station, pf_votes, upnd_votes, other_votes
-        FROM polling_station_results
-        ORDER BY id DESC
-        LIMIT 5
-    """)
-    recent_results = cur.fetchall()
+        turnout_efficiency = round((pf_total / expected_votes) * 100, 1) if expected_votes else 0
 
-    # ==============================
-    # DANGER ZONES
-    # ==============================
-    cur.execute("""
-        SELECT constituency,
-               SUM(upnd_votes - pf_votes) AS gap
-        FROM polling_station_results
-        GROUP BY constituency
-        HAVING SUM(upnd_votes) > SUM(pf_votes)
-        ORDER BY gap DESC
-        LIMIT 5
-    """)
-    danger_zones = cur.fetchall()
+        # ==============================
+        # RECENT RESULTS (NEW SCHEMA)
+        # ==============================
+        cur.execute("""
+            SELECT polling_station, pf_presidential, upnd_presidential, other_presidential
+            FROM polling_station_results
+            ORDER BY id DESC
+            LIMIT 5
+        """)
+        recent_results = cur.fetchall()
 
-    # ==============================
-    # STRONGHOLDS
-    # ==============================
-    cur.execute("""
-        SELECT constituency,
-               SUM(pf_votes - upnd_votes) AS lead
-        FROM polling_station_results
-        GROUP BY constituency
-        HAVING SUM(pf_votes) > SUM(upnd_votes)
-        ORDER BY lead DESC
-        LIMIT 5
-    """)
-    strongholds = cur.fetchall()
+        # ==============================
+        # DANGER ZONES
+        # ==============================
+        cur.execute("""
+            SELECT constituency,
+                   SUM(upnd_presidential - pf_presidential) AS gap
+            FROM polling_station_results
+            GROUP BY constituency
+            HAVING SUM(upnd_presidential) > SUM(pf_presidential)
+            ORDER BY gap DESC
+            LIMIT 5
+        """)
+        danger_zones = cur.fetchall()
 
-    cur.close()
-    conn.close()
+        # ==============================
+        # STRONGHOLDS
+        # ==============================
+        cur.execute("""
+            SELECT constituency,
+                   SUM(pf_presidential - upnd_presidential) AS lead
+            FROM polling_station_results
+            GROUP BY constituency
+            HAVING SUM(pf_presidential) > SUM(upnd_presidential)
+            ORDER BY lead DESC
+            LIMIT 5
+        """)
+        strongholds = cur.fetchall()
 
-    system_status = {
-        "telegram": "OK",
-        "database": "Connected",
-        "server": "Running"
-    }
+        # ==============================
+        # SYSTEM STATUS
+        # ==============================
+        system_status = {
+            "telegram": "OK",
+            "database": "Connected",
+            "server": "Running"
+        }
 
-    return render_template(
-        "index.html",
-        total_members=total_members,
-        provinces=provinces,
-        pf_total=pf_total,
-        upnd_total=upnd_total,
-        other_total=other_total,
-        margin=margin,
-        status=status,
-        coverage=coverage,
-        reporting_stations=reporting_stations,
-        total_stations=total_stations,
-        total_voters=total_voters,
-        national_stations=national_stations,
-        expected_votes=expected_votes,
-        vote_gap=vote_gap,
-        votes_needed_to_win=votes_needed_to_win,
-        distance_to_majority=distance_to_majority,
-        turnout_efficiency=turnout_efficiency,
-        recent_results=recent_results,
-        danger_zones=danger_zones,
-        strongholds=strongholds,
-        system_status=system_status
-    )
+        # ==============================
+        # RESPONSE
+        # ==============================
+        return render_template(
+            "index.html",
+            total_members=total_members,
+            provinces=provinces,
+
+            pf_total=pf_total,
+            upnd_total=upnd_total,
+            other_total=other_total,
+
+            margin=margin,
+            status=status,
+
+            coverage=coverage,
+            reporting_stations=reporting_stations,
+            total_stations=total_stations,
+
+            total_voters=total_voters,
+            national_stations=national_stations,
+
+            expected_votes=expected_votes,
+            vote_gap=vote_gap,
+
+            votes_needed_to_win=votes_needed_to_win,
+            distance_to_majority=distance_to_majority,
+            turnout_efficiency=turnout_efficiency,
+
+            recent_results=recent_results,
+            danger_zones=danger_zones,
+            strongholds=strongholds,
+
+            system_status=system_status
+        )
+
+    except Exception as e:
+        print("DASHBOARD ERROR:", e)
+        return "Dashboard failed to load", 500
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 # ==============================
 # POLLING INTELLIGENCE
