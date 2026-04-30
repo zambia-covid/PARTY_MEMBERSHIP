@@ -63,17 +63,11 @@ input {
 }
 
 /* sortable */
-.sortable {
-    cursor: pointer;
-}
-.sortable:hover {
-    background: #145214;
-}
+.sortable { cursor: pointer; }
+.sortable:hover { background: #145214; }
 
-/* numeric columns centered */
-.num {
-    text-align: center;
-}
+/* numeric */
+.num { text-align: center; }
 
 /* province grouping */
 .province-row {
@@ -87,9 +81,12 @@ input {
 .heat-toss { background: rgba(255,200,0,0.2); }
 .heat-lose { background: rgba(255,0,0,0.15); }
 
+/* urgency */
+.low-coverage { background: #330000 !important; color:white; }
+
 /* status text */
-.WIN { color: green; font-weight: bold; }
-.LOSE { color: red; font-weight: bold; }
+.WIN, .LEANING\ WIN, .STRONGHOLD { color: green; font-weight: bold; }
+.LOSE, .LEANING\ LOSS, .LOST { color: red; font-weight: bold; }
 .TOSS-UP { color: orange; font-weight: bold; }
 
 </style>
@@ -100,43 +97,30 @@ input {
     <input type="text" id="provinceFilter" placeholder="Filter province...">
 </div>
 
-<!-- ACTIVE FILTER BADGES -->
 <div id="activeFilters" style="margin-bottom:10px;"></div>
 
-<!-- TABLE -->
 <div class="table-container">
 <table class="intel-table">
 
-    <colgroup>
-        <col style="width:20%">
-        <col style="width:15%">
-        <col style="width:12%">
-        <col style="width:12%">
-        <col style="width:13%">
-        <col style="width:12%">
-        <col style="width:16%">
-    </colgroup>
+<thead>
+<tr>
+    <th class="sortable" onclick="sortTable('constituency')">Constituency</th>
+    <th class="sortable" onclick="sortTable('province')">Province</th>
+    <th class="sortable num" onclick="sortTable('members')">Members</th>
+    <th class="sortable num" onclick="sortTable('voters')">Voters</th>
+    <th class="sortable num" onclick="sortTable('penetration')">Penetration %</th>
+    <th class="sortable num" onclick="sortTable('margin')">Margin</th>
+    <th class="sortable num" onclick="sortTable('coverage')">Coverage %</th>
+    <th class="sortable" onclick="sortTable('status')">Status</th>
+</tr>
+</thead>
 
-    <thead>
-        <tr>
-            <th class="sortable" onclick="sortTable('constituency')">Constituency</th>
-            <th class="sortable" onclick="sortTable('province')">Province</th>
-            <th class="sortable num" onclick="sortTable('members')">Members</th>
-            <th class="sortable num" onclick="sortTable('voters')">Voters</th>
-            <th class="sortable num" onclick="sortTable('penetration')">Penetration %</th>
-            <th class="sortable num" onclick="sortTable('margin')">Margin</th>
-            <th class="sortable" onclick="sortTable('status')">Status</th>
-        </tr>
-    </thead>
-
-    <tbody id="table-body"></tbody>
+<tbody id="table-body"></tbody>
 
 </table>
 </div>
 
 <script>
-
-document.addEventListener("DOMContentLoaded", function(){
 
 let allData = []
 let sortKey = null
@@ -145,16 +129,19 @@ let sortAsc = true
 async function loadData() {
     try {
         let res = await fetch("/api/constituency_intelligence")
-        allData = await res.json()
+        let data = await res.json()
+
+        console.log("INTEL DATA:", data)
+
+        allData = data
         render()
     } catch (e) {
         console.error("LOAD ERROR:", e)
     }
 }
 
-/* SORTING */
-window.sortTable = function(key) {
-    if (sortKey === key) {
+window.sortTable = function(key){
+    if(sortKey === key){
         sortAsc = !sortAsc
     } else {
         sortKey = key
@@ -163,8 +150,11 @@ window.sortTable = function(key) {
     render()
 }
 
-/* MAIN RENDER */
-function render() {
+function openConstituency(name){
+    window.location.href = `/constituency_dashboard?c=${encodeURIComponent(name)}`
+}
+
+function render(){
 
     let tbody = document.getElementById("table-body")
     let badgeBox = document.getElementById("activeFilters")
@@ -172,12 +162,10 @@ function render() {
     let search = (document.getElementById("search").value || "").toLowerCase()
     let provinceFilter = (document.getElementById("provinceFilter").value || "").toLowerCase()
 
-    /* BADGES */
     badgeBox.innerHTML = ""
-    if (search) badgeBox.innerHTML += `<span class="badge">Search: ${search}</span>`
-    if (provinceFilter) badgeBox.innerHTML += `<span class="badge">Province: ${provinceFilter}</span>`
+    if(search) badgeBox.innerHTML += `<span class="badge">Search: ${search}</span>`
+    if(provinceFilter) badgeBox.innerHTML += `<span class="badge">Province: ${provinceFilter}</span>`
 
-    /* FILTER */
     let data = allData.filter(c => {
         let con = (c.constituency || "").toLowerCase()
         let prov = (c.province || "").toLowerCase()
@@ -188,20 +176,28 @@ function render() {
         )
     })
 
-    /* SORT */
-    if (sortKey) {
+    if(sortKey){
         data.sort((a,b) => {
-            let x = a[sortKey] || 0
-            let y = b[sortKey] || 0
+            let x = a[sortKey]
+            let y = b[sortKey]
+
+            if(typeof x === "string"){
+                return sortAsc ? x.localeCompare(y) : y.localeCompare(x)
+            }
+
             return sortAsc ? x - y : y - x
         })
     }
 
-    /* GROUP BY PROVINCE */
+    if(data.length === 0){
+        tbody.innerHTML = `<tr><td colspan="8">No data available</td></tr>`
+        return
+    }
+
     let grouped = {}
 
     data.forEach(c => {
-        if (!grouped[c.province]) grouped[c.province] = []
+        if(!grouped[c.province]) grouped[c.province] = []
         grouped[c.province].push(c)
     })
 
@@ -211,25 +207,29 @@ function render() {
 
         html += `
         <tr class="province-row">
-            <td colspan="7">${province}</td>
+            <td colspan="8">${province}</td>
         </tr>
         `
 
         grouped[province].forEach(c => {
 
-            let heat = ""
-            if (c.status === "WIN") heat = "heat-win"
-            else if (c.status === "LOSE") heat = "heat-lose"
-            else heat = "heat-toss"
+            let heat = "heat-toss"
+
+            if(c.status && c.status.includes("WIN")) heat = "heat-win"
+            else if(c.status && c.status.includes("LOSS")) heat = "heat-lose"
+
+            let urgency = ""
+            if((c.coverage || 0) < 30) urgency = "low-coverage"
 
             html += `
-            <tr class="${heat}">
+            <tr class="${heat} ${urgency}" onclick="openConstituency('${c.constituency}')" style="cursor:pointer">
                 <td>${c.constituency}</td>
                 <td>${c.province}</td>
                 <td class="num">${c.members}</td>
                 <td class="num">${c.voters}</td>
                 <td class="num">${c.penetration}%</td>
                 <td class="num">${c.margin}</td>
+                <td class="num">${c.coverage || 0}%</td>
                 <td class="${c.status}">${c.status}</td>
             </tr>
             `
@@ -245,13 +245,10 @@ setTimeout(() => {
     document.getElementById("provinceFilter").addEventListener("input", render)
 }, 100)
 
-/* refresh */
-setInterval(loadData, 5000)
+/* safer refresh */
+setInterval(loadData, 15000)
 
-/* init */
 loadData()
-
-})
 
 </script>
 
