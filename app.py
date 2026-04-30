@@ -871,6 +871,104 @@ def normalize_phone(phone):
 
     return phone
 
+# ==============================
+# STATION INTEL
+# ==============================
+@app.route("/api/station_intelligence/<constituency>/<ward>")
+@login_required
+def station_intelligence(constituency, ward):
+
+    conn = None
+    cur = None
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        # ======================
+        # GET constituency_id
+        # ======================
+        cur.execute("""
+            SELECT id FROM constituencies
+            WHERE LOWER(TRIM(constituency_name)) = LOWER(TRIM(%s))
+        """, (constituency,))
+        row = cur.fetchone()
+
+        if not row:
+            return jsonify([])
+
+        constituency_id = row[0]
+
+        # ======================
+        # GET ward_id
+        # ======================
+        cur.execute("""
+            SELECT ward_id FROM wards
+            WHERE LOWER(TRIM(ward_name)) = LOWER(TRIM(%s))
+            AND constituency_id = %s
+        """, (ward, constituency_id))
+
+        row = cur.fetchone()
+
+        if not row:
+            return jsonify([])
+
+        ward_id = row[0]
+
+        # ======================
+        # STATION QUERY
+        # ======================
+        cur.execute("""
+            SELECT 
+                ps.station_name,
+                COALESCE(SUM(r.pf_votes),0),
+                COALESCE(SUM(r.upnd_votes),0)
+
+            FROM polling_stations ps
+
+            LEFT JOIN polling_station_results r
+                ON LOWER(TRIM(ps.station_name)) = LOWER(TRIM(r.polling_station))
+
+            WHERE ps.ward_id = %s
+
+            GROUP BY ps.station_name
+            ORDER BY ps.station_name
+        """, (ward_id,))
+
+        results = []
+
+        for station, pf, upnd in cur.fetchall():
+
+            margin = pf - upnd
+
+            if margin > 200:
+                status = "STRONG"
+            elif margin > 0:
+                status = "LEAN WIN"
+            elif margin == 0:
+                status = "NO DATA"
+            elif margin > -200:
+                status = "LEAN LOSS"
+            else:
+                status = "LOSS"
+
+            results.append({
+                "station": station,
+                "pf_votes": pf,
+                "upnd_votes": upnd,
+                "margin": margin,
+                "status": status
+            })
+
+        return jsonify(results)
+
+    except Exception as e:
+        print("STATION ERROR:", e)
+        return jsonify({"error": "Failed"}), 500
+
+    finally:
+        if cur: cur.close()
+        if conn: conn.close()
 
 # ==============================
 # WARD INTEL
