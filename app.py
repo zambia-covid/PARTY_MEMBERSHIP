@@ -871,9 +871,18 @@ def normalize_phone(phone):
 
     return phone
 
+
+# ==============================
+# WARD INTEL
+# ==============================
+@app.route("/api/ward_intelligence/<constituency>")
+@login_required
+def ward_intelligence(constituency):
+    return jsonify([])
+    
 # ==============================
 # CONSTITUENCY DASHBOARD
-# ==============================
+# ==============================    
 @app.route("/constituency_dashboard")
 @login_required
 def constituency_dashboard_page():
