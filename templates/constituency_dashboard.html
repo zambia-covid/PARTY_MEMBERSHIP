@@ -6,104 +6,42 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<h2 style="margin-bottom:10px;">⚔️ War Room</h2>
+<h2>⚔️ War Room</h2>
 
-<div class="selector">
+<div>
     <select id="constituencySelect"></select>
-    <small id="selectorNote" style="opacity:0.6;"></small>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 body { background:#0b0b0b; color:white; font-family:Arial; }
-
-.selector select {
-    width:100%; padding:10px; font-size:16px; border-radius:6px;
-}
-
-.grid {
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
-    gap:10px;
-}
-
-.card { background:#111; padding:10px; border-radius:8px; text-align:center; }
-
+.card { background:#111; padding:10px; margin:10px 0; border-radius:6px; }
+.scroll-box { max-height:250px; overflow-y:auto; }
+.list-item { padding:6px; border-bottom:1px solid #222; }
 .win { color:#00ff00; }
 .lose { color:#ff4444; }
 .tie { color:#ffaa00; }
-
-.section { margin-top:12px; }
-
-.scroll-box { max-height:250px; overflow-y:auto; }
-
-.list-item { padding:6px; border-bottom:1px solid #222; font-size:13px; }
-
-.split {
-    display:grid;
-    grid-template-columns:1fr;
-    gap:10px;
-}
-
-@media(min-width:768px){
-    .split { grid-template-columns:2fr 1fr; }
-}
 </style>
 
-<!-- KPI -->
-<div class="grid">
-    <div class="card">
-        <h4>Presidential</h4>
-        <p>PF: <b id="pf_pres"></b></p>
-        <p>UPND: <b id="upnd_pres"></b></p>
-    </div>
-
-    <div class="card">
-        <h4>Parliamentary</h4>
-        <p>PF: <b id="pf_parl"></b></p>
-        <p>UPND: <b id="upnd_parl"></b></p>
-    </div>
-
-    <div class="card">
-        <h4>Status</h4>
-        <h3 id="status"></h3>
-        <p id="margin"></p>
-    </div>
-
-    <div class="card">
-        <h4>Coverage</h4>
-        <p><b id="coverage"></b>%</p>
-    </div>
-
-    <div class="card">
-        <h4>Turnout</h4>
-        <p><b id="turnout"></b>%</p>
-    </div>
+<div class="card">
+    <h4>Status</h4>
+    <h3 id="status"></h3>
+    <p id="margin"></p>
 </div>
 
-<!-- CHART -->
-<div class="section card">
-    <h4>Ward Performance</h4>
-    <canvas id="wardChart" style="max-height:250px;"></canvas>
+<div class="card">
+    <h4>Ward Intelligence</h4>
+    <div id="wards" class="scroll-box">Loading...</div>
 </div>
 
-<!-- CONTENT -->
-<div class="section split">
-    <div class="card">
-        <h4>Ward Intelligence</h4>
-        <div id="wards" class="scroll-box"></div>
-    </div>
-
-    <div class="card">
-        <h4>🚨 Risk Zones</h4>
-        <div id="danger" class="scroll-box"></div>
-    </div>
+<div class="card">
+    <h4>🚨 Risk Zones</h4>
+    <div id="danger" class="scroll-box"></div>
 </div>
 
 <script>
 
-let chart;
 let currentConstituency = "";
 
 /* ================= LOAD CONSTITUENCIES ================= */
@@ -113,14 +51,6 @@ async function loadConstituencies(){
     const data = await res.json();
 
     const select = document.getElementById("constituencySelect");
-    const note = document.getElementById("selectorNote");
-
-    if(!data || data.length === 0){
-        select.innerHTML = `<option>No constituencies</option>`;
-        select.disabled = true;
-        note.innerText = "No access assigned";
-        return;
-    }
 
     select.innerHTML = data.map(c =>
         `<option value="${c}">${c}</option>`
@@ -128,15 +58,10 @@ async function loadConstituencies(){
 
     currentConstituency = data[0];
 
-    if(data.length === 1){
-        select.disabled = true;
-        note.innerText = "Locked to your constituency";
-    } else {
-        select.addEventListener("change", () => {
-            currentConstituency = select.value;
-            loadDashboard();
-        });
-    }
+    select.addEventListener("change", () => {
+        currentConstituency = select.value;
+        loadDashboard();
+    });
 
     loadDashboard();
 }
@@ -144,16 +69,8 @@ async function loadConstituencies(){
 /* ================= MAIN DASHBOARD ================= */
 async function loadDashboard(){
 
-    if(!currentConstituency) return;
-
     const res = await fetch(`/api/constituency_dashboard/${currentConstituency}`);
     const data = await res.json();
-
-    pf_pres.innerText = data.presidential.pf;
-    upnd_pres.innerText = data.presidential.upnd;
-
-    pf_parl.innerText = data.parliamentary.pf;
-    upnd_parl.innerText = data.parliamentary.upnd;
 
     margin.innerText = "Margin: " + data.margin;
 
@@ -162,79 +79,76 @@ async function loadDashboard(){
         data.status === "WINNING" ? "win" :
         data.status === "LOSING" ? "lose" : "tie";
 
-    coverage.innerText = data.coverage;
-    turnout.innerText = data.turnout;
-
-    // 🔥 LOAD WARD INTELLIGENCE (NEW)
     loadWardIntelligence();
 }
 
 /* ================= WARD INTELLIGENCE ================= */
 async function loadWardIntelligence(){
 
-    const res = await fetch(`/api/ward_intelligence/${currentConstituency}`);
-    const data = await res.json();
+    try {
+        const res = await fetch(`/api/ward_intelligence/${currentConstituency}`);
+        const data = await res.json();
 
-    let labels=[], pfData=[], upndData=[];
-    let html = "";
-    let dangerHTML = "";
+        // 🔥 DEBUG LOG
+        console.log("WARD DATA:", data);
 
-    data.forEach(w => {
+        if (!Array.isArray(data)) {
+            console.error("Invalid response format:", data);
+            document.getElementById("wards").innerHTML = "Error loading ward data";
+            return;
+        }
 
-        labels.push(w.ward);
-        pfData.push(w.pf_votes);
-        upndData.push(w.upnd_votes);
+        if (data.length === 0) {
+            document.getElementById("wards").innerHTML = "No ward data available";
+            return;
+        }
 
-        let color =
-            w.status === "STRONGHOLD" ? "#00ff00" :
-            w.status.includes("LOSS") ? "#ff4444" :
-            "#ffaa00";
+        let html = "";
+        let dangerHTML = "";
 
-        html += `
-        <div class="list-item" style="color:${color}">
-            <strong>${w.ward}</strong><br>
-            PF: ${w.pf_votes} | UPND: ${w.upnd_votes}<br>
-            Margin: ${w.margin}<br>
-            Stations: ${w.reporting}/${w.stations} (${w.coverage}%)
-        </div>`;
+        data.forEach(w => {
 
-        if(w.status.includes("LOSS")){
-            dangerHTML += `
-            <div class="list-item" style="color:red;">
-                ${w.ward} (${w.margin})
+            // SAFE VALUES
+            const pf = w.pf_votes || 0;
+            const upnd = w.upnd_votes || 0;
+            const margin = w.margin || 0;
+            const stations = w.stations || 0;
+            const reporting = w.reporting || 0;
+            const coverage = w.coverage || 0;
+            const status = w.status || "";
+
+            // COLOR LOGIC (SAFE)
+            let color = "#ffaa00";
+            if (status === "STRONGHOLD") color = "#00ff00";
+            else if (status && status.includes("LOSS")) color = "#ff4444";
+
+            html += `
+            <div class="list-item" style="color:${color}">
+                <strong>${w.ward}</strong><br>
+                PF: ${pf} | UPND: ${upnd}<br>
+                Margin: ${margin}<br>
+                Stations: ${reporting}/${stations} (${coverage}%)
             </div>`;
-        }
-    });
 
-    document.getElementById("wards").innerHTML = html;
-    document.getElementById("danger").innerHTML = dangerHTML || "None";
-
-    // CHART
-    if(chart) chart.destroy();
-
-    chart = new Chart(wardChart, {
-        type:"bar",
-        data:{
-            labels:labels,
-            datasets:[
-                {label:"PF", data:pfData},
-                {label:"UPND", data:upndData}
-            ]
-        },
-        options:{
-            responsive:true,
-            plugins:{legend:{labels:{color:"white"}}},
-            scales:{
-                x:{ticks:{color:"white"}},
-                y:{ticks:{color:"white"}}
+            if (status && status.includes("LOSS")) {
+                dangerHTML += `
+                <div class="list-item" style="color:red;">
+                    ${w.ward} (${margin})
+                </div>`;
             }
-        }
-    });
+        });
+
+        document.getElementById("wards").innerHTML = html || "No ward data available";
+        document.getElementById("danger").innerHTML = dangerHTML || "None";
+
+    } catch (err) {
+        console.error("WARD LOAD ERROR:", err);
+        document.getElementById("wards").innerHTML = "Error loading ward data";
+    }
 }
 
 /* ================= INIT ================= */
 loadConstituencies();
-setInterval(loadDashboard, 30000);
 
 </script>
 
