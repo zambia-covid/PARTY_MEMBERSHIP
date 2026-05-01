@@ -1789,15 +1789,9 @@ def ai_insights():
 @login_required
 def register():
 
-    # =========================
-    # SHOW FORM
-    # =========================
     if request.method == "GET":
         return render_template("register.html")
 
-    # =========================
-    # HANDLE INPUT
-    # =========================
     data = request.get_json() if request.is_json else request.form
 
     try:
@@ -1806,9 +1800,7 @@ def register():
         district = validate_location(data.get("district"), "district")
         constituency = validate_location(data.get("constituency"), "constituency")
 
-        # 🔥 TEMP: allow free ward input
         ward = (data.get("ward") or "").strip()
-
         if not ward:
             return "Ward is required", 400
 
@@ -1825,7 +1817,7 @@ def register():
         cur = conn.cursor()
 
         # =========================
-        # CHECK EXISTING MEMBER
+        # CHECK EXISTING
         # =========================
         cur.execute("""
             SELECT membership_id 
@@ -1844,18 +1836,12 @@ def register():
             )
 
         # =========================
-        # GENERATE MEMBER ID
+        # GENERATE ID
         # =========================
         member_id = generate_member_id()
 
         # =========================
-        # TEMP MODE (NO WARD_ID / STATION)
-        # =========================
-        ward_id = None
-        polling_station = None
-
-        # =========================
-        # AI CLASSIFICATION
+        # AI
         # =========================
         ai_score = ai_classify_voter({
             "full_name": full_name,
@@ -1864,13 +1850,10 @@ def register():
             "ward": ward
         })
 
-        # =========================
-        # AGENT ID
-        # =========================
         agent_id = getattr(current_user, "id", None)
 
         # =========================
-        # INSERT MEMBER (SAFE)
+        # INSERT
         # =========================
         cur.execute("""
             INSERT INTO members
@@ -1896,7 +1879,7 @@ def register():
             constituency,
             ward,
             phone,
-            polling_station,
+            None,
             agent_id,
             ai_score
         ))
@@ -1909,7 +1892,6 @@ def register():
 
         import traceback
         traceback.print_exc()
-
         return f"Error: {str(e)}", 500
 
     finally:
@@ -1919,15 +1901,12 @@ def register():
             conn.close()
 
     # =========================
-    # GENERATE ASSETS (NON-BLOCKING)
+    # 🔥 GENERATE CARD (SYNC)
     # =========================
-    try:
-        generate_assets_async(full_name, province, constituency, member_id)
-    except Exception as e:
-        print(f"[ASSET ERROR] {e}")
+    generate_assets(full_name, province, constituency, member_id)
 
     # =========================
-    # SUCCESS RESPONSE
+    # SUCCESS
     # =========================
     return render_template(
         "success.html",
@@ -1935,6 +1914,31 @@ def register():
         card_url=f"/download_card/{member_id}",
         message="Registration successful. Your card is ready."
     )
+
+
+def generate_assets(full_name, province, constituency, member_id):
+
+    try:
+        os.makedirs("static/cards", exist_ok=True)
+
+        file_path = os.path.join("static", "cards", f"{member_id}.png")
+
+        img = Image.new("RGB", (600, 350), color=(0, 80, 0))
+        draw = ImageDraw.Draw(img)
+
+        draw.text((20, 20), "PF Pamodzi Alliance", fill="white")
+        draw.text((20, 80), f"Name: {full_name}", fill="white")
+        draw.text((20, 120), f"Province: {province}", fill="white")
+        draw.text((20, 160), f"Constituency: {constituency}", fill="white")
+        draw.text((20, 200), f"ID: {member_id}", fill="yellow")
+
+        img.save(file_path)
+
+        print("✅ CARD SAVED:", file_path)
+
+    except Exception as e:
+        print("❌ CARD GENERATION FAILED:", e)
+        raise
 
 # ==============================
 # TELEGRAM WEBHOOK
