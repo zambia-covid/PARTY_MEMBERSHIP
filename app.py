@@ -133,7 +133,7 @@ def build_polling_intelligence(cur):
             cs.total_voters,
             cs.total_polling_stations,
 
-            COALESCE(SUM(r.RP_votes), 0) AS RP_votes,
+            COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
             COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes,
 
             COUNT(DISTINCT r.polling_station) AS reporting_stations
@@ -164,7 +164,7 @@ def build_polling_intelligence(cur):
             members,
             voters,
             total_stations,
-            RP_votes,
+            pf_votes,
             upnd_votes,
             reporting_stations
         ) = r
@@ -173,8 +173,8 @@ def build_polling_intelligence(cur):
         # CORE METRICS
         # =========================
         penetration = (members / voters * 100) if voters else 0
-        margin = RP_votes - upnd_votes
-        turnout = RP_votes + upnd_votes
+        margin = pf_votes - upnd_votes
+        turnout = pf_votes + upnd_votes
         coverage = (reporting_stations / total_stations * 100) if total_stations else 0
 
         # =========================
@@ -292,7 +292,7 @@ def build_polling_intelligence(cur):
             "coverage": round(coverage, 2),
             "penetration": round(penetration, 2),
 
-            "RP_votes": RP_votes,
+            "pf_votes": pf_votes,
             "upnd_votes": upnd_votes,
             "margin": margin,
             "turnout": turnout,
@@ -372,7 +372,7 @@ def send_sms(phone, message):
         "username": os.getenv("TA_USERNAME"),
         "to": phone,
         "message": message,
-        "sender_id": os.getenv("TA_SENDER_ID")  # e.g. "RP2026"
+        "sender_id": os.getenv("TA_SENDER_ID")  # e.g. "PF2026"
     }
 
     try:
@@ -583,7 +583,7 @@ def generate_member_id():
 
     while True:
         number = random.randint(100000, 999999)
-        member_id = f"RPA{number}"
+        member_id = f"PFP{number}"
 
         cur.execute("SELECT 1 FROM members WHERE membership_id=%s", (member_id,))
         if not cur.fetchone():
@@ -605,7 +605,7 @@ def generate_membership_card(name, province, constituency, member_id):
     # QR CODE
     # ==============================
     qr_data = f"""
-Organisation: RP Alliance
+Organisation: PF Pamodzi Alliance
 Name: {name}
 Province: {province}
 Constituency: {constituency}
@@ -637,7 +637,7 @@ Issue Date: {issue_date}
     # HEADER BAR
     # ==============================
     draw.rectangle([(0, 0), (width, 70)], fill="#083D14")  # darker green
-    draw.text((20, 20), "RP Alliance", fill="white", font=title_font)
+    draw.text((20, 20), "PF PAMODZI ALLIANCE", fill="white", font=title_font)
 
     # ==============================
     # MEMBER DETAILS
@@ -921,7 +921,7 @@ def station_intelligence(constituency, ward):
         cur.execute("""
             SELECT 
                 ps.station_name,
-                COALESCE(SUM(r.RP_votes),0),
+                COALESCE(SUM(r.pf_votes),0),
                 COALESCE(SUM(r.upnd_votes),0)
 
             FROM polling_stations ps
@@ -937,9 +937,9 @@ def station_intelligence(constituency, ward):
 
         results = []
 
-        for station, RP, upnd in cur.fetchall():
+        for station, pf, upnd in cur.fetchall():
 
-            margin = RP - upnd
+            margin = pf - upnd
 
             if margin > 200:
                 status = "STRONG"
@@ -954,7 +954,7 @@ def station_intelligence(constituency, ward):
 
             results.append({
                 "station": station,
-                "RP_votes": RP,
+                "pf_votes": pf,
                 "upnd_votes": upnd,
                 "margin": margin,
                 "status": status
@@ -1024,7 +1024,7 @@ def ward_intelligence(constituency):
                 w.ward_name,
                 COUNT(DISTINCT ps.id) AS stations,
                 COUNT(DISTINCT r.polling_station) AS reporting,
-                COALESCE(SUM(r.RP_votes), 0) AS RP_votes,
+                COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
                 COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
 
             FROM wards w
@@ -1045,9 +1045,9 @@ def ward_intelligence(constituency):
 
         results = []
 
-        for ward, stations, reporting, RP, upnd in rows:
+        for ward, stations, reporting, pf, upnd in rows:
 
-            margin = RP - upnd
+            margin = pf - upnd
             coverage = (reporting / stations * 100) if stations else 0
 
             # ======================
@@ -1066,7 +1066,7 @@ def ward_intelligence(constituency):
 
             results.append({
                 "ward": ward,
-                "RP_votes": RP,
+                "pf_votes": pf,
                 "upnd_votes": upnd,
                 "margin": margin,
                 "stations": stations,
@@ -1177,17 +1177,17 @@ def constituency_dashboard(constituency):
         # ======================
         cur.execute("""
             SELECT 
-                COALESCE(SUM(RP_votes),0),
+                COALESCE(SUM(pf_votes),0),
                 COALESCE(SUM(upnd_votes),0)
             FROM polling_station_results
             WHERE constituency = %s
         """, (constituency,))
-        RP_pres, upnd_pres = cur.fetchone()
+        pf_pres, upnd_pres = cur.fetchone()
 
         # ======================
         # PARLIAMENTARY (TEMP FIX)
         # ======================
-        RP_parl = RP_pres
+        pf_parl = pf_pres
         upnd_parl = upnd_pres
 
         # ======================
@@ -1200,7 +1200,7 @@ def constituency_dashboard(constituency):
         """, (constituency,))
         members = cur.fetchone()[0]
 
-        total_votes = RP_pres + upnd_pres
+        total_votes = pf_pres + upnd_pres
         turnout = (total_votes / members * 100) if members else 0
 
         # ======================
@@ -1228,7 +1228,7 @@ def constituency_dashboard(constituency):
         cur.execute("""
             SELECT 
                 w.ward_name,
-                COALESCE(SUM(r.RP_votes),0),
+                COALESCE(SUM(r.pf_votes),0),
                 COALESCE(SUM(r.upnd_votes),0)
             FROM wards w
             LEFT JOIN polling_stations ps ON ps.ward_id = w.ward_id
@@ -1243,8 +1243,8 @@ def constituency_dashboard(constituency):
         wards = []
         danger_zones = []
 
-        for name, RP, upnd in cur.fetchall():
-            margin = RP - upnd
+        for name, pf, upnd in cur.fetchall():
+            margin = pf - upnd
 
             if margin > 1000:
                 status = "STRONGHOLD"
@@ -1262,20 +1262,20 @@ def constituency_dashboard(constituency):
 
             wards.append({
                 "ward": name,
-                "RP": RP,
+                "pf": pf,
                 "upnd": upnd,
                 "margin": margin,
                 "status": status
             })
 
-        margin_total = RP_pres - upnd_pres
+        margin_total = pf_pres - upnd_pres
 
         status = "WINNING" if margin_total > 0 else "LOSING" if margin_total < 0 else "TIED"
 
         return jsonify({
             "constituency": constituency,
-            "presidential": {"RP": RP_pres, "upnd": upnd_pres},
-            "parliamentary": {"RP": RP_parl, "upnd": upnd_parl},
+            "presidential": {"pf": pf_pres, "upnd": upnd_pres},
+            "parliamentary": {"pf": pf_parl, "upnd": upnd_parl},
             "margin": margin_total,
             "status": status,
             "coverage": round(coverage, 2),
@@ -1523,6 +1523,7 @@ def ai_insights():
 # ==============================
 # REGISTER
 # ==============================
+
 @app.route('/register', methods=['GET', 'POST'])
 def register():
 
@@ -1549,7 +1550,6 @@ def register():
         return str(e), 400
 
     conn = None
-    cur = None
 
     try:
         conn = get_db()
@@ -1558,41 +1558,28 @@ def register():
         # =========================
         # CHECK EXISTING MEMBER
         # =========================
-        cur.execute("""
-            SELECT membership_id 
-            FROM members 
-            WHERE phone = %s
-            LIMIT 1
-        """, (phone,))
+        cur.execute(
+            "SELECT membership_id FROM members WHERE phone=%s",
+            (phone,)
+        )
         existing = cur.fetchone()
 
         if existing:
             member_id = existing[0]
+            card_url = f"/download_card/{member_id}"
+
             return render_template(
                 "success.html",
                 member_id=member_id,
-                card_url=f"/download_card/{member_id}",
+                card_url=card_url,
                 message="You are already registered"
             )
-
-        # =========================
-        # GET constituency_id (FOR CONSISTENCY)
-        # =========================
-        cur.execute("""
-            SELECT id FROM constituencies
-            WHERE LOWER(TRIM(constituency_name)) = LOWER(TRIM(%s))
-        """, (constituency,))
-        row = cur.fetchone()
-
-        if not row:
-            return "Invalid constituency", 400
-
-        constituency_id = row[0]
 
         # =========================
         # GENERATE MEMBER ID
         # =========================
         member_id = generate_member_id()
+        card_url = f"/download_card/{member_id}"
 
         # =========================
         # ASSIGN POLLING STATION
@@ -1614,32 +1601,18 @@ def register():
         })
 
         # =========================
-        # INSERT MEMBER (STRICT)
+        # INSERT MEMBER
         # =========================
         cur.execute("""
             INSERT INTO members
-            (
-                membership_id,
-                full_name,
-                province,
-                district,
-                constituency,
-                constituency_id,
-                ward,
-                phone,
-                polling_station,
-                status,
-                ai_support,
-                created_at
-            )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'Active',%s,NOW())
+            (membership_id, full_name, province, district, constituency, ward, phone, polling_station, status, ai_support)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'Active',%s)
         """, (
             member_id,
             full_name,
             province,
             district,
             constituency,
-            constituency_id,
             ward,
             phone,
             polling_station,
@@ -1651,18 +1624,14 @@ def register():
     except Exception as e:
         if conn:
             conn.rollback()
-
-        print("REGISTER ERROR:", e)
-        return "Registration failed", 500
+        return f"Error: {str(e)}", 500
 
     finally:
-        if cur:
-            cur.close()
         if conn:
             conn.close()
 
     # =========================
-    # BACKGROUND TASKS
+    # GENERATE ASSETS (SAFE MODE)
     # =========================
     try:
         generate_assets_async(full_name, province, constituency, member_id)
@@ -1675,9 +1644,10 @@ def register():
     return render_template(
         "success.html",
         member_id=member_id,
-        card_url=f"/download_card/{member_id}",
+        card_url=card_url,
         message="Registration successful. Your card is ready."
     )
+
 
 # ==============================
 # TELEGRAM WEBHOOK
@@ -1854,7 +1824,7 @@ def whatsapp_webhook():
     if msg.lower() == "start":
 
         whatsapp_states[phone_id] = "ASK_NAME"
-        resp.message("Welcome to RP Pamodzi registration.\nWhat is your full name?")
+        resp.message("Welcome to PF Pamodzi registration.\nWhat is your full name?")
 
         return str(resp)
 
@@ -1948,7 +1918,7 @@ def constituency_detail(constituency):
 
     cur.execute("""
         SELECT polling_station,
-               RP_votes,
+               pf_votes,
                upnd_votes
         FROM polling_station_results
         WHERE constituency = %s
@@ -1961,7 +1931,7 @@ def constituency_detail(constituency):
     return jsonify([
         {
             "station": r[0],
-            "RP": r[1],
+            "pf": r[1],
             "upnd": r[2]
         } for r in rows
     ])
@@ -2123,7 +2093,7 @@ def live_dashboard():
 
     cur.execute("""
         SELECT constituency,
-               COALESCE(SUM(RP_votes),0),
+               COALESCE(SUM(pf_votes),0),
                COALESCE(SUM(upnd_votes),0)
         FROM polling_station_results
         GROUP BY constituency
@@ -2131,8 +2101,8 @@ def live_dashboard():
 
     data = []
 
-    for c, RP, upnd in cur.fetchall():
-        margin = RP - upnd
+    for c, pf, upnd in cur.fetchall():
+        margin = pf - upnd
 
         if margin > 0:
             status = "WIN"
@@ -2143,7 +2113,7 @@ def live_dashboard():
 
         data.append({
             "constituency": c,
-            "RP": RP,
+            "pf": pf,
             "upnd": upnd,
             "margin": margin,
             "status": status
@@ -2163,7 +2133,7 @@ def map_intelligence():
 
     cur.execute("""
         SELECT constituency,
-               SUM(RP_votes),
+               SUM(pf_votes),
                SUM(upnd_votes)
         FROM polling_station_results
         GROUP BY constituency
@@ -2172,14 +2142,14 @@ def map_intelligence():
     map_data = []
     alerts = []
 
-    for c, RP, upnd in cur.fetchall():
+    for c, pf, upnd in cur.fetchall():
 
-        margin = (RP or 0) - (upnd or 0)
+        margin = (pf or 0) - (upnd or 0)
 
         if margin > 1000:
-            heat = "strong_RP"
+            heat = "strong_pf"
         elif margin > 0:
-            heat = "lean_RP"
+            heat = "lean_pf"
         elif margin < -1000:
             heat = "strong_upnd"
         elif margin < 0:
@@ -2189,7 +2159,7 @@ def map_intelligence():
 
         map_data.append({
             "constituency": c,
-            "RP": RP,
+            "pf": pf,
             "upnd": upnd,
             "margin": margin,
             "heat": heat
@@ -2218,7 +2188,7 @@ def turnout_targets():
         SELECT 
             polling_station,
             COUNT(m.membership_id) as members,
-            COALESCE(SUM(r.RP_votes + r.upnd_votes),0) as votes
+            COALESCE(SUM(r.pf_votes + r.upnd_votes),0) as votes
         FROM members m
         LEFT JOIN polling_station_results r
         ON m.polling_station = r.polling_station
@@ -2261,13 +2231,13 @@ def strategy():
     # ==============================
     cur.execute("""
         SELECT 
-            COALESCE(SUM(RP_votes),0),
+            COALESCE(SUM(pf_votes),0),
             COALESCE(SUM(upnd_votes),0)
         FROM polling_station_results
     """)
 
-    RP, upnd = cur.fetchone()
-    margin = RP - upnd
+    pf, upnd = cur.fetchone()
+    margin = pf - upnd
 
     # ==============================
     # 📍 PROVINCIAL BREAKDOWN
@@ -2276,7 +2246,7 @@ def strategy():
         SELECT 
             p.province,
             p.total_voters,
-            COALESCE(SUM(r.RP_votes),0) AS RP_votes,
+            COALESCE(SUM(r.pf_votes),0) AS pf_votes,
             COALESCE(SUM(r.upnd_votes),0) AS upnd_votes
         FROM provinces p
         LEFT JOIN polling_station_results r
@@ -2292,14 +2262,14 @@ def strategy():
     for r in rows:
         province = r[0]
         voters = r[1]
-        RP_votes = r[2]
+        pf_votes = r[2]
         upnd_votes = r[3]
 
-        turnout = (RP_votes + upnd_votes)
+        turnout = (pf_votes + upnd_votes)
         turnout_pct = (turnout / voters * 100) if voters else 0
 
         province_lines.append(
-            f"{province}: {voters} voters | RP {RP_votes} vs UPND {upnd_votes} | turnout {turnout_pct:.1f}%"
+            f"{province}: {voters} voters | PF {pf_votes} vs UPND {upnd_votes} | turnout {turnout_pct:.1f}%"
         )
 
     province_breakdown = "\n".join(province_lines)
@@ -2312,7 +2282,7 @@ National election situation:
 
 {province_breakdown}
 
-Total RP: {RP}
+Total PF: {pf}
 Total UPND: {upnd}
 Margin: {margin}
 
@@ -2352,7 +2322,7 @@ Focus on:
     return jsonify({
         "advice": advice,
         "margin": margin,
-        "RP": RP,
+        "pf": pf,
         "upnd": upnd
     })
 
@@ -2387,7 +2357,7 @@ def api_constituency_intelligence():
         c.total_voters,
         c.total_polling_stations,
 
-        COALESCE(SUM(r.RP_votes), 0) AS RP_votes,
+        COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
         COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
 
     FROM constituencies c
@@ -2412,12 +2382,12 @@ def api_constituency_intelligence():
 
     for r in rows:
 
-        constituency, province, members, voters, stations, RP, upnd = r
+        constituency, province, members, voters, stations, pf, upnd = r
 
         # ======================
         # CORE METRICS
         # ======================
-        score = RP - upnd
+        score = pf - upnd
         margin = score
         penetration = (members / voters * 100) if voters else 0
         margin_pct = (score / voters * 100) if voters else 0
@@ -2442,7 +2412,7 @@ def api_constituency_intelligence():
             "members": members,
             "voters": voters,
             "stations": stations,
-            "RP_votes": RP,
+            "pf_votes": pf,
             "upnd_votes": upnd,
             "penetration": round(penetration, 2),
             "margin": margin,
@@ -2478,17 +2448,17 @@ def submit_results():
     if request.method == 'POST':
 
         try:
-            RP = int(request.form.get("RP", 0))
+            pf = int(request.form.get("pf", 0))
             upnd = int(request.form.get("upnd", 0))
             other = int(request.form.get("other", 0))
         except:
             return "Invalid input", 400
 
         # 🔴 BASIC VALIDATION
-        if RP < 0 or upnd < 0 or other < 0:
+        if pf < 0 or upnd < 0 or other < 0:
             return "Votes cannot be negative", 400
 
-        total_votes = RP + upnd + other
+        total_votes = pf + upnd + other
 
         if total_votes == 0:
             return "Total votes cannot be zero", 400
@@ -2546,14 +2516,14 @@ def submit_results():
         # ==============================
         cur.execute("""
             INSERT INTO polling_station_results
-            (agent_id, province, constituency, polling_station, RP_votes, upnd_votes, other_votes, created_at)
+            (agent_id, province, constituency, polling_station, pf_votes, upnd_votes, other_votes, created_at)
             VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
         """, (
             agent_id,
             province,
             constituency,
             polling_station,
-            RP,
+            pf,
             upnd,
             other
         ))
@@ -2802,7 +2772,7 @@ def voter_tabulation():
     cur.execute("""
         SELECT 
             polling_station,
-            SUM(RP_votes) as RP,
+            SUM(pf_votes) as pf,
             SUM(upnd_votes) as upnd,
             SUM(other_votes) as other
         FROM polling_station_results
@@ -2815,7 +2785,7 @@ def voter_tabulation():
     # 🔢 National totals
     cur.execute("""
         SELECT 
-            COALESCE(SUM(RP_votes),0),
+            COALESCE(SUM(pf_votes),0),
             COALESCE(SUM(upnd_votes),0),
             COALESCE(SUM(other_votes),0)
         FROM polling_station_results
@@ -2843,7 +2813,7 @@ def agent_results():
 
     cur.execute("""
         SELECT agent_id, province, constituency, polling_station,
-               RP_votes, upnd_votes, other_votes
+               pf_votes, upnd_votes, other_votes
         FROM polling_station_results
         ORDER BY polling_station
     """)
@@ -2981,22 +2951,22 @@ def agent_vote_send():
         try:
             parts = msg.split()
 
-            RP_votes = int(parts[1])
+            pf_votes = int(parts[1])
             upnd_votes = int(parts[2])
             other_votes = int(parts[3]) if len(parts) > 3 else 0
 
             cur.execute("""
                 INSERT INTO polling_station_results
-                (agent_id, province, constituency, polling_station, RP_votes, upnd_votes, other_votes)
+                (agent_id, province, constituency, polling_station, pf_votes, upnd_votes, other_votes)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (agent_id, province, constituency, polling_station, RP_votes, upnd_votes, other_votes))
+            """, (agent_id, province, constituency, polling_station, pf_votes, upnd_votes, other_votes))
 
             conn.commit()
 
-            reply = f"Results received for {polling_station}. RP:{RP_votes} UPND:{upnd_votes}"
+            reply = f"Results received for {polling_station}. PF:{pf_votes} UPND:{upnd_votes}"
 
         except:
-            reply = "Invalid format. Use: RESULT RP UPND OTHER"
+            reply = "Invalid format. Use: RESULT PF UPND OTHER"
 
     # 🔹 TURNOUT
     elif msg == "TURNOUT":
@@ -3008,7 +2978,7 @@ def agent_vote_send():
         total_members = cur.fetchone()[0]
 
         cur.execute("""
-            SELECT COALESCE(SUM(RP_votes + upnd_votes + other_votes),0)
+            SELECT COALESCE(SUM(pf_votes + upnd_votes + other_votes),0)
             FROM polling_station_results
             WHERE polling_station=%s
         """, (polling_station,))
@@ -3234,7 +3204,7 @@ def war_room():
     # =========================
     cur.execute("""
         SELECT constituency,
-               COALESCE(SUM(RP_votes),0) as RP,
+               COALESCE(SUM(pf_votes),0) as pf,
                COALESCE(SUM(upnd_votes),0) as upnd
         FROM polling_station_results
         WHERE constituency IS NOT NULL
@@ -3243,10 +3213,10 @@ def war_room():
 
     map_data = []
 
-    for c, RP, upnd in cur.fetchall():
+    for c, pf, upnd in cur.fetchall():
 
         constituency = (c or "").strip()
-        margin = RP - upnd
+        margin = pf - upnd
 
         if margin > 0:
             status = "WIN"
@@ -3257,7 +3227,7 @@ def war_room():
 
         map_data.append({
             "constituency": constituency,
-            "RP": int(RP),
+            "pf": int(pf),
             "upnd": int(upnd),
             "margin": int(margin),
             "status": status
@@ -3299,7 +3269,7 @@ def map_data():
 
     cur.execute("""
         SELECT constituency,
-               SUM(RP_votes),
+               SUM(pf_votes),
                SUM(upnd_votes)
         FROM polling_station_results
         GROUP BY constituency
@@ -3307,16 +3277,16 @@ def map_data():
 
     data = {}
 
-    for c, RP, upnd in cur.fetchall():
-        if RP > upnd:
-            status = "RP"
-        elif upnd > RP:
+    for c, pf, upnd in cur.fetchall():
+        if pf > upnd:
+            status = "PF"
+        elif upnd > pf:
             status = "UPND"
         else:
             status = "TIED"
 
         data[c] = {
-            "RP": RP,
+            "pf": pf,
             "upnd": upnd,
             "status": status
         }
@@ -3397,14 +3367,14 @@ def dashboard():
         # ==============================
         cur.execute("""
             SELECT 
-                COALESCE(SUM(RP_presidential),0),
+                COALESCE(SUM(pf_presidential),0),
                 COALESCE(SUM(upnd_presidential),0),
                 COALESCE(SUM(other_presidential),0)
             FROM polling_station_results
         """)
-        RP_total, upnd_total, other_total = cur.fetchone()
+        pf_total, upnd_total, other_total = cur.fetchone()
 
-        margin = RP_total - upnd_total
+        margin = pf_total - upnd_total
 
         if margin > 0:
             status = "WINNING"
@@ -3434,18 +3404,18 @@ def dashboard():
         # STRATEGIC METRICS
         # ==============================
         expected_votes = int(total_members * 0.65)
-        vote_gap = expected_votes - RP_total
+        vote_gap = expected_votes - pf_total
 
         votes_needed_to_win = int((total_voters * 0.5) + 1) if total_voters else 0
-        distance_to_majority = votes_needed_to_win - RP_total
+        distance_to_majority = votes_needed_to_win - pf_total
 
-        turnout_efficiency = round((RP_total / expected_votes) * 100, 1) if expected_votes else 0
+        turnout_efficiency = round((pf_total / expected_votes) * 100, 1) if expected_votes else 0
 
         # ==============================
         # RECENT RESULTS (NEW SCHEMA)
         # ==============================
         cur.execute("""
-            SELECT polling_station, RP_presidential, upnd_presidential, other_presidential
+            SELECT polling_station, pf_presidential, upnd_presidential, other_presidential
             FROM polling_station_results
             ORDER BY id DESC
             LIMIT 5
@@ -3457,10 +3427,10 @@ def dashboard():
         # ==============================
         cur.execute("""
             SELECT constituency,
-                   SUM(upnd_presidential - RP_presidential) AS gap
+                   SUM(upnd_presidential - pf_presidential) AS gap
             FROM polling_station_results
             GROUP BY constituency
-            HAVING SUM(upnd_presidential) > SUM(RP_presidential)
+            HAVING SUM(upnd_presidential) > SUM(pf_presidential)
             ORDER BY gap DESC
             LIMIT 5
         """)
@@ -3471,10 +3441,10 @@ def dashboard():
         # ==============================
         cur.execute("""
             SELECT constituency,
-                   SUM(RP_presidential - upnd_presidential) AS lead
+                   SUM(pf_presidential - upnd_presidential) AS lead
             FROM polling_station_results
             GROUP BY constituency
-            HAVING SUM(RP_presidential) > SUM(upnd_presidential)
+            HAVING SUM(pf_presidential) > SUM(upnd_presidential)
             ORDER BY lead DESC
             LIMIT 5
         """)
@@ -3497,7 +3467,7 @@ def dashboard():
             total_members=total_members,
             provinces=provinces,
 
-            RP_total=RP_total,
+            pf_total=pf_total,
             upnd_total=upnd_total,
             other_total=other_total,
 
@@ -3810,7 +3780,7 @@ def send_cards_to_existing_members():
 def send_existing_cards():
     key = request.args.get("key")
 
-    if key != os.getenv("ADMIN_KEY", "RPA_secure_12345"):
+    if key != os.getenv("ADMIN_KEY", "pfp_secure_12345"):
         return {"error": "Unauthorized"}, 403
 
     count = send_cards_to_existing_members()
@@ -3851,6 +3821,7 @@ from flask import send_file, request
 from dotenv import load_dotenv
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
+from tempfile import NamedTemporaryFile
 
 load_dotenv()
 
