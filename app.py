@@ -1604,12 +1604,16 @@ def district_summary():
 
 @app.route("/download_card/<member_id>")
 def download_card(member_id):
-    path = f"cards/{member_id}.png"
 
-    if not os.path.exists(path):
-        return "Card not found", 404
+    file_path = os.path.join("static", "cards", f"{member_id}.png")
 
-    return send_file(path, as_attachment=True)
+    print("🔍 Looking for:", file_path)
+
+    if not os.path.exists(file_path):
+        print("❌ FILE NOT FOUND")
+        return f"Card not found for {member_id}", 404
+
+    return send_file(file_path, as_attachment=True)
 
 # ==============================
 # API PROVINCES
