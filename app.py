@@ -1117,13 +1117,13 @@ def api_provincial_dashboard(province):
         province = province.strip()
 
         # ======================
-        # ACCESS CONTROL
+        # ACCESS CONTROL (HARD)
         # ======================
         if current_user.role in ["admin", "national_manager"]:
             pass
 
         elif current_user.role == "provincial_manager":
-            if province.lower().strip() != (current_user.province or "").lower().strip():
+            if province.lower() != (current_user.province or "").lower():
                 return jsonify({"error": "Unauthorized"}), 403
 
         else:
@@ -1136,7 +1136,7 @@ def api_provincial_dashboard(province):
             SELECT COUNT(*)
             FROM members
             WHERE LOWER(TRIM(province)) = LOWER(TRIM(%s))
-            AND status='Active'
+            AND status = 'Active'
         """, (province,))
         total_members = cur.fetchone()[0]
 
@@ -1152,11 +1152,11 @@ def api_provincial_dashboard(province):
         """, (province,))
         pf_total, upnd_total = cur.fetchone()
 
-        margin = pf_total - upnd_total
+        margin_total = pf_total - upnd_total
 
         status = (
-            "WINNING" if margin > 0
-            else "LOSING" if margin < 0
+            "WINNING" if margin_total > 0
+            else "LOSING" if margin_total < 0
             else "TIED"
         )
 
@@ -1180,16 +1180,23 @@ def api_provincial_dashboard(province):
         coverage = (reporting / total_stations * 100) if total_stations else 0
 
         # ======================
-        # CONSTITUENCY BREAKDOWN
+        # CONSTITUENCIES (FIXED CORE)
         # ======================
         cur.execute("""
             SELECT 
-                constituency,
-                COALESCE(SUM(pf_votes),0) AS pf,
-                COALESCE(SUM(upnd_votes),0) AS upnd
-            FROM polling_station_results
-            WHERE LOWER(TRIM(province)) = LOWER(TRIM(%s))
-            GROUP BY constituency
+                c.constituency_name,
+                COALESCE(SUM(r.pf_votes),0) AS pf,
+                COALESCE(SUM(r.upnd_votes),0) AS upnd
+
+            FROM constituencies c
+
+            LEFT JOIN polling_station_results r
+                ON LOWER(TRIM(r.constituency)) = LOWER(TRIM(c.constituency_name))
+                AND LOWER(TRIM(r.province)) = LOWER(TRIM(c.province))
+
+            WHERE LOWER(TRIM(c.province)) = LOWER(TRIM(%s))
+
+            GROUP BY c.constituency_name
         """, (province,))
 
         constituencies = []
@@ -1199,6 +1206,9 @@ def api_provincial_dashboard(province):
 
             margin = pf - upnd
 
+            # ======================
+            # STATUS CLASSIFICATION
+            # ======================
             if margin > 1000:
                 status_c = "STRONGHOLD"
             elif margin > 0:
@@ -1209,6 +1219,14 @@ def api_provincial_dashboard(province):
                 status_c = "LEANING LOSS"
             else:
                 status_c = "LOST"
+
+            # ======================
+            # COVERAGE FLAG
+            # ======================
+            if pf == 0 and upnd == 0:
+                coverage_flag = "NO DATA"
+            else:
+                coverage_flag = "ACTIVE"
 
             if status_c in ["LOST", "LEANING LOSS"]:
                 danger_zones.append({
@@ -1221,20 +1239,25 @@ def api_provincial_dashboard(province):
                 "pf": pf,
                 "upnd": upnd,
                 "margin": margin,
-                "status": status_c
+                "status": status_c,
+                "coverage_flag": coverage_flag
             })
 
         # ======================
-        # RANK WORST AREAS
+        # SORTING (WAR-ROOM MODE)
         # ======================
+        constituencies = sorted(constituencies, key=lambda x: x["margin"])
         danger_zones = sorted(danger_zones, key=lambda x: x["margin"])[:5]
 
+        # ======================
+        # RESPONSE
+        # ======================
         return jsonify({
             "province": province,
             "members": total_members,
             "pf_votes": pf_total,
             "upnd_votes": upnd_total,
-            "margin": margin,
+            "margin": margin_total,
             "status": status,
             "coverage": round(coverage, 2),
             "reporting": reporting,
@@ -1248,8 +1271,10 @@ def api_provincial_dashboard(province):
         return jsonify({"error": "Failed to load provincial dashboard"}), 500
 
     finally:
-        if cur: cur.close()
-        if conn: conn.close()
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 # ==============================
 # CONSTITUENCY DASHBOARD
