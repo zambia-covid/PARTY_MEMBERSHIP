@@ -1876,8 +1876,10 @@ def register():
             district,
             constituency,
             ward,
+            ward_id,
             phone,
             polling_station,
+            current_user.id,
             ai_score
         ))
 
