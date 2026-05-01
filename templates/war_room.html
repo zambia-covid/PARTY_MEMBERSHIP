@@ -4,6 +4,8 @@
 
 {% block content %}
 
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <h2 style="text-align:center;color:#00ff88;margin-bottom:10px;">
 ⚔️ WAR ROOM
 </h2>
@@ -14,6 +16,7 @@
 <style>
 .main { background: #050505; color: white; }
 
+/* KPI */
 .kpis {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px,1fr));
@@ -34,6 +37,7 @@
 .lose { color:#ff0000; background:rgba(255,0,0,0.1); border-left:4px solid #ff0000; }
 .tie { color:#ffff00; background:rgba(255,255,0,0.1); border-left:4px solid #ffff00; }
 
+/* LAYOUT */
 .layout {
     display:grid;
     grid-template-columns:2fr 1fr;
@@ -54,17 +58,63 @@
 }
 
 .row {
-    padding:6px;
+    padding:10px;
     border-bottom:1px solid #222;
+    cursor:pointer;
 }
 
-/* 🔥 LABEL STYLE */
+.row:hover {
+    background:#1a1a1a;
+}
+
+/* MAP LABEL */
 .map-label {
     color: black;
     font-size: 10px;
     font-weight: bold;
     background: transparent;
     border: none;
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+
+    h2 {
+        font-size: 20px;
+    }
+
+    .layout {
+        grid-template-columns: 1fr;
+    }
+
+    #map {
+        height: 300px;
+    }
+
+    .kpis {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+
+    .kpi {
+        padding: 8px;
+    }
+
+    .kpi b {
+        font-size: 16px;
+    }
+
+    .card {
+        padding: 10px;
+    }
+
+    .row {
+        font-size: 14px;
+    }
+
+    .map-label {
+        font-size: 8px;
+    }
 }
 </style>
 
@@ -74,6 +124,19 @@
     <div class="kpi tie">TOSS-UP<br><b>{{ summary.toss }}</b></div>
     <div class="kpi lose">LOSE<br><b>{{ summary.lose }}</b></div>
 </div>
+
+<!-- MOBILE MAP TOGGLE -->
+<button onclick="toggleMap()" style="
+    width:100%;
+    padding:10px;
+    margin-bottom:10px;
+    background:#111;
+    color:white;
+    border:none;
+    border-radius:6px;
+">
+Toggle Map
+</button>
 
 <div class="layout">
 
@@ -86,7 +149,8 @@
         <div class="card">
             <h3>🚨 Danger Zones</h3>
             {% for d in danger_zones %}
-                <div class="row lose">
+                <div class="row lose"
+                     onclick="openConstituency('{{ d.constituency if d.constituency else d[0] }}')">
                     {{ d.constituency if d.constituency else d[0] }}
                 </div>
             {% endfor %}
@@ -100,7 +164,9 @@
                     {% elif r.status in ['LOST','LEANING LOSS'] %}lose
                     {% else %}tie
                     {% endif %}
-                ">
+                "
+                onclick="openConstituency('{{ r.constituency }}')">
+
                     <strong>{{ r.constituency }}</strong><br>
                     {{ r.status }}
                 </div>
@@ -113,12 +179,23 @@
 
 <script>
 
-// INIT MAP
+/* NAVIGATION */
+function openConstituency(name){
+    window.location.href = `/constituency_dashboard/${encodeURIComponent(name)}`
+}
+
+/* MAP TOGGLE (MOBILE) */
+function toggleMap(){
+    let mapDiv = document.getElementById("map");
+    mapDiv.style.display = mapDiv.style.display === "none" ? "block" : "none";
+}
+
+/* INIT MAP */
 var map = L.map('map').setView([-13.1339, 27.8493], 6);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
 
-// NORMALIZE
+/* NORMALIZE */
 function normalize(name){
     return (name || "")
         .toLowerCase()
@@ -127,12 +204,12 @@ function normalize(name){
         .trim();
 }
 
-// 🔥 SAFE GEOJSON NAME
+/* SAFE NAME */
 function getName(props){
     return props.shapeName || props.name || props.NAME || "";
 }
 
-// LOAD DATA
+/* LOAD DATA */
 fetch("/api/constituency_intelligence")
 .then(res => res.json())
 .then(data => {
@@ -165,31 +242,31 @@ fetch("/api/constituency_intelligence")
 
             style: function(feature){
                 let raw = getName(feature.properties);
-                let key = normalize(raw);
-                let r = results[key];
+                let r = results[normalize(raw)];
 
                 return {
                     color:"#333",
                     weight:1,
-                    fillColor: getColor(r ? r.status : "TOSS-UP"),
-                    fillOpacity: getOpacity(r ? r.score : 0)
+                    fillColor:getColor(r ? r.status : "TOSS-UP"),
+                    fillOpacity:getOpacity(r ? r.score : 0)
                 };
             },
 
             onEachFeature: function(feature, layer){
 
                 let raw = getName(feature.properties);
-                let key = normalize(raw);
-                let r = results[key];
+                let r = results[normalize(raw)];
 
-                // POPUP
                 layer.bindPopup(`
                     <b>${raw}</b><br>
                     Status: ${r ? r.status : "TOSS-UP"}<br>
                     Score: ${r ? r.score : 0}
                 `);
 
-                // 🔥 LABEL FIX
+                layer.on("click", function(){
+                    openConstituency(raw);
+                });
+
                 layer.bindTooltip(raw, {
                     permanent: true,
                     direction: "center",
