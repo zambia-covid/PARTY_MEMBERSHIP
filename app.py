@@ -1786,12 +1786,17 @@ def ai_insights():
 # REGISTER
 # ==============================
 @app.route('/register', methods=['GET', 'POST'])
-@login_required
 def register():
 
+    # =========================
+    # SHOW FORM
+    # =========================
     if request.method == "GET":
         return render_template("register.html")
 
+    # =========================
+    # HANDLE INPUT
+    # =========================
     data = request.get_json() if request.is_json else request.form
 
     try:
@@ -1799,49 +1804,55 @@ def register():
         province = validate_location(data.get("province"), "province")
         district = validate_location(data.get("district"), "district")
         constituency = validate_location(data.get("constituency"), "constituency")
-
-        ward = (data.get("ward") or "").strip()
-        if not ward:
-            return "Ward is required", 400
-
+        ward = validate_location(data.get("ward"), "ward")
         phone = normalize_phone(data.get("phone"))
 
     except ValueError as e:
         return str(e), 400
 
     conn = None
-    cur = None
 
     try:
         conn = get_db()
         cur = conn.cursor()
 
         # =========================
-        # CHECK EXISTING
+        # CHECK EXISTING MEMBER
         # =========================
-        cur.execute("""
-            SELECT membership_id 
-            FROM members 
-            WHERE phone = %s
-        """, (phone,))
+        cur.execute(
+            "SELECT membership_id FROM members WHERE phone=%s",
+            (phone,)
+        )
         existing = cur.fetchone()
 
         if existing:
             member_id = existing[0]
+            card_url = f"/download_card/{member_id}"
+
             return render_template(
                 "success.html",
                 member_id=member_id,
-                card_url=f"/download_card/{member_id}",
+                card_url=card_url,
                 message="You are already registered"
             )
 
         # =========================
-        # GENERATE ID
+        # GENERATE MEMBER ID
         # =========================
         member_id = generate_member_id()
+        card_url = f"/download_card/{member_id}"
 
         # =========================
-        # AI
+        # ASSIGN POLLING STATION
+        # =========================
+        polling_station = assign_polling_station({
+            "province": province,
+            "district": district,
+            "constituency": constituency
+        })
+
+        # =========================
+        # AI CLASSIFICATION
         # =========================
         ai_score = ai_classify_voter({
             "full_name": full_name,
@@ -1850,27 +1861,13 @@ def register():
             "ward": ward
         })
 
-        agent_id = getattr(current_user, "id", None)
-
         # =========================
-        # INSERT
+        # INSERT MEMBER
         # =========================
         cur.execute("""
             INSERT INTO members
-            (
-                membership_id,
-                full_name,
-                province,
-                district,
-                constituency,
-                ward,
-                phone,
-                polling_station,
-                agent_id,
-                status,
-                ai_support
-            )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'Active',%s)
+            (membership_id, full_name, province, district, constituency, ward, phone, polling_station, status, ai_support)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'Active',%s)
         """, (
             member_id,
             full_name,
@@ -1879,8 +1876,7 @@ def register():
             constituency,
             ward,
             phone,
-            None,
-            agent_id,
+            polling_station,
             ai_score
         ))
 
@@ -1889,56 +1885,30 @@ def register():
     except Exception as e:
         if conn:
             conn.rollback()
-
-        import traceback
-        traceback.print_exc()
         return f"Error: {str(e)}", 500
 
     finally:
-        if cur:
-            cur.close()
         if conn:
             conn.close()
 
     # =========================
-    # 🔥 GENERATE CARD (SYNC)
+    # GENERATE ASSETS (SAFE MODE)
     # =========================
-    generate_assets(full_name, province, constituency, member_id)
+    try:
+        generate_assets_async(full_name, province, constituency, member_id)
+    except Exception as e:
+        print(f"[ASSET ERROR] {e}")
 
     # =========================
-    # SUCCESS
+    # RESPONSE
     # =========================
     return render_template(
         "success.html",
         member_id=member_id,
-        card_url=f"/download_card/{member_id}",
+        card_url=card_url,
         message="Registration successful. Your card is ready."
     )
 
-
-def generate_assets(full_name, province, constituency, member_id):
-
-    try:
-        os.makedirs("static/cards", exist_ok=True)
-
-        file_path = os.path.join("static", "cards", f"{member_id}.png")
-
-        img = Image.new("RGB", (600, 350), color=(0, 80, 0))
-        draw = ImageDraw.Draw(img)
-
-        draw.text((20, 20), "PF Pamodzi Alliance", fill="white")
-        draw.text((20, 80), f"Name: {full_name}", fill="white")
-        draw.text((20, 120), f"Province: {province}", fill="white")
-        draw.text((20, 160), f"Constituency: {constituency}", fill="white")
-        draw.text((20, 200), f"ID: {member_id}", fill="yellow")
-
-        img.save(file_path)
-
-        print("✅ CARD SAVED:", file_path)
-
-    except Exception as e:
-        print("❌ CARD GENERATION FAILED:", e)
-        raise
 
 # ==============================
 # TELEGRAM WEBHOOK
