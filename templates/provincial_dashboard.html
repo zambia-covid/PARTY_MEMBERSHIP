@@ -1,82 +1,63 @@
 {% extends "base.html" %}
 
-{% block title %}Provincial Dashboard{% endblock %}
+{% block title %}Provincial War Room{% endblock %}
 
 {% block content %}
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-.page {
-    display:flex;
-    gap:15px;
-}
+.page { display:flex; gap:15px; }
 
 /* ===== SIDEBAR ===== */
 .sidebar {
-    width:220px;
-    background:#0B5D1E;
-    padding:15px;
-    border-radius:10px;
-    height:fit-content;
+    width:230px; background:#0B5D1E; padding:15px; border-radius:10px; height:fit-content;
 }
-
 .sidebar a {
-    display:block;
-    color:white;
-    text-decoration:none;
-    padding:10px;
-    margin-bottom:5px;
-    border-radius:6px;
+    display:block; color:white; text-decoration:none; padding:10px; margin-bottom:6px; border-radius:6px;
 }
-
-.sidebar a:hover {
-    background:#145214;
-}
+.sidebar a:hover { background:#145214; }
+.sidebar hr { border-color:#145214; margin:12px 0; }
 
 /* ===== MAIN ===== */
-.main {
-    flex:1;
-}
+.main { flex:1; }
 
+/* ===== CARDS ===== */
 .card {
-    background:white;
-    padding:15px;
-    border-radius:10px;
-    margin-bottom:15px;
+    background:#fff; padding:14px; border-radius:10px; margin-bottom:12px;
+    box-shadow:0 2px 6px rgba(0,0,0,0.08);
 }
-
 .grid {
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
-    gap:10px;
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px;
 }
 
 /* ===== COLORS ===== */
-.good { color:green; font-weight:bold; }
-.bad { color:red; font-weight:bold; }
-.warn { color:orange; font-weight:bold; }
+.good { color:#0a8a0a; font-weight:bold; }
+.bad { color:#c40000; font-weight:bold; }
+.warn { color:#c47a00; font-weight:bold; }
+.muted { color:#777; font-size:12px; }
 
 /* ===== TABLE ===== */
-.table {
-    width:100%;
-    border-collapse:collapse;
-}
+.table { width:100%; border-collapse:collapse; }
+.table th { background:#0B5D1E; color:white; padding:10px; text-align:left; }
+.table td { padding:10px; border-bottom:1px solid #eee; }
 
-.table th {
-    background:#0B5D1E;
-    color:white;
-    padding:10px;
-}
-
-.table td {
-    padding:10px;
-    border-bottom:1px solid #eee;
-}
-
-.row-win { background:rgba(0,200,0,0.1); }
-.row-loss { background:rgba(255,0,0,0.1); }
+.row-win { background:rgba(0,200,0,0.10); }
+.row-loss { background:rgba(255,0,0,0.10); }
 .row-risk { background:#330000; color:white; }
+.low-coverage { outline:2px solid #c47a00; }
+
+/* ===== BADGES ===== */
+.badge { display:inline-block; padding:3px 8px; border-radius:6px; font-size:11px; }
+.b-red { background:#5a0000; color:#fff; }
+.b-amber { background:#5a3d00; color:#fff; }
+.b-green { background:#004d00; color:#fff; }
+
+/* ===== CONTROLS ===== */
+.controls { display:flex; gap:10px; margin-bottom:10px; }
+.controls input {
+    padding:8px; border-radius:6px; border:1px solid #ddd; width:220px;
+}
 
 /* ===== MOBILE ===== */
 @media(max-width:768px){
@@ -92,20 +73,17 @@
 
     <h3 style="color:white;">Command</h3>
 
-    <a href="{{ url_for('provincial_dashboard_page') }}">
-        📍 Provincial
-    </a>
+    <a href="{{ url_for('dashboard') }}">🏠 National</a>
+    <a href="{{ url_for('provincial_dashboard_page') }}">📍 Provincial</a>
+    <a href="{{ url_for('constituency_dashboard_page') }}">🗺️ Constituency</a>
+    <a href="{{ url_for('ward_intelligence_page') }}">🧭 Ward Intelligence</a>
 
-    <a href="{{ url_for('constituency_dashboard_page') }}">
-        🗺️ Constituency
-    </a>
+    <hr>
 
-    <a href="{{ url_for('ward_intelligence_page') }}">
-        🧭 Ward Intelligence
-    </a>
-
-    <!-- 🔴 ADD THIS -->
-    <hr style="border-color:#145214; margin:15px 0;">
+    <p class="muted">
+        {{ current_user.role }}<br>
+        {{ current_user.province }}
+    </p>
 
     <a href="{{ url_for('logout') }}" style="background:#660000;">
         🚪 Logout
@@ -116,16 +94,21 @@
 <!-- ================= MAIN ================= -->
 <div class="main">
 
-<h2>📍 Provincial Dashboard</h2>
+<h2>⚔️ Provincial War Room</h2>
 
 <div class="card">
-    <strong>Province:</strong> 
-    <span id="provinceName">{{ province }}</span>
+    <strong>Province:</strong> <span id="provinceName">{{ province }}</span>
+    <span class="muted" id="lastUpdated" style="float:right;"></span>
+</div>
+
+<!-- ================= ALERTS ================= -->
+<div class="card">
+    <h4>⚠️ Operational Alerts</h4>
+    <ul id="alerts"></ul>
 </div>
 
 <!-- ================= KPIs ================= -->
 <div class="grid">
-
     <div class="card">
         <h4>Members</h4>
         <h2 id="members">0</h2>
@@ -142,6 +125,11 @@
     </div>
 
     <div class="card">
+        <h4>Margin</h4>
+        <h2 id="margin">0</h2>
+    </div>
+
+    <div class="card">
         <h4>Status</h4>
         <h2 id="status"></h2>
     </div>
@@ -149,14 +137,19 @@
     <div class="card">
         <h4>Coverage</h4>
         <h2 id="coverage">0%</h2>
+        <div class="muted" id="coverageMeta"></div>
     </div>
-
 </div>
 
 <!-- ================= DANGER ================= -->
 <div class="card">
-    <h3>🚨 Danger Constituencies</h3>
+    <h3>🚨 Top Risk Constituencies</h3>
     <ul id="dangerList"></ul>
+</div>
+
+<!-- ================= CONTROLS ================= -->
+<div class="controls">
+    <input id="search" placeholder="Filter constituency...">
 </div>
 
 <!-- ================= TABLE ================= -->
@@ -166,11 +159,12 @@
     <table class="table">
         <thead>
             <tr>
-                <th>Constituency</th>
-                <th>PF</th>
-                <th>UPND</th>
-                <th>Margin</th>
+                <th onclick="sortBy('constituency')" style="cursor:pointer;">Constituency</th>
+                <th onclick="sortBy('pf')" style="cursor:pointer;">PF</th>
+                <th onclick="sortBy('upnd')" style="cursor:pointer;">UPND</th>
+                <th onclick="sortBy('margin')" style="cursor:pointer;">Margin</th>
                 <th>Status</th>
+                <th>Coverage</th>
             </tr>
         </thead>
         <tbody id="tableBody"></tbody>
@@ -183,6 +177,9 @@
 <script>
 
 let province = "{{ province }}";
+let allData = [];
+let sortKey = "margin";
+let sortAsc = true;
 
 /* ================= LOAD ================= */
 async function loadDashboard(){
@@ -191,55 +188,139 @@ async function loadDashboard(){
         const res = await fetch(`/api/provincial_dashboard/${province}`);
         const data = await res.json();
 
+        if (data.error){
+            console.error(data.error);
+            return;
+        }
+
         console.log("PROV DATA:", data);
 
+        // KPIs
         document.getElementById("members").innerText = data.members;
         document.getElementById("pf").innerText = data.pf_votes;
         document.getElementById("upnd").innerText = data.upnd_votes;
 
-        document.getElementById("coverage").innerText = data.coverage + "%";
+        const margin = data.margin || 0;
+        document.getElementById("margin").innerText = margin;
 
-        let statusEl = document.getElementById("status");
+        const statusEl = document.getElementById("status");
         statusEl.innerText = data.status;
+        statusEl.className = (data.status === "WINNING") ? "good" :
+                             (data.status === "LOSING") ? "bad" : "warn";
 
-        if(data.status === "WINNING") statusEl.className = "good";
-        else if(data.status === "LOSING") statusEl.className = "bad";
-        else statusEl.className = "warn";
+        document.getElementById("coverage").innerText = data.coverage + "%";
+        document.getElementById("coverageMeta").innerText =
+            `${data.reporting} / ${data.total_stations}`;
 
-        /* ===== DANGER ===== */
-        let dangerHTML = "";
-        data.danger_zones.forEach(d => {
-            dangerHTML += `<li class="bad">${d.constituency} → ${d.margin}</li>`;
-        });
+        document.getElementById("lastUpdated").innerText =
+            "Updated: " + new Date().toLocaleTimeString();
+
+        // Alerts
+        buildAlerts(data);
+
+        // Danger (already pre-sorted worst first from API)
+        const dangerHTML = (data.danger_zones || [])
+            .map(d => `<li class="bad"><strong>${d.constituency}</strong> → ${d.margin}</li>`)
+            .join("");
         document.getElementById("dangerList").innerHTML = dangerHTML || "None";
 
-        /* ===== TABLE ===== */
-        let html = "";
-
-        data.constituencies.forEach(c => {
-
-            let rowClass = "row-toss";
-
-            if(c.status.includes("WIN")) rowClass = "row-win";
-            else if(c.status.includes("LOSS")) rowClass = "row-loss";
-
-            if(c.margin < -1000) rowClass = "row-risk";
-
-            html += `
-            <tr class="${rowClass}" onclick="openConstituency('${c.constituency}')">
-                <td>${c.constituency}</td>
-                <td>${c.pf}</td>
-                <td>${c.upnd}</td>
-                <td>${c.margin}</td>
-                <td>${c.status}</td>
-            </tr>`;
+        // Table
+        allData = (data.constituencies || []).map(c => {
+            // derive simple coverage flag (no per-const coverage from API → fallback 0)
+            c.coverage = c.coverage || 0;
+            return c;
         });
 
-        document.getElementById("tableBody").innerHTML = html;
+        renderTable();
 
     } catch(err){
         console.error("LOAD ERROR:", err);
     }
+}
+
+/* ================= ALERT ENGINE ================= */
+function buildAlerts(data){
+    const alerts = [];
+
+    if ((data.coverage || 0) < 40){
+        alerts.push("Low reporting coverage — deploy field agents now");
+    }
+
+    if ((data.margin || 0) < 0){
+        alerts.push("Province losing — concentrate resources in top risk constituencies");
+    }
+
+    if (!alerts.length){
+        alerts.push("Stable — maintain pressure and protect strongholds");
+    }
+
+    document.getElementById("alerts").innerHTML =
+        alerts.map(a => `<li class="warn">${a}</li>`).join("");
+}
+
+/* ================= TABLE ================= */
+function sortBy(key){
+    if (sortKey === key){
+        sortAsc = !sortAsc;
+    } else {
+        sortKey = key;
+        sortAsc = true;
+    }
+    renderTable();
+}
+
+function renderTable(){
+    const q = (document.getElementById("search").value || "").toLowerCase();
+
+    let data = allData.filter(c =>
+        (c.constituency || "").toLowerCase().includes(q)
+    );
+
+    data.sort((a,b)=>{
+        let x = a[sortKey];
+        let y = b[sortKey];
+
+        if (typeof x === "string"){
+            return sortAsc ? x.localeCompare(y) : y.localeCompare(x);
+        }
+        return sortAsc ? x - y : y - x;
+    });
+
+    // default: worst first if margin sort
+    if (sortKey === "margin" && sortAsc){
+        data = data.reverse();
+    }
+
+    let html = "";
+
+    data.forEach(c => {
+
+        let rowClass = "row-win";
+        if (c.status && c.status.includes("LOSS")) rowClass = "row-loss";
+        if ((c.margin || 0) < -1000) rowClass = "row-risk";
+
+        const covBadge = (c.coverage === 0)
+            ? `<span class="badge b-red">NOT REPORTING</span>`
+            : (c.coverage < 30)
+                ? `<span class="badge b-amber">LOW</span>`
+                : `<span class="badge b-green">OK</span>`;
+
+        html += `
+        <tr class="${rowClass}" onclick="openConstituency('${c.constituency}')">
+            <td>${c.constituency}</td>
+            <td>${c.pf}</td>
+            <td>${c.upnd}</td>
+            <td>${c.margin}</td>
+            <td>${c.status}</td>
+            <td>${covBadge}</td>
+        </tr>`;
+    });
+
+    if (!html){
+        html = `<tr><td colspan="6">No data</td></tr>`;
+    }
+
+    document.getElementById("tableBody").innerHTML = html;
 }
 
 /* ================= NAV ================= */
@@ -247,10 +328,10 @@ function openConstituency(name){
     window.location.href = `/constituency_dashboard?c=${encodeURIComponent(name)}`;
 }
 
-/* INIT */
-loadDashboard();
+/* ================= INIT ================= */
+document.getElementById("search").addEventListener("input", renderTable);
 
-/* REFRESH */
+loadDashboard();
 setInterval(loadDashboard, 15000);
 
 </script>
