@@ -5,38 +5,35 @@
 {% block content %}
 
 <h2 style="text-align:center;color:#00ff88;margin-bottom:10px;">
-⚔️ NATIONAL WAR ROOM
+⚔️ WAR ROOM
 </h2>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <style>
-.main { background:#050505; color:white; }
+.main { background: #050505; color: white; }
 
-/* KPI */
 .kpis {
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(120px,1fr));
-    gap:10px;
-    margin-bottom:15px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px,1fr));
+    gap: 10px;
+    margin-bottom: 15px;
 }
 
 .kpi {
-    background:#111;
-    padding:12px;
-    border-radius:8px;
-    text-align:center;
+    background: #111;
+    padding: 10px;
+    border-radius: 8px;
+    text-align: center;
 }
 
-.kpi b { font-size:22px; }
+.kpi b { font-size: 20px; }
 
-/* STATUS COLORS */
-.win { color:#00ff00; background:rgba(0,255,0,0.15); border-left:4px solid #00ff00; }
-.lose { color:#ff0000; background:rgba(255,0,0,0.15); border-left:4px solid #ff0000; }
-.tie { color:#ffff00; background:rgba(255,255,0,0.15); border-left:4px solid #ffff00; }
+.win { color:#00ff00; background:rgba(0,255,0,0.1); border-left:4px solid #00ff00; }
+.lose { color:#ff0000; background:rgba(255,0,0,0.1); border-left:4px solid #ff0000; }
+.tie { color:#ffff00; background:rgba(255,255,0,0.1); border-left:4px solid #ffff00; }
 
-/* LAYOUT */
 .layout {
     display:grid;
     grid-template-columns:2fr 1fr;
@@ -44,7 +41,7 @@
 }
 
 #map {
-    height:520px;
+    height:500px;
     border-radius:10px;
 }
 
@@ -56,48 +53,20 @@
     border-radius:10px;
 }
 
-/* ROW */
 .row {
-    padding:8px;
+    padding:6px;
     border-bottom:1px solid #222;
-    cursor:pointer;
-    transition:0.2s;
 }
 
-.row:hover {
-    background:#1a1a1a;
-}
-
-/* 🔥 FLASHING ALERT */
-.flash {
-    animation: flash 1s infinite;
-}
-
-@keyframes flash {
-    0% { background:#330000; }
-    50% { background:#660000; }
-    100% { background:#330000; }
-}
-
-/* MAP LABEL */
+/* 🔥 LABEL STYLE */
 .map-label {
-    color:white;
-    font-size:10px;
-    font-weight:bold;
-    text-shadow:0 0 3px black;
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    text-shadow: 0 0 3px black;
+    background: transparent;
+    border: none;
 }
-
-/* LEGEND */
-.legend {
-    position:absolute;
-    bottom:20px;
-    left:20px;
-    background:#111;
-    padding:10px;
-    border-radius:8px;
-    font-size:12px;
-}
-.legend div { margin-bottom:5px; }
 </style>
 
 <!-- KPI -->
@@ -110,33 +79,20 @@
 <div class="layout">
 
     <!-- MAP -->
-    <div style="position:relative;">
-        <div id="map"></div>
-
-        <!-- LEGEND -->
-        <div class="legend">
-            <div><span style="color:#00ff00;">■</span> Stronghold</div>
-            <div><span style="color:#ffff00;">■</span> Toss-up</div>
-            <div><span style="color:#ff9900;">■</span> Risk</div>
-            <div><span style="color:#ff0000;">■</span> Lost</div>
-        </div>
-    </div>
+    <div id="map"></div>
 
     <!-- SIDE -->
     <div class="side">
 
-        <!-- DANGER -->
         <div class="card">
             <h3>🚨 Danger Zones</h3>
             {% for d in danger_zones %}
-                <div class="row lose flash"
-                     onclick="openConstituency('{{ d.constituency if d.constituency else d[0] }}')">
+                <div class="row lose">
                     {{ d.constituency if d.constituency else d[0] }}
                 </div>
             {% endfor %}
         </div>
 
-        <!-- LIST -->
         <div class="card">
             <h3>🗺 Constituencies</h3>
             {% for r in map_data %}
@@ -145,9 +101,7 @@
                     {% elif r.status in ['LOST','LEANING LOSS'] %}lose
                     {% else %}tie
                     {% endif %}
-                "
-                onclick="openConstituency('{{ r.constituency }}')">
-
+                ">
                     <strong>{{ r.constituency }}</strong><br>
                     {{ r.status }}
                 </div>
@@ -160,12 +114,7 @@
 
 <script>
 
-// NAVIGATION
-function openConstituency(name){
-    window.location.href = `/constituency_dashboard/${encodeURIComponent(name)}`
-}
-
-// MAP
+// INIT MAP
 var map = L.map('map').setView([-13.1339, 27.8493], 6);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png").addTo(map);
@@ -179,16 +128,15 @@ function normalize(name){
         .trim();
 }
 
-// SAFE NAME
+// 🔥 SAFE GEOJSON NAME
 function getName(props){
     return props.shapeName || props.name || props.NAME || "";
 }
 
 // LOAD DATA
-async function loadMap(){
-
-    const res = await fetch("/api/constituency_intelligence");
-    const data = await res.json();
+fetch("/api/constituency_intelligence")
+.then(res => res.json())
+.then(data => {
 
     let results = {};
     data.forEach(r => {
@@ -210,54 +158,53 @@ async function loadMap(){
         return 0.5;
     }
 
-    const geo = await fetch("/static/geo/zambia_constituencies.geojson")
-        .then(res => res.json());
+    fetch("/static/geo/zambia_constituencies.geojson")
+    .then(res => res.json())
+    .then(geo => {
 
-    let geoLayer = L.geoJSON(geo, {
+        let geoLayer = L.geoJSON(geo, {
 
-        style: function(feature){
-            let raw = getName(feature.properties);
-            let r = results[normalize(raw)];
+            style: function(feature){
+                let raw = getName(feature.properties);
+                let key = normalize(raw);
+                let r = results[key];
 
-            return {
-                color:"#333",
-                weight:1,
-                fillColor:getColor(r ? r.status : "TOSS-UP"),
-                fillOpacity:getOpacity(r ? r.score : 0)
-            };
-        },
+                return {
+                    color:"#333",
+                    weight:1,
+                    fillColor: getColor(r ? r.status : "TOSS-UP"),
+                    fillOpacity: getOpacity(r ? r.score : 0)
+                };
+            },
 
-        onEachFeature: function(feature, layer){
+            onEachFeature: function(feature, layer){
 
-            let raw = getName(feature.properties);
-            let r = results[normalize(raw)];
+                let raw = getName(feature.properties);
+                let key = normalize(raw);
+                let r = results[key];
 
-            layer.bindPopup(`
-                <b>${raw}</b><br>
-                Status: ${r ? r.status : "TOSS-UP"}<br>
-                Score: ${r ? r.score : 0}
-            `);
+                // POPUP
+                layer.bindPopup(`
+                    <b>${raw}</b><br>
+                    Status: ${r ? r.status : "TOSS-UP"}<br>
+                    Score: ${r ? r.score : 0}
+                `);
 
-            // CLICK → DRILLDOWN
-            layer.on("click", function(){
-                openConstituency(raw);
-            });
+                // 🔥 LABEL FIX
+                layer.bindTooltip(raw, {
+                    permanent: true,
+                    direction: "center",
+                    className: "map-label"
+                });
+            }
 
-            layer.bindTooltip(raw, {
-                permanent:true,
-                direction:"center",
-                className:"map-label"
-            });
-        }
+        }).addTo(map);
 
-    }).addTo(map);
+        map.fitBounds(geoLayer.getBounds());
 
-    map.fitBounds(geoLayer.getBounds());
-}
+    });
 
-// AUTO REFRESH
-loadMap();
-setInterval(loadMap, 15000);
+});
 
 </script>
 
