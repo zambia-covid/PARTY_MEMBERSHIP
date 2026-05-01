@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}Provincial Dashboard{% endblock %}
+
+{% block content %}
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+.page {
+    display:flex;
+    gap:15px;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+    width:220px;
+    background:#0B5D1E;
+    padding:15px;
+    border-radius:10px;
+    height:fit-content;
+}
+
+.sidebar a {
+    display:block;
+    color:white;
+    text-decoration:none;
+    padding:10px;
+    margin-bottom:5px;
+    border-radius:6px;
+}
+
+.sidebar a:hover {
+    background:#145214;
+}
+
+/* ===== MAIN ===== */
+.main {
+    flex:1;
+}
+
+.card {
+    background:white;
+    padding:15px;
+    border-radius:10px;
+    margin-bottom:15px;
+}
+
+.grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:10px;
+}
+
+/* ===== COLORS ===== */
+.good { color:green; font-weight:bold; }
+.bad { color:red; font-weight:bold; }
+.warn { color:orange; font-weight:bold; }
+
+/* ===== TABLE ===== */
+.table {
+    width:100%;
+    border-collapse:collapse;
+}
+
+.table th {
+    background:#0B5D1E;
+    color:white;
+    padding:10px;
+}
+
+.table td {
+    padding:10px;
+    border-bottom:1px solid #eee;
+}
+
+.row-win { background:rgba(0,200,0,0.1); }
+.row-loss { background:rgba(255,0,0,0.1); }
+.row-risk { background:#330000; color:white; }
+
+/* ===== MOBILE ===== */
+@media(max-width:768px){
+    .page { flex-direction:column; }
+    .sidebar { width:100%; }
+}
+</style>
+
+<div class="page">
+
+<!-- ================= SIDEBAR ================= -->
+<div class="sidebar">
+
+    <h3 style="color:white;">Command</h3>
+
+    <a href="{{ url_for('dashboard') }}">🏠 National</a>
+
+    <a href="{{ url_for('provincial_dashboard_page') }}">
+        📍 Provincial
+    </a>
+
+    <a href="{{ url_for('constituency_dashboard_page') }}">
+        🗺️ Constituency
+    </a>
+
+    <a href="{{ url_for('ward_intelligence_page') }}">
+        🧭 Ward Intelligence
+    </a>
+
+</div>
+
+<!-- ================= MAIN ================= -->
+<div class="main">
+
+<h2>📍 Provincial Dashboard</h2>
+
+<div class="card">
+    <strong>Province:</strong> 
+    <span id="provinceName">{{ province }}</span>
+</div>
+
+<!-- ================= KPIs ================= -->
+<div class="grid">
+
+    <div class="card">
+        <h4>Members</h4>
+        <h2 id="members">0</h2>
+    </div>
+
+    <div class="card">
+        <h4>PF Votes</h4>
+        <h2 id="pf" class="good">0</h2>
+    </div>
+
+    <div class="card">
+        <h4>UPND Votes</h4>
+        <h2 id="upnd" class="bad">0</h2>
+    </div>
+
+    <div class="card">
+        <h4>Status</h4>
+        <h2 id="status"></h2>
+    </div>
+
+    <div class="card">
+        <h4>Coverage</h4>
+        <h2 id="coverage">0%</h2>
+    </div>
+
+</div>
+
+<!-- ================= DANGER ================= -->
+<div class="card">
+    <h3>🚨 Danger Constituencies</h3>
+    <ul id="dangerList"></ul>
+</div>
+
+<!-- ================= TABLE ================= -->
+<div class="card">
+    <h3>Constituency Breakdown</h3>
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Constituency</th>
+                <th>PF</th>
+                <th>UPND</th>
+                <th>Margin</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+    </table>
+</div>
+
+</div>
+</div>
+
+<script>
+
+let province = "{{ province }}";
+
+/* ================= LOAD ================= */
+async function loadDashboard(){
+
+    try {
+        const res = await fetch(`/api/provincial_dashboard/${province}`);
+        const data = await res.json();
+
+        console.log("PROV DATA:", data);
+
+        document.getElementById("members").innerText = data.members;
+        document.getElementById("pf").innerText = data.pf_votes;
+        document.getElementById("upnd").innerText = data.upnd_votes;
+
+        document.getElementById("coverage").innerText = data.coverage + "%";
+
+        let statusEl = document.getElementById("status");
+        statusEl.innerText = data.status;
+
+        if(data.status === "WINNING") statusEl.className = "good";
+        else if(data.status === "LOSING") statusEl.className = "bad";
+        else statusEl.className = "warn";
+
+        /* ===== DANGER ===== */
+        let dangerHTML = "";
+        data.danger_zones.forEach(d => {
+            dangerHTML += `<li class="bad">${d.constituency} → ${d.margin}</li>`;
+        });
+        document.getElementById("dangerList").innerHTML = dangerHTML || "None";
+
+        /* ===== TABLE ===== */
+        let html = "";
+
+        data.constituencies.forEach(c => {
+
+            let rowClass = "row-toss";
+
+            if(c.status.includes("WIN")) rowClass = "row-win";
+            else if(c.status.includes("LOSS")) rowClass = "row-loss";
+
+            if(c.margin < -1000) rowClass = "row-risk";
+
+            html += `
+            <tr class="${rowClass}" onclick="openConstituency('${c.constituency}')">
+                <td>${c.constituency}</td>
+                <td>${c.pf}</td>
+                <td>${c.upnd}</td>
+                <td>${c.margin}</td>
+                <td>${c.status}</td>
+            </tr>`;
+        });
+
+        document.getElementById("tableBody").innerHTML = html;
+
+    } catch(err){
+        console.error("LOAD ERROR:", err);
+    }
+}
+
+/* ================= NAV ================= */
+function openConstituency(name){
+    window.location.href = `/constituency_dashboard?c=${encodeURIComponent(name)}`;
+}
+
+/* INIT */
+loadDashboard();
+
+/* REFRESH */
+setInterval(loadDashboard, 15000);
+
+</script>
+
+{% endblock %}
