@@ -1086,7 +1086,50 @@ def ward_intelligence(constituency):
             cur.close()
         if conn:
             conn.close()
-    
+
+# ==============================
+# STATION DRILLDOWN
+# ==============================
+@app.route("/api/station_drilldown/<int:ward_id>")
+@login_required
+def station_drilldown(ward_id):
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT 
+            ps.station_name,
+            COALESCE(SUM(r.pf_votes),0),
+            COALESCE(SUM(r.upnd_votes),0)
+
+        FROM polling_stations ps
+
+        LEFT JOIN polling_station_results r
+            ON LOWER(TRIM(r.polling_station)) = LOWER(TRIM(ps.station_name))
+
+        WHERE ps.ward_id = %s
+
+        GROUP BY ps.station_name
+    """, (ward_id,))
+
+    stations = []
+
+    for name, pf, upnd in cur.fetchall():
+        stations.append({
+            "station": name,
+            "pf": pf,
+            "upnd": upnd,
+            "margin": pf - upnd
+        })
+
+    return jsonify(stations)
+
+@app.route("/station_drilldown/<int:ward_id>")
+@login_required
+def station_drilldown_page(ward_id):
+    return render_template("station_drilldown.html", ward_id=ward_id)
+
 @app.route("/ward_intelligence")
 @login_required
 def ward_intelligence_page():
