@@ -1158,19 +1158,34 @@ def constituency_dashboard(constituency):
         cur = conn.cursor()
 
         # ======================
-        # ACCESS CONTROL
+        # NORMALIZE INPUT
         # ======================
-        if current_user.role == "provincial_manager":
+        constituency = constituency.strip()
+
+        # ======================
+        # ACCESS CONTROL (HARDENED)
+        # ======================
+
+        # 🔴 ADMIN / NATIONAL → FULL ACCESS
+        if current_user.role in ["admin", "national_manager"]:
+            pass
+
+        # 🔵 PROVINCIAL MANAGER → ONLY THEIR PROVINCE
+        elif current_user.role == "provincial_manager":
+
             cur.execute("""
                 SELECT 1 FROM constituencies
-                WHERE constituency_name = %s AND province = %s
+                WHERE LOWER(TRIM(constituency_name)) = LOWER(TRIM(%s))
+                AND LOWER(TRIM(province)) = LOWER(TRIM(%s))
             """, (constituency, current_user.province))
-            if not cur.fetchone():
-                return jsonify({"error": "Unauthorized"}), 403
 
-        elif current_user.role not in ["admin", "national_manager"]:
-            if constituency != current_user.constituency:
-                return jsonify({"error": "Unauthorized"}), 403
+            if not cur.fetchone():
+                return jsonify({"error": "Unauthorized - outside province"}), 403
+
+        # 🟡 OTHER USERS → ONLY THEIR CONSTITUENCY
+        else:
+            if constituency.lower().strip() != (current_user.constituency or "").lower().strip():
+                return jsonify({"error": "Unauthorized - constituency restricted"}), 403
 
         # ======================
         # PRESIDENTIAL TOTALS
@@ -1180,12 +1195,12 @@ def constituency_dashboard(constituency):
                 COALESCE(SUM(pf_votes),0),
                 COALESCE(SUM(upnd_votes),0)
             FROM polling_station_results
-            WHERE constituency = %s
+            WHERE LOWER(TRIM(constituency)) = LOWER(TRIM(%s))
         """, (constituency,))
         pf_pres, upnd_pres = cur.fetchone()
 
         # ======================
-        # PARLIAMENTARY (TEMP FIX)
+        # PARLIAMENTARY (TEMP)
         # ======================
         pf_parl = pf_pres
         upnd_parl = upnd_pres
@@ -1196,7 +1211,8 @@ def constituency_dashboard(constituency):
         cur.execute("""
             SELECT COUNT(*)
             FROM members
-            WHERE constituency = %s AND status='Active'
+            WHERE LOWER(TRIM(constituency)) = LOWER(TRIM(%s))
+            AND status='Active'
         """, (constituency,))
         members = cur.fetchone()[0]
 
@@ -1209,21 +1225,35 @@ def constituency_dashboard(constituency):
         cur.execute("""
             SELECT COUNT(DISTINCT polling_station)
             FROM polling_station_results
-            WHERE constituency = %s
+            WHERE LOWER(TRIM(constituency)) = LOWER(TRIM(%s))
         """, (constituency,))
         reporting = cur.fetchone()[0]
 
         cur.execute("""
             SELECT COUNT(*)
             FROM polling_stations
-            WHERE constituency = %s
+            WHERE LOWER(TRIM(constituency)) = LOWER(TRIM(%s))
         """, (constituency,))
         total_stations = cur.fetchone()[0]
 
         coverage = (reporting / total_stations * 100) if total_stations else 0
 
         # ======================
-        # WARDS
+        # GET constituency_id (SAFE)
+        # ======================
+        cur.execute("""
+            SELECT id FROM constituencies
+            WHERE LOWER(TRIM(constituency_name)) = LOWER(TRIM(%s))
+        """, (constituency,))
+        row = cur.fetchone()
+
+        if not row:
+            return jsonify({"error": "Invalid constituency"}), 400
+
+        constituency_id = row[0]
+
+        # ======================
+        # WARDS (ID-BASED SAFE)
         # ======================
         cur.execute("""
             SELECT 
@@ -1231,19 +1261,19 @@ def constituency_dashboard(constituency):
                 COALESCE(SUM(r.pf_votes),0),
                 COALESCE(SUM(r.upnd_votes),0)
             FROM wards w
-            LEFT JOIN polling_stations ps ON ps.ward_id = w.ward_id
+            LEFT JOIN polling_stations ps 
+                ON ps.ward_id = w.ward_id
             LEFT JOIN polling_station_results r 
                 ON LOWER(TRIM(r.polling_station)) = LOWER(TRIM(ps.station_name))
-            WHERE w.constituency_id = (
-                SELECT id FROM constituencies WHERE constituency_name = %s
-            )
+            WHERE w.constituency_id = %s
             GROUP BY w.ward_name
-        """, (constituency,))
+        """, (constituency_id,))
 
         wards = []
         danger_zones = []
 
         for name, pf, upnd in cur.fetchall():
+
             margin = pf - upnd
 
             if margin > 1000:
@@ -1268,9 +1298,16 @@ def constituency_dashboard(constituency):
                 "status": status
             })
 
+        # ======================
+        # FINAL STATUS
+        # ======================
         margin_total = pf_pres - upnd_pres
 
-        status = "WINNING" if margin_total > 0 else "LOSING" if margin_total < 0 else "TIED"
+        status = (
+            "WINNING" if margin_total > 0
+            else "LOSING" if margin_total < 0
+            else "TIED"
+        )
 
         return jsonify({
             "constituency": constituency,
@@ -1289,10 +1326,8 @@ def constituency_dashboard(constituency):
         return jsonify({"error": "Failed to load dashboard"}), 500
 
     finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
+        if cur: cur.close()
+        if conn: conn.close()
 
 @app.route("/api/district_summary")
 @login_required
