@@ -1,0 +1,42 @@
+<div class="card">
+    <h3>Polling Stations</h3>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Station</th>
+                <th>PF</th>
+                <th>UPND</th>
+                <th>Margin</th>
+            </tr>
+        </thead>
+        <tbody id="stationBody"></tbody>
+    </table>
+</div>
+
+<script>
+
+const ward_id = {{ ward_id }}
+
+async function loadStations(){
+
+    const res = await fetch(`/api/station_drilldown/${ward_id}`)
+    const data = await res.json()
+
+    let html = ""
+
+    data.forEach(s => {
+        html += `
+        <tr>
+            <td>${s.station}</td>
+            <td>${s.pf}</td>
+            <td>${s.upnd}</td>
+            <td>${s.margin}</td>
+        </tr>`
+    })
+
+    document.getElementById("stationBody").innerHTML = html
+}
+
+loadStations()
+
+</script>
