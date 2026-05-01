@@ -1093,6 +1093,165 @@ def ward_intelligence_page():
     return render_template("ward_intelligence.html")
 
 # ==============================
+# PROVINCIAL DASHBOARD
+# ==============================
+@app.route("/provincial_dashboard")
+@login_required
+def provincial_dashboard_page():
+    return render_template(
+        "provincial_dashboard.html",
+        province=getattr(current_user, "province", None)
+    )
+
+@app.route("/api/provincial_dashboard/<province>")
+@login_required
+def api_provincial_dashboard(province):
+
+    conn = None
+    cur = None
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+
+        province = province.strip()
+
+        # ======================
+        # ACCESS CONTROL
+        # ======================
+        if current_user.role in ["admin", "national_manager"]:
+            pass
+
+        elif current_user.role == "provincial_manager":
+            if province.lower().strip() != (current_user.province or "").lower().strip():
+                return jsonify({"error": "Unauthorized"}), 403
+
+        else:
+            return jsonify({"error": "Unauthorized"}), 403
+
+        # ======================
+        # MEMBERS
+        # ======================
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM members
+            WHERE LOWER(TRIM(province)) = LOWER(TRIM(%s))
+            AND status='Active'
+        """, (province,))
+        total_members = cur.fetchone()[0]
+
+        # ======================
+        # VOTES
+        # ======================
+        cur.execute("""
+            SELECT 
+                COALESCE(SUM(pf_votes),0),
+                COALESCE(SUM(upnd_votes),0)
+            FROM polling_station_results
+            WHERE LOWER(TRIM(province)) = LOWER(TRIM(%s))
+        """, (province,))
+        pf_total, upnd_total = cur.fetchone()
+
+        margin = pf_total - upnd_total
+
+        status = (
+            "WINNING" if margin > 0
+            else "LOSING" if margin < 0
+            else "TIED"
+        )
+
+        # ======================
+        # COVERAGE
+        # ======================
+        cur.execute("""
+            SELECT COUNT(DISTINCT polling_station)
+            FROM polling_station_results
+            WHERE LOWER(TRIM(province)) = LOWER(TRIM(%s))
+        """, (province,))
+        reporting = cur.fetchone()[0]
+
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM polling_stations
+            WHERE LOWER(TRIM(province)) = LOWER(TRIM(%s))
+        """, (province,))
+        total_stations = cur.fetchone()[0]
+
+        coverage = (reporting / total_stations * 100) if total_stations else 0
+
+        # ======================
+        # CONSTITUENCY BREAKDOWN
+        # ======================
+        cur.execute("""
+            SELECT 
+                constituency,
+                COALESCE(SUM(pf_votes),0) AS pf,
+                COALESCE(SUM(upnd_votes),0) AS upnd
+            FROM polling_station_results
+            WHERE LOWER(TRIM(province)) = LOWER(TRIM(%s))
+            GROUP BY constituency
+        """, (province,))
+
+        constituencies = []
+        danger_zones = []
+
+        for name, pf, upnd in cur.fetchall():
+
+            margin = pf - upnd
+
+            if margin > 1000:
+                status_c = "STRONGHOLD"
+            elif margin > 0:
+                status_c = "LEANING WIN"
+            elif margin == 0:
+                status_c = "TOSS-UP"
+            elif margin > -1000:
+                status_c = "LEANING LOSS"
+            else:
+                status_c = "LOST"
+
+            if status_c in ["LOST", "LEANING LOSS"]:
+                danger_zones.append({
+                    "constituency": name,
+                    "margin": margin
+                })
+
+            constituencies.append({
+                "constituency": name,
+                "pf": pf,
+                "upnd": upnd,
+                "margin": margin,
+                "status": status_c
+            })
+
+        # ======================
+        # RANK WORST AREAS
+        # ======================
+        danger_zones = sorted(danger_zones, key=lambda x: x["margin"])[:5]
+
+        return jsonify({
+            "province": province,
+            "members": total_members,
+            "pf_votes": pf_total,
+            "upnd_votes": upnd_total,
+            "margin": margin,
+            "status": status,
+            "coverage": round(coverage, 2),
+            "reporting": reporting,
+            "total_stations": total_stations,
+            "constituencies": constituencies,
+            "danger_zones": danger_zones
+        })
+
+    except Exception as e:
+        print("PROVINCIAL ERROR:", e)
+        return jsonify({"error": "Failed to load provincial dashboard"}), 500
+
+    finally:
+        if cur: cur.close()
+        if conn: conn.close()
+
+# ==============================
 # CONSTITUENCY DASHBOARD
 # ==============================    
 @app.route("/constituency_dashboard")
