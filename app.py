@@ -1785,8 +1785,8 @@ def ai_insights():
 # ==============================
 # REGISTER
 # ==============================
-
 @app.route('/register', methods=['GET', 'POST'])
+@login_required
 def register():
 
     # =========================
@@ -1812,6 +1812,7 @@ def register():
         return str(e), 400
 
     conn = None
+    cur = None
 
     try:
         conn = get_db()
@@ -1820,28 +1821,41 @@ def register():
         # =========================
         # CHECK EXISTING MEMBER
         # =========================
-        cur.execute(
-            "SELECT membership_id FROM members WHERE phone=%s",
-            (phone,)
-        )
+        cur.execute("""
+            SELECT membership_id 
+            FROM members 
+            WHERE phone = %s
+        """, (phone,))
         existing = cur.fetchone()
 
         if existing:
             member_id = existing[0]
-            card_url = f"/download_card/{member_id}"
-
             return render_template(
                 "success.html",
                 member_id=member_id,
-                card_url=card_url,
+                card_url=f"/download_card/{member_id}",
                 message="You are already registered"
             )
+
+        # =========================
+        # RESOLVE WARD ID (CRITICAL)
+        # =========================
+        cur.execute("""
+            SELECT ward_id 
+            FROM wards
+            WHERE LOWER(TRIM(ward_name)) = LOWER(TRIM(%s))
+        """, (ward,))
+        row = cur.fetchone()
+
+        if not row:
+            return "Invalid ward selection", 400
+
+        ward_id = row[0]
 
         # =========================
         # GENERATE MEMBER ID
         # =========================
         member_id = generate_member_id()
-        card_url = f"/download_card/{member_id}"
 
         # =========================
         # ASSIGN POLLING STATION
@@ -1851,6 +1865,9 @@ def register():
             "district": district,
             "constituency": constituency
         })
+
+        if not polling_station:
+            return "Failed to assign polling station", 500
 
         # =========================
         # AI CLASSIFICATION
@@ -1863,12 +1880,30 @@ def register():
         })
 
         # =========================
-        # INSERT MEMBER
+        # AGENT ID (SAFE)
+        # =========================
+        agent_id = getattr(current_user, "id", None)
+
+        # =========================
+        # INSERT MEMBER (FIXED)
         # =========================
         cur.execute("""
             INSERT INTO members
-            (membership_id, full_name, province, district, constituency, ward, phone, polling_station, status, ai_support)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'Active',%s)
+            (
+                membership_id,
+                full_name,
+                province,
+                district,
+                constituency,
+                ward,
+                ward_id,
+                phone,
+                polling_station,
+                agent_id,
+                status,
+                ai_support
+            )
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'Active',%s)
         """, (
             member_id,
             full_name,
@@ -1876,10 +1911,10 @@ def register():
             district,
             constituency,
             ward,
-            ward_id,
+            ward_id,              # ✅ FIXED
             phone,
             polling_station,
-            current_user.id,
+            agent_id,            # ✅ FIXED
             ai_score
         ))
 
@@ -1888,14 +1923,20 @@ def register():
     except Exception as e:
         if conn:
             conn.rollback()
+
+        import traceback
+        traceback.print_exc()
+
         return f"Error: {str(e)}", 500
 
     finally:
+        if cur:
+            cur.close()
         if conn:
             conn.close()
 
     # =========================
-    # GENERATE ASSETS (SAFE MODE)
+    # GENERATE ASSETS (NON-BLOCKING)
     # =========================
     try:
         generate_assets_async(full_name, province, constituency, member_id)
@@ -1903,12 +1944,12 @@ def register():
         print(f"[ASSET ERROR] {e}")
 
     # =========================
-    # RESPONSE
+    # SUCCESS RESPONSE
     # =========================
     return render_template(
         "success.html",
         member_id=member_id,
-        card_url=card_url,
+        card_url=f"/download_card/{member_id}",
         message="Registration successful. Your card is ready."
     )
 
