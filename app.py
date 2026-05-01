@@ -1805,7 +1805,13 @@ def register():
         province = validate_location(data.get("province"), "province")
         district = validate_location(data.get("district"), "district")
         constituency = validate_location(data.get("constituency"), "constituency")
-        ward = validate_location(data.get("ward"), "ward")
+
+        # 🔥 TEMP: allow free ward input
+        ward = (data.get("ward") or "").strip()
+
+        if not ward:
+            return "Ward is required", 400
+
         phone = normalize_phone(data.get("phone"))
 
     except ValueError as e:
@@ -1838,36 +1844,15 @@ def register():
             )
 
         # =========================
-        # RESOLVE WARD ID (CRITICAL)
-        # =========================
-        cur.execute("""
-            SELECT ward_id 
-            FROM wards
-            WHERE LOWER(TRIM(ward_name)) = LOWER(TRIM(%s))
-        """, (ward,))
-        row = cur.fetchone()
-
-        if not row:
-            return "Invalid ward selection", 400
-
-        ward_id = row[0]
-
-        # =========================
         # GENERATE MEMBER ID
         # =========================
         member_id = generate_member_id()
 
         # =========================
-        # ASSIGN POLLING STATION
+        # TEMP MODE (NO WARD_ID / STATION)
         # =========================
-        polling_station = assign_polling_station({
-            "province": province,
-            "district": district,
-            "constituency": constituency
-        })
-
-        if not polling_station:
-            return "Failed to assign polling station", 500
+        ward_id = None
+        polling_station = None
 
         # =========================
         # AI CLASSIFICATION
@@ -1880,12 +1865,12 @@ def register():
         })
 
         # =========================
-        # AGENT ID (SAFE)
+        # AGENT ID
         # =========================
         agent_id = getattr(current_user, "id", None)
 
         # =========================
-        # INSERT MEMBER (FIXED)
+        # INSERT MEMBER (SAFE)
         # =========================
         cur.execute("""
             INSERT INTO members
@@ -1896,14 +1881,13 @@ def register():
                 district,
                 constituency,
                 ward,
-                ward_id,
                 phone,
                 polling_station,
                 agent_id,
                 status,
                 ai_support
             )
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'Active',%s)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,'Active',%s)
         """, (
             member_id,
             full_name,
@@ -1911,10 +1895,9 @@ def register():
             district,
             constituency,
             ward,
-            ward_id,              # ✅ FIXED
             phone,
             polling_station,
-            agent_id,            # ✅ FIXED
+            agent_id,
             ai_score
         ))
 
@@ -1952,7 +1935,6 @@ def register():
         card_url=f"/download_card/{member_id}",
         message="Registration successful. Your card is ready."
     )
-
 
 # ==============================
 # TELEGRAM WEBHOOK
