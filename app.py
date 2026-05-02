@@ -739,14 +739,32 @@ def assign_polling_station(member):
 # ==============================
 # GENERATE ASSET
 # ==============================
+def generate_assets(full_name, province, constituency, member_id):
 
-def generate_assets_async(name, province, constituency, member_id):
-    try:
-        qr = generate_qr(member_id)
-        card = generate_membership_card(name, province, constituency, member_id)
-        print(f"[ASYNC] Generated assets for {member_id}")
-    except Exception as e:
-        print(f"[ASYNC ERROR] {e}")
+    print("🚀 GENERATE CALLED:", member_id)
+
+    base_dir = os.getcwd()
+    card_dir = os.path.join(base_dir, "static", "cards")
+
+    os.makedirs(card_dir, exist_ok=True)
+
+    file_path = os.path.join(card_dir, f"{member_id}.png")
+
+    print("📁 SAVING TO:", file_path)
+
+    img = Image.new("RGB", (600, 350), color=(0, 80, 0))
+    draw = ImageDraw.Draw(img)
+
+    draw.text((20, 20), "PF Pamodzi Alliance", fill="white")
+    draw.text((20, 80), f"Name: {full_name}", fill="white")
+    draw.text((20, 120), f"Province: {province}", fill="white")
+    draw.text((20, 160), f"Constituency: {constituency}", fill="white")
+    draw.text((20, 200), f"ID: {member_id}", fill="yellow")
+
+    img.save(file_path)
+
+    print("✅ CARD SAVED:", file_path)
+    print("📁 EXISTS:", os.path.exists(file_path))
 # ==============================
 # AI GENERATED MSG
 # ==============================
@@ -1901,7 +1919,8 @@ def register():
     try:
         generate_assets_async(full_name, province, constituency, member_id)
     except Exception as e:
-        print(f"[ASSET ERROR] {e}")
+        print("❌ GENERATION ERROR:", e)
+        return f"Card failed: {str(e)}", 500
 
     # =========================
     # RESPONSE
