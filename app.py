@@ -613,7 +613,7 @@ Membership ID: {member_id}
 Issue Date: {issue_date}
 """
     qr = qrcode.make(qr_data).resize((180, 180))
-
+`
     # ==============================
     # CARD BASE (GREEN THEME)
     # ==============================
@@ -1867,7 +1867,7 @@ def register():
         print("🆔 GENERATED ID:", member_id)
 
         # =========================
-        # ASSIGN POLLING STATION (SAFE)
+        # ASSIGN POLLING STATION
         # =========================
         try:
             polling_station = assign_polling_station({
@@ -1894,7 +1894,7 @@ def register():
             ai_score = None
 
         # =========================
-        # INSERT MEMBER (MATCHES YOUR DB)
+        # INSERT MEMBER
         # =========================
         print("🚀 INSERTING MEMBER...")
 
@@ -1921,7 +1921,7 @@ def register():
             constituency,
             ward,
             phone,
-            polling_station,   # can be None
+            polling_station,
             ai_score
         ))
 
@@ -1944,11 +1944,16 @@ def register():
             conn.close()
 
     # =========================
-    # 🔥 GENERATE CARD (SYNC — NO ASYNC)
+    # 🔥 GENERATE CARD (UNIFIED SYSTEM)
     # =========================
     try:
         print("🚀 GENERATING CARD...")
-        generate_assets(full_name, province, constituency, member_id)
+        generate_membership_card(
+            full_name,
+            province,
+            constituency,
+            member_id
+        )
         print("✅ CARD GENERATED")
     except Exception as e:
         print("❌ CARD GENERATION FAILED:", e)
@@ -1963,7 +1968,6 @@ def register():
         card_url=card_url,
         message="Registration successful. Your card is ready."
     )
-
 
 # ==============================
 # TELEGRAM WEBHOOK
