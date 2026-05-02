@@ -1833,6 +1833,7 @@ def register():
         return str(e), 400
 
     conn = None
+    cur = None
 
     try:
         conn = get_db()
@@ -1841,20 +1842,19 @@ def register():
         # =========================
         # CHECK EXISTING MEMBER
         # =========================
-        cur.execute(
-            "SELECT membership_id FROM members WHERE phone=%s",
-            (phone,)
-        )
+        cur.execute("""
+            SELECT membership_id 
+            FROM members 
+            WHERE phone = %s
+        """, (phone,))
         existing = cur.fetchone()
 
         if existing:
             member_id = existing[0]
-            card_url = f"/download_card/{member_id}"
-
             return render_template(
                 "success.html",
                 member_id=member_id,
-                card_url=card_url,
+                card_url=f"/download_card/{member_id}",
                 message="You are already registered"
             )
 
@@ -1864,31 +1864,54 @@ def register():
         member_id = generate_member_id()
         card_url = f"/download_card/{member_id}"
 
+        print("🆔 GENERATED ID:", member_id)
+
         # =========================
-        # ASSIGN POLLING STATION
+        # ASSIGN POLLING STATION (SAFE)
         # =========================
-        polling_station = assign_polling_station({
-            "province": province,
-            "district": district,
-            "constituency": constituency
-        })
+        try:
+            polling_station = assign_polling_station({
+                "province": province,
+                "district": district,
+                "constituency": constituency
+            })
+        except Exception as e:
+            print("⚠️ STATION ASSIGN FAILED:", e)
+            polling_station = None
 
         # =========================
         # AI CLASSIFICATION
         # =========================
-        ai_score = ai_classify_voter({
-            "full_name": full_name,
-            "province": province,
-            "constituency": constituency,
-            "ward": ward
-        })
+        try:
+            ai_score = ai_classify_voter({
+                "full_name": full_name,
+                "province": province,
+                "constituency": constituency,
+                "ward": ward
+            })
+        except Exception as e:
+            print("⚠️ AI FAILED:", e)
+            ai_score = None
 
         # =========================
-        # INSERT MEMBER
+        # INSERT MEMBER (MATCHES YOUR DB)
         # =========================
+        print("🚀 INSERTING MEMBER...")
+
         cur.execute("""
             INSERT INTO members
-            (membership_id, full_name, province, district, constituency, ward, phone, polling_station, status, ai_support)
+            (
+                membership_id,
+                full_name,
+                province,
+                district,
+                constituency,
+                ward,
+                phone,
+                polling_station,
+                status,
+                ai_support
+            )
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'Active',%s)
         """, (
             member_id,
@@ -1898,29 +1921,38 @@ def register():
             constituency,
             ward,
             phone,
-            none,
+            polling_station,   # can be None
             ai_score
         ))
 
         conn.commit()
+        print("💾 COMMIT SUCCESS")
 
     except Exception as e:
         if conn:
             conn.rollback()
+
+        import traceback
+        traceback.print_exc()
+
         return f"Error: {str(e)}", 500
 
     finally:
+        if cur:
+            cur.close()
         if conn:
             conn.close()
 
     # =========================
-    # GENERATE ASSETS (SAFE MODE)
+    # 🔥 GENERATE CARD (SYNC — NO ASYNC)
     # =========================
     try:
-        generate_assets_async(full_name, province, constituency, member_id)
+        print("🚀 GENERATING CARD...")
+        generate_assets(full_name, province, constituency, member_id)
+        print("✅ CARD GENERATED")
     except Exception as e:
-        print("❌ GENERATION ERROR:", e)
-        return f"Card failed: {str(e)}", 500
+        print("❌ CARD GENERATION FAILED:", e)
+        return f"Card generation failed: {str(e)}", 500
 
     # =========================
     # RESPONSE
