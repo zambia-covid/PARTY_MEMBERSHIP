@@ -1880,7 +1880,7 @@ def register():
             constituency,
             ward,
             phone,
-            polling_station,
+            none,
             ai_score
         ))
 
