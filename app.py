@@ -5,6 +5,7 @@ import psycopg2
 import requests
 import threading
 
+from utils.card_generator import generate_membership_card
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, render_template, redirect, Response, session, url_for, send_file, flash
 from twilio.rest import Client
