@@ -613,7 +613,7 @@ Membership ID: {member_id}
 Issue Date: {issue_date}
 """
     qr = qrcode.make(qr_data).resize((180, 180))
-`
+    
     # ==============================
     # CARD BASE (GREEN THEME)
     # ==============================
