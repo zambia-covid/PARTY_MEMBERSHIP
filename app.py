@@ -896,7 +896,6 @@ def normalize_phone(phone):
 @app.route("/api/ward_intelligence/<constituency>")
 @login_required
 def ward_intelligence(constituency):
-
     conn = None
     cur = None
 
@@ -937,21 +936,17 @@ def ward_intelligence(constituency):
         constituency_id = row[0]
 
         # ======================
-        # CORE QUERY (SAFE VERSION)
+        # CORE QUERY (NO RESULTS DEPENDENCY)
         # ======================
         cur.execute("""
             SELECT 
                 w.ward_id,
                 w.ward_name,
                 COUNT(ps.id) AS stations
-
             FROM wards w
-
             LEFT JOIN polling_stations ps
                 ON ps.ward_id = w.ward_id
-
             WHERE w.constituency_id = %s
-
             GROUP BY w.ward_id, w.ward_name
             ORDER BY w.ward_name
         """, (constituency_id,))
@@ -960,11 +955,10 @@ def ward_intelligence(constituency):
 
         results = []
 
-        for ward_id, ward, stations in rows:
-
+        for ward_id, ward_name, stations in rows:
             results.append({
                 "ward_id": ward_id,
-                "ward": ward,
+                "ward": ward_name,
                 "stations": stations,
                 "reporting": 0,
                 "pf_votes": 0,
