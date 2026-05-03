@@ -55,36 +55,29 @@ input {
     text-overflow: ellipsis;
 }
 
-/* header */
 .intel-table th {
     background: #0B5D1E;
     color: white;
     text-align: left;
 }
 
-/* sortable */
 .sortable { cursor: pointer; }
 .sortable:hover { background: #145214; }
 
-/* numeric */
 .num { text-align: center; }
 
-/* province grouping */
 .province-row {
     background: #0B5D1E;
     color: white;
     font-weight: bold;
 }
 
-/* heatmap */
 .heat-win { background: rgba(0,200,0,0.15); }
 .heat-toss { background: rgba(255,200,0,0.2); }
 .heat-lose { background: rgba(255,0,0,0.15); }
 
-/* urgency */
 .low-coverage { background: #330000 !important; color:white; }
 
-/* status text */
 .WIN, .LEANING\ WIN, .STRONGHOLD { color: green; font-weight: bold; }
 .LOSE, .LEANING\ LOSS, .LOST { color: red; font-weight: bold; }
 .TOSS-UP { color: orange; font-weight: bold; }
@@ -126,10 +119,11 @@ let allData = []
 let sortKey = null
 let sortAsc = true
 
+/* ================= LOAD DATA ================= */
 async function loadData() {
     try {
-        let res = await fetch("/api/constituency_intelligence")
-        let data = await res.json()
+        const res = await fetch("/api/constituency_intelligence")
+        const data = await res.json()
 
         console.log("INTEL DATA:", data)
 
@@ -140,7 +134,8 @@ async function loadData() {
     }
 }
 
-window.sortTable = function(key){
+/* ================= SORT ================= */
+function sortTable(key){
     if(sortKey === key){
         sortAsc = !sortAsc
     } else {
@@ -150,10 +145,12 @@ window.sortTable = function(key){
     render()
 }
 
-function openConstituency(name){
-    window.location.href = `/constituency_dashboard?c=${encodeURIComponent(name)}`
+/* ================= NAVIGATION (FIXED) ================= */
+function openConstituency(id){
+    window.location.href = `/constituency_dashboard?id=${id}`
 }
 
+/* ================= RENDER ================= */
 function render(){
 
     let tbody = document.getElementById("table-body")
@@ -176,6 +173,7 @@ function render(){
         )
     })
 
+    /* SORT */
     if(sortKey){
         data.sort((a,b) => {
             let x = a[sortKey]
@@ -184,7 +182,6 @@ function render(){
             if(typeof x === "string"){
                 return sortAsc ? x.localeCompare(y) : y.localeCompare(x)
             }
-
             return sortAsc ? x - y : y - x
         })
     }
@@ -194,6 +191,7 @@ function render(){
         return
     }
 
+    /* GROUP BY PROVINCE */
     let grouped = {}
 
     data.forEach(c => {
@@ -222,7 +220,9 @@ function render(){
             if((c.coverage || 0) < 30) urgency = "low-coverage"
 
             html += `
-            <tr class="${heat} ${urgency}" onclick="openConstituency('${c.constituency}')" style="cursor:pointer">
+            <tr class="${heat} ${urgency}" 
+                onclick="openConstituency(${c.constituency_id})"
+                style="cursor:pointer">
                 <td>${c.constituency}</td>
                 <td>${c.province}</td>
                 <td class="num">${c.members}</td>
@@ -239,15 +239,16 @@ function render(){
     tbody.innerHTML = html
 }
 
-/* listeners */
+/* LISTENERS */
 setTimeout(() => {
     document.getElementById("search").addEventListener("input", render)
     document.getElementById("provinceFilter").addEventListener("input", render)
 }, 100)
 
-/* safer refresh */
+/* AUTO REFRESH */
 setInterval(loadData, 15000)
 
+/* INIT */
 loadData()
 
 </script>
