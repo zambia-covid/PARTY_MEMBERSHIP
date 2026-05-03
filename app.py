@@ -905,7 +905,7 @@ def ward_intelligence(constituency_id):
         cur = conn.cursor()
 
         # ======================
-        # ACCESS CONTROL
+        # ACCESS CONTROL (FIXED)
         # ======================
         if current_user.role == "provincial_manager":
             cur.execute("""
@@ -917,13 +917,15 @@ def ward_intelligence(constituency_id):
                 return jsonify({"error": "Unauthorized"}), 403
 
         elif current_user.role not in ["admin", "national_manager"]:
+            # 🔥 Convert user constituency → ID safely
             cur.execute("""
-                SELECT constituency_name FROM constituencies
-                WHERE id = %s
-            """, (constituency_id,))
-            row = cur.fetchone()
+                SELECT id FROM constituencies
+                WHERE LOWER(TRIM(constituency_name)) = LOWER(TRIM(%s))
+            """, (current_user.constituency,))
 
-            if not row or row[0] != current_user.constituency:
+            user_row = cur.fetchone()
+
+            if not user_row or user_row[0] != constituency_id:
                 return jsonify({"error": "Unauthorized"}), 403
 
         # ======================
