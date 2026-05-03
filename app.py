@@ -893,9 +893,10 @@ def normalize_phone(phone):
 # ==============================
 # STATION INTEL
 # ==============================
-@app.route("/api/ward_intelligence/<constituency>")
+@app.route("/api/ward_intelligence/<int:constituency_id>")
 @login_required
-def ward_intelligence(constituency):
+def ward_intelligence(constituency_id):
+
     conn = None
     cur = None
 
@@ -909,34 +910,24 @@ def ward_intelligence(constituency):
         if current_user.role == "provincial_manager":
             cur.execute("""
                 SELECT 1 FROM constituencies
-                WHERE LOWER(TRIM(constituency_name)) = LOWER(TRIM(%s))
-                AND province = %s
-            """, (constituency, current_user.province))
+                WHERE id = %s AND province = %s
+            """, (constituency_id, current_user.province))
 
             if not cur.fetchone():
                 return jsonify({"error": "Unauthorized"}), 403
 
         elif current_user.role not in ["admin", "national_manager"]:
-            if constituency != current_user.constituency:
+            cur.execute("""
+                SELECT constituency_name FROM constituencies
+                WHERE id = %s
+            """, (constituency_id,))
+            row = cur.fetchone()
+
+            if not row or row[0] != current_user.constituency:
                 return jsonify({"error": "Unauthorized"}), 403
 
         # ======================
-        # GET constituency_id
-        # ======================
-        cur.execute("""
-            SELECT id FROM constituencies
-            WHERE LOWER(TRIM(constituency_name)) = LOWER(TRIM(%s))
-        """, (constituency,))
-
-        row = cur.fetchone()
-
-        if not row:
-            return jsonify([])
-
-        constituency_id = row[0]
-
-        # ======================
-        # CORE QUERY (NO RESULTS DEPENDENCY)
+        # CORE QUERY (STABLE)
         # ======================
         cur.execute("""
             SELECT 
