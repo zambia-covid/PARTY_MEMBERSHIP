@@ -498,7 +498,7 @@ def classify_constituency(penetration):
 
 def send_telegram_message(chat_id, text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-8
+
     payload = {
         "chat_id": chat_id,
         "text": text
