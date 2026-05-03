@@ -1,125 +1,206 @@
-@app.route("/api/ward_intelligence/<int:constituency_id>")
-@login_required
-def ward_intelligence(constituency_id):
+{% extends "base.html" %}
 
-    conn = None
-    cur = None
+{% block title %}Ward Intelligence{% endblock %}
 
-    try:
-        conn = get_db()
-        cur = conn.cursor()
+{% block content %}
 
-        # ======================
-        # ACCESS CONTROL (ID SAFE)
-        # ======================
-        if current_user.role == "provincial_manager":
-            cur.execute("""
-                SELECT 1 FROM constituencies
-                WHERE id = %s AND province = %s
-            """, (constituency_id, current_user.province))
+<h2 style="margin-bottom:15px;">📡 Ward Intelligence</h2>
 
-            if not cur.fetchone():
-                return jsonify({"error": "Unauthorized"}), 403
+<style>
+body { font-family: Arial; background:#f5f5f5; }
 
-        elif current_user.role not in ["admin", "national_manager"]:
-            cur.execute("""
-                SELECT id FROM constituencies
-                WHERE LOWER(TRIM(constituency_name)) = LOWER(TRIM(%s))
-            """, (current_user.constituency,))
+.controls {
+    margin-bottom: 15px;
+}
 
-            row = cur.fetchone()
+select {
+    padding:8px;
+    border-radius:6px;
+}
 
-            if not row or row[0] != constituency_id:
-                return jsonify({"error": "Unauthorized"}), 403
+.grid {
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:15px;
+}
 
-        # ======================
-        # FULL INTELLIGENCE QUERY
-        # ======================
-        cur.execute("""
-            SELECT 
-                w.ward_id,
-                w.ward_name,
+.card {
+    background:white;
+    padding:12px;
+    border-radius:8px;
+    box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
 
-                COUNT(DISTINCT ps.id) AS stations,
+.list-item {
+    padding:8px;
+    border-bottom:1px solid #eee;
+    cursor:pointer;
+}
 
-                COUNT(DISTINCT CASE 
-                    WHEN r.polling_station IS NOT NULL 
-                    THEN ps.id 
-                END) AS reporting,
+.green { background:#e6ffe6; }
+.red { background:#ffe6e6; }
+.orange { background:#fff4e6; }
 
-                COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
-                COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+.low { border-left:5px solid red; }
 
-            FROM wards w
+.kpi {
+    display:flex;
+    justify-content:space-between;
+    margin-bottom:10px;
+    font-size:14px;
+}
+</style>
 
-            LEFT JOIN polling_stations ps
-                ON ps.ward_id = w.ward_id
+<div class="controls">
+    <select id="constituencySelect"></select>
+</div>
 
-            LEFT JOIN polling_station_results r
-                ON LOWER(TRIM(ps.station_name)) = LOWER(TRIM(r.polling_station))
+<div class="grid">
 
-            WHERE w.constituency_id = %s
+    <!-- LEFT: WARDS -->
+    <div class="card">
+        <h4>Wards</h4>
 
-            GROUP BY w.ward_id, w.ward_name
-            ORDER BY w.ward_name
-        """, (constituency_id,))
+        <div class="kpi">
+            <span>Total: <b id="totalWards">0</b></span>
+            <span>Strongholds: <b id="strongholds">0</b></span>
+            <span>Risk: <b id="risk">0</b></span>
+            <span>Coverage: <b id="coverage">0%</b></span>
+        </div>
 
-        rows = cur.fetchall()
+        <div id="wardList">Loading...</div>
+    </div>
 
-        results = []
+    <!-- RIGHT: STATIONS -->
+    <div class="card">
+        <h4>Polling Stations</h4>
+        <div id="stations">Select a ward</div>
+    </div>
 
-        for ward_id, ward_name, stations, reporting, pf, upnd in rows:
+</div>
 
-            pf = pf or 0
-            upnd = upnd or 0
-            stations = stations or 0
-            reporting = reporting or 0
+<script>
 
-            margin = pf - upnd
+let currentConstituency = null;
 
-            coverage = (reporting / stations * 100) if stations else 0
+/* ================= LOAD CONSTITUENCIES ================= */
+async function loadConstituencies(){
+    const res = await fetch("/api/constituencies");
+    const data = await res.json();
 
-            # ======================
-            # STATUS ENGINE
-            # ======================
-            if coverage < 30:
-                status = "LOW COVERAGE"
+    const select = document.getElementById("constituencySelect");
 
-            elif margin > 1000:
-                status = "STRONGHOLD"
+    select.innerHTML = data.map(c =>
+        `<option value="${c.id}">${c.constituency_name}</option>`
+    ).join("");
 
-            elif margin > 0:
-                status = "LEANING WIN"
+    currentConstituency = data[0].id;
 
-            elif margin == 0:
-                status = "TOSS-UP"
+    select.addEventListener("change", () => {
+        currentConstituency = select.value;
+        loadWardIntelligence();
+    });
 
-            elif margin > -1000:
-                status = "LEANING LOSS"
+    loadWardIntelligence();
+}
 
-            else:
-                status = "LOST"
+/* ================= LOAD WARDS ================= */
+async function loadWardIntelligence(){
 
-            results.append({
-                "ward_id": ward_id,
-                "ward": ward_name,
-                "stations": stations,
-                "reporting": reporting,
-                "coverage": round(coverage, 2),
-                "pf_votes": pf,
-                "upnd_votes": upnd,
-                "margin": margin,
-                "status": status
-            })
+    const res = await fetch(`/api/ward_intelligence/${currentConstituency}`);
+    const data = await res.json();
 
-        return jsonify(results)
+    console.log("WARD DATA:", data);
 
-    except Exception as e:
-        print("WARD INTELLIGENCE ERROR:", e)
-        return jsonify({"error": "Failed to load ward intelligence"}), 500
+    if (!Array.isArray(data) || data.length === 0){
+        document.getElementById("wardList").innerHTML = "No data";
+        return;
+    }
 
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
+    let html = "";
+    let total = data.length;
+    let strong = 0;
+    let risk = 0;
+    let coverageTotal = 0;
+
+    data.forEach(w => {
+
+        const pf = w.pf_votes || 0;
+        const upnd = w.upnd_votes || 0;
+        const margin = w.margin || 0;
+        const coverage = w.coverage || 0;
+
+        coverageTotal += coverage;
+
+        let color = "orange";
+        let extra = "";
+
+        if (w.status === "STRONGHOLD"){
+            color = "green";
+            strong++;
+        }
+        else if (w.status.includes("LOSS")){
+            color = "red";
+            risk++;
+        }
+
+        if (coverage < 30){
+            extra = "low";
+        }
+
+        html += `
+        <div class="list-item ${color} ${extra}" onclick="loadStations(${w.ward_id})">
+            <strong>${w.ward}</strong><br>
+            PF: ${pf} | UPND: ${upnd}<br>
+            Margin: ${margin}<br>
+            Coverage: ${coverage}%
+        </div>`;
+    });
+
+    document.getElementById("wardList").innerHTML = html;
+
+    document.getElementById("totalWards").innerText = total;
+    document.getElementById("strongholds").innerText = strong;
+    document.getElementById("risk").innerText = risk;
+
+    let avgCoverage = (coverageTotal / total).toFixed(1);
+    document.getElementById("coverage").innerText = avgCoverage + "%";
+}
+
+/* ================= LOAD STATIONS ================= */
+async function loadStations(ward_id){
+
+    const res = await fetch(`/api/station_drilldown/${ward_id}`);
+    const data = await res.json();
+
+    if (!Array.isArray(data) || data.length === 0){
+        document.getElementById("stations").innerHTML = "No stations";
+        return;
+    }
+
+    let html = "";
+
+    data.forEach(s => {
+
+        let color = "orange";
+
+        if (s.margin > 0) color = "green";
+        else if (s.margin < 0) color = "red";
+
+        html += `
+        <div class="list-item ${color}">
+            <strong>${s.station}</strong><br>
+            PF: ${s.pf} | UPND: ${s.upnd}<br>
+            Margin: ${s.margin}
+        </div>`;
+    });
+
+    document.getElementById("stations").innerHTML = html;
+}
+
+/* ================= INIT ================= */
+loadConstituencies();
+
+</script>
+
+{% endblock %}
