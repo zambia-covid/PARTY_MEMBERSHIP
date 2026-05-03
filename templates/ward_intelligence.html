@@ -1,139 +1,125 @@
-<script>
+@app.route("/api/ward_intelligence/<int:constituency_id>")
+@login_required
+def ward_intelligence(constituency_id):
 
-let currentConstituency = null;
+    conn = None
+    cur = None
 
-/* ================= LOAD CONSTITUENCIES ================= */
-async function loadConstituencies(){
+    try:
+        conn = get_db()
+        cur = conn.cursor()
 
-    const res = await fetch("/api/constituencies");
-    const data = await res.json();
+        # ======================
+        # ACCESS CONTROL (ID SAFE)
+        # ======================
+        if current_user.role == "provincial_manager":
+            cur.execute("""
+                SELECT 1 FROM constituencies
+                WHERE id = %s AND province = %s
+            """, (constituency_id, current_user.province))
 
-    if (!data || data.length === 0){
-        console.error("No constituencies");
-        return;
-    }
+            if not cur.fetchone():
+                return jsonify({"error": "Unauthorized"}), 403
 
-    const select = document.getElementById("constituencySelect");
+        elif current_user.role not in ["admin", "national_manager"]:
+            cur.execute("""
+                SELECT id FROM constituencies
+                WHERE LOWER(TRIM(constituency_name)) = LOWER(TRIM(%s))
+            """, (current_user.constituency,))
 
-    select.innerHTML = data.map(c =>
-        `<option value="${c.id}">${c.constituency_name}</option>`
-    ).join("");
+            row = cur.fetchone()
 
-    currentConstituency = data[0].id;
+            if not row or row[0] != constituency_id:
+                return jsonify({"error": "Unauthorized"}), 403
 
-    select.addEventListener("change", () => {
-        currentConstituency = select.value;
-        loadWardIntelligence();
-    });
+        # ======================
+        # FULL INTELLIGENCE QUERY
+        # ======================
+        cur.execute("""
+            SELECT 
+                w.ward_id,
+                w.ward_name,
 
-    loadWardIntelligence();
-}
+                COUNT(DISTINCT ps.id) AS stations,
 
-/* ================= LOAD WARDS ================= */
-async function loadWardIntelligence(){
+                COUNT(DISTINCT CASE 
+                    WHEN r.polling_station IS NOT NULL 
+                    THEN ps.id 
+                END) AS reporting,
 
-    if (!currentConstituency) return;
+                COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+                COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
 
-    try {
-        const res = await fetch(`/api/ward_intelligence/${currentConstituency}`);
-        const data = await res.json();
+            FROM wards w
 
-        if (!Array.isArray(data) || data.length === 0){
-            document.getElementById("wardList").innerHTML = "No ward data";
-            return;
-        }
+            LEFT JOIN polling_stations ps
+                ON ps.ward_id = w.ward_id
 
-        let html = "";
-        let total = data.length;
-        let strong = 0;
-        let risk = 0;
-        let coverageTotal = 0;
+            LEFT JOIN polling_station_results r
+                ON LOWER(TRIM(ps.station_name)) = LOWER(TRIM(r.polling_station))
 
-        data.forEach(w => {
+            WHERE w.constituency_id = %s
 
-            const pf = w.pf_votes || 0;
-            const upnd = w.upnd_votes || 0;
-            const margin = w.margin || 0;
-            const coverage = w.coverage || 0;
+            GROUP BY w.ward_id, w.ward_name
+            ORDER BY w.ward_name
+        """, (constituency_id,))
 
-            coverageTotal += coverage;
+        rows = cur.fetchall()
 
-            let color = "orange";
-            let extra = "";
+        results = []
 
-            if (w.status === "STRONGHOLD"){
-                color = "green";
-                strong++;
-            }
-            else if (w.status.includes("LOSS")){
-                color = "red";
-                risk++;
-            }
+        for ward_id, ward_name, stations, reporting, pf, upnd in rows:
 
-            if (coverage < 30){
-                extra = "low-coverage";
-            }
+            pf = pf or 0
+            upnd = upnd or 0
+            stations = stations or 0
+            reporting = reporting or 0
 
-            html += `
-            <div class="list-item ${color} ${extra}" onclick="loadStations(${w.ward_id})">
-                <strong>${w.ward}</strong><br>
-                PF: ${pf} | UPND: ${upnd}<br>
-                Margin: ${margin}<br>
-                Coverage: ${coverage}%
-            </div>`;
-        });
+            margin = pf - upnd
 
-        document.getElementById("wardList").innerHTML = html;
+            coverage = (reporting / stations * 100) if stations else 0
 
-        document.getElementById("totalWards").innerText = total;
-        document.getElementById("strongholds").innerText = strong;
-        document.getElementById("risk").innerText = risk;
+            # ======================
+            # STATUS ENGINE
+            # ======================
+            if coverage < 30:
+                status = "LOW COVERAGE"
 
-        let avgCoverage = (coverageTotal / total).toFixed(1);
-        document.getElementById("coverage").innerText = avgCoverage + "%";
+            elif margin > 1000:
+                status = "STRONGHOLD"
 
-    } catch (err){
-        document.getElementById("wardList").innerHTML = "Error loading wards";
-    }
-}
+            elif margin > 0:
+                status = "LEANING WIN"
 
-/* ================= LOAD STATIONS ================= */
-async function loadStations(ward_id){
+            elif margin == 0:
+                status = "TOSS-UP"
 
-    try {
-        const res = await fetch(`/api/station_drilldown/${ward_id}`);
-        const data = await res.json();
+            elif margin > -1000:
+                status = "LEANING LOSS"
 
-        if (!Array.isArray(data) || data.length === 0){
-            document.getElementById("stations").innerHTML = "No station data";
-            return;
-        }
+            else:
+                status = "LOST"
 
-        let html = "";
+            results.append({
+                "ward_id": ward_id,
+                "ward": ward_name,
+                "stations": stations,
+                "reporting": reporting,
+                "coverage": round(coverage, 2),
+                "pf_votes": pf,
+                "upnd_votes": upnd,
+                "margin": margin,
+                "status": status
+            })
 
-        data.forEach(s => {
+        return jsonify(results)
 
-            let color = "orange";
+    except Exception as e:
+        print("WARD INTELLIGENCE ERROR:", e)
+        return jsonify({"error": "Failed to load ward intelligence"}), 500
 
-            if (s.margin > 0) color = "green";
-            else if (s.margin < 0) color = "red";
-
-            html += `
-            <div class="list-item ${color}">
-                <strong>${s.station}</strong><br>
-                PF: ${s.pf} | UPND: ${s.upnd}<br>
-                Margin: ${s.margin}
-            </div>`;
-        });
-
-        document.getElementById("stations").innerHTML = html;
-
-    } catch (err){
-        document.getElementById("stations").innerHTML = "Error loading stations";
-    }
-}
-
-/* ================= INIT ================= */
-loadConstituencies();
-
-</script>
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
