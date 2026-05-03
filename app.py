@@ -904,7 +904,9 @@ def ward_intelligence(constituency_id):
         conn = get_db()
         cur = conn.cursor()
 
-        # ACCESS CONTROL
+        # ======================
+        # ACCESS CONTROL (ID SAFE)
+        # ======================
         if current_user.role == "provincial_manager":
             cur.execute("""
                 SELECT 1 FROM constituencies
@@ -915,26 +917,45 @@ def ward_intelligence(constituency_id):
                 return jsonify({"error": "Unauthorized"}), 403
 
         elif current_user.role not in ["admin", "national_manager"]:
+            # Convert user's constituency → ID
             cur.execute("""
                 SELECT id FROM constituencies
                 WHERE LOWER(TRIM(constituency_name)) = LOWER(TRIM(%s))
             """, (current_user.constituency,))
 
-            row = cur.fetchone()
+            user_row = cur.fetchone()
 
-            if not row or row[0] != constituency_id:
+            if not user_row or user_row[0] != constituency_id:
                 return jsonify({"error": "Unauthorized"}), 403
 
-        # QUERY
+        # ======================
+        # FULL INTELLIGENCE QUERY
+        # ======================
         cur.execute("""
             SELECT 
                 w.ward_id,
                 w.ward_name,
-                COUNT(ps.id) AS stations
+
+                COUNT(DISTINCT ps.id) AS stations,
+
+                COUNT(DISTINCT CASE 
+                    WHEN r.polling_station IS NOT NULL 
+                    THEN ps.id 
+                END) AS reporting,
+
+                COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
+                COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+
             FROM wards w
+
             LEFT JOIN polling_stations ps
                 ON ps.ward_id = w.ward_id
+
+            LEFT JOIN polling_station_results r
+                ON LOWER(TRIM(ps.station_name)) = LOWER(TRIM(r.polling_station))
+
             WHERE w.constituency_id = %s
+
             GROUP BY w.ward_id, w.ward_name
             ORDER BY w.ward_name
         """, (constituency_id,))
@@ -943,24 +964,49 @@ def ward_intelligence(constituency_id):
 
         results = []
 
-        for ward_id, ward_name, stations in rows:
+        for ward_id, ward_name, stations, reporting, pf, upnd in rows:
+
+            pf = pf or 0
+            upnd = upnd or 0
+            stations = stations or 0
+            reporting = reporting or 0
+
+            margin = pf - upnd
+            coverage = (reporting / stations * 100) if stations else 0
+
+            # ======================
+            # STATUS ENGINE
+            # ======================
+            if coverage < 30:
+                status = "LOW COVERAGE"
+            elif margin > 1000:
+                status = "STRONGHOLD"
+            elif margin > 0:
+                status = "LEANING WIN"
+            elif margin == 0:
+                status = "TOSS-UP"
+            elif margin > -1000:
+                status = "LEANING LOSS"
+            else:
+                status = "LOST"
+
             results.append({
                 "ward_id": ward_id,
                 "ward": ward_name,
                 "stations": stations,
-                "reporting": 0,
-                "pf_votes": 0,
-                "upnd_votes": 0,
-                "margin": 0,
-                "coverage": 0,
-                "status": "NO DATA"
+                "reporting": reporting,
+                "coverage": round(coverage, 2),
+                "pf_votes": pf,
+                "upnd_votes": upnd,
+                "margin": margin,
+                "status": status
             })
 
         return jsonify(results)
 
     except Exception as e:
         print("WARD INTELLIGENCE ERROR:", e)
-        return jsonify({"error": "Failed"}), 500
+        return jsonify({"error": "Failed to load ward intelligence"}), 500
 
     finally:
         if cur:
