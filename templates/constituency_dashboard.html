@@ -42,7 +42,7 @@ body { background:#0b0b0b; color:white; font-family:Arial; }
 
 <script>
 
-let currentConstituency = "";
+let currentConstituency = null;
 
 /* ================= LOAD CONSTITUENCIES ================= */
 async function loadConstituencies(){
@@ -50,13 +50,18 @@ async function loadConstituencies(){
     const res = await fetch("/api/constituencies");
     const data = await res.json();
 
+    if (!data || data.length === 0){
+        console.error("No constituencies found");
+        return;
+    }
+
     const select = document.getElementById("constituencySelect");
 
     select.innerHTML = data.map(c =>
-        `<option value="${c}">${c}</option>`
+        `<option value="${c.id}">${c.constituency_name}</option>`
     ).join("");
 
-    currentConstituency = data[0];
+    currentConstituency = data[0].id;
 
     select.addEventListener("change", () => {
         currentConstituency = select.value;
@@ -69,17 +74,26 @@ async function loadConstituencies(){
 /* ================= MAIN DASHBOARD ================= */
 async function loadDashboard(){
 
-    const res = await fetch(`/api/constituency_dashboard/${currentConstituency}`);
-    const data = await res.json();
+    if (!currentConstituency) return;
 
-    margin.innerText = "Margin: " + data.margin;
+    try {
+        const res = await fetch(`/api/constituency_dashboard/${currentConstituency}`);
+        const data = await res.json();
 
-    status.innerText = data.status;
-    status.className =
-        data.status === "WINNING" ? "win" :
-        data.status === "LOSING" ? "lose" : "tie";
+        document.getElementById("margin").innerText = "Margin: " + (data.margin || 0);
 
-    loadWardIntelligence();
+        const statusEl = document.getElementById("status");
+        statusEl.innerText = data.status || "NO DATA";
+
+        statusEl.className =
+            data.status === "WINNING" ? "win" :
+            data.status === "LOSING" ? "lose" : "tie";
+
+        loadWardIntelligence();
+
+    } catch (err){
+        console.error("DASHBOARD ERROR:", err);
+    }
 }
 
 /* ================= WARD INTELLIGENCE ================= */
@@ -89,17 +103,11 @@ async function loadWardIntelligence(){
         const res = await fetch(`/api/ward_intelligence/${currentConstituency}`);
         const data = await res.json();
 
-        // 🔥 DEBUG LOG
         console.log("WARD DATA:", data);
 
-        if (!Array.isArray(data)) {
-            console.error("Invalid response format:", data);
-            document.getElementById("wards").innerHTML = "Error loading ward data";
-            return;
-        }
-
-        if (data.length === 0) {
+        if (!Array.isArray(data) || data.length === 0){
             document.getElementById("wards").innerHTML = "No ward data available";
+            document.getElementById("danger").innerHTML = "None";
             return;
         }
 
@@ -108,7 +116,6 @@ async function loadWardIntelligence(){
 
         data.forEach(w => {
 
-            // SAFE VALUES
             const pf = w.pf_votes || 0;
             const upnd = w.upnd_votes || 0;
             const margin = w.margin || 0;
@@ -117,10 +124,9 @@ async function loadWardIntelligence(){
             const coverage = w.coverage || 0;
             const status = w.status || "";
 
-            // COLOR LOGIC (SAFE)
             let color = "#ffaa00";
             if (status === "STRONGHOLD") color = "#00ff00";
-            else if (status && status.includes("LOSS")) color = "#ff4444";
+            else if (status.includes("LOSS")) color = "#ff4444";
 
             html += `
             <div class="list-item" style="color:${color}">
@@ -130,7 +136,7 @@ async function loadWardIntelligence(){
                 Stations: ${reporting}/${stations} (${coverage}%)
             </div>`;
 
-            if (status && status.includes("LOSS")) {
+            if (status.includes("LOSS")) {
                 dangerHTML += `
                 <div class="list-item" style="color:red;">
                     ${w.ward} (${margin})
@@ -138,7 +144,7 @@ async function loadWardIntelligence(){
             }
         });
 
-        document.getElementById("wards").innerHTML = html || "No ward data available";
+        document.getElementById("wards").innerHTML = html;
         document.getElementById("danger").innerHTML = dangerHTML || "None";
 
     } catch (err) {
