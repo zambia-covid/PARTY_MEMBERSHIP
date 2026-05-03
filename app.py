@@ -927,7 +927,7 @@ def ward_intelligence(constituency_id):
                 return jsonify({"error": "Unauthorized"}), 403
 
         # ======================
-        # CORE QUERY (STABLE)
+        # CORE QUERY
         # ======================
         cur.execute("""
             SELECT 
@@ -1180,44 +1180,66 @@ def constituency_dashboard_page():
 @login_required
 def get_constituencies():
 
-    conn = get_db()
-    cur = conn.cursor()
+    conn = None
+    cur = None
 
-    # ======================
-    # ROLE-BASED FILTERING
-    # ======================
+    try:
+        conn = get_db()
+        cur = conn.cursor()
 
-    if current_user.role == "admin" or current_user.role == "national_manager":
-        # Full access
-        cur.execute("""
-            SELECT constituency_name
-            FROM constituencies
-            ORDER BY constituency_name
-        """)
+        # ======================
+        # ROLE-BASED FILTERING
+        # ======================
 
-    elif current_user.role == "provincial_manager":
-        # Only constituencies in their province
-        cur.execute("""
-            SELECT constituency_name
-            FROM constituencies
-            WHERE province = %s
-            ORDER BY constituency_name
-        """, (current_user.province,))
+        if current_user.role in ["admin", "national_manager"]:
+            # Full access
+            cur.execute("""
+                SELECT id, constituency_name
+                FROM constituencies
+                ORDER BY constituency_name
+            """)
 
-    else:
-        # Agents → locked to one constituency
-        cur.execute("""
-            SELECT constituency_name
-            FROM constituencies
-            WHERE constituency_name = %s
-        """, (current_user.constituency,))
+        elif current_user.role == "provincial_manager":
+            # Only constituencies in their province
+            cur.execute("""
+                SELECT id, constituency_name
+                FROM constituencies
+                WHERE province = %s
+                ORDER BY constituency_name
+            """, (current_user.province,))
 
-    rows = [r[0] for r in cur.fetchall()]
+        else:
+            # Agents → locked to one constituency
+            cur.execute("""
+                SELECT id, constituency_name
+                FROM constituencies
+                WHERE LOWER(TRIM(constituency_name)) = LOWER(TRIM(%s))
+            """, (current_user.constituency,))
 
-    cur.close()
-    conn.close()
+        rows = cur.fetchall()
 
-    return jsonify(rows)
+        # ======================
+        # RETURN STRUCTURED DATA
+        # ======================
+        result = [
+            {
+                "id": row[0],
+                "constituency_name": row[1]
+            }
+            for row in rows
+        ]
+
+        return jsonify(result)
+
+    except Exception as e:
+        print("CONSTITUENCIES ERROR:", e)
+        return jsonify([]), 500
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
 
 @app.route("/api/constituency_dashboard/<constituency>")
 @login_required
