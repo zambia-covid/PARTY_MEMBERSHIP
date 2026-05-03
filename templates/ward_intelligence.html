@@ -1,143 +1,6 @@
-{% extends "base.html" %}
-
-{% block title %}Ward Intelligence{% endblock %}
-
-{% block content %}
-
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<h2>🧭 Ward Intelligence</h2>
-
-<style>
-body {
-    background:#0b0b0b;
-    color:white;
-    font-family:Arial;
-}
-
-/* ===== LAYOUT ===== */
-.page {
-    display:grid;
-    grid-template-columns: 1fr 1fr;
-    gap:15px;
-}
-
-@media(max-width:768px){
-    .page { grid-template-columns:1fr; }
-}
-
-/* ===== SELECT ===== */
-select {
-    width:100%;
-    padding:12px;
-    margin-bottom:15px;
-    border-radius:8px;
-    border:none;
-    font-size:15px;
-}
-
-/* ===== CARDS ===== */
-.card {
-    background:#111;
-    padding:15px;
-    border-radius:10px;
-    box-shadow:0 0 10px rgba(0,0,0,0.3);
-}
-
-/* ===== KPI ===== */
-.grid {
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
-    gap:12px;
-    margin-bottom:15px;
-}
-
-.card h4 {
-    font-size:13px;
-    color:#aaa;
-}
-
-.card p {
-    font-size:20px;
-    font-weight:bold;
-}
-
-/* ===== LIST ===== */
-.scroll-box {
-    max-height:350px;
-    overflow-y:auto;
-}
-
-.list-item {
-    padding:10px;
-    border-bottom:1px solid #222;
-    cursor:pointer;
-    transition:0.2s;
-}
-
-.list-item:hover {
-    background:#1a1a1a;
-}
-
-/* ===== COLORS ===== */
-.green { color:#00ff00; }
-.red { color:#ff4444; }
-.orange { color:#ffaa00; }
-
-/* ===== ALERT ===== */
-.low-coverage {
-    background:#2a0000;
-}
-
-</style>
-
-<!-- ================= SELECT ================= -->
-<select id="constituencySelect"></select>
-
-<!-- ================= KPI ================= -->
-<div class="grid">
-
-    <div class="card">
-        <h4>Total Wards</h4>
-        <p id="totalWards">0</p>
-    </div>
-
-    <div class="card">
-        <h4>Strongholds</h4>
-        <p id="strongholds">0</p>
-    </div>
-
-    <div class="card">
-        <h4>Risk</h4>
-        <p id="risk">0</p>
-    </div>
-
-    <div class="card">
-        <h4>Coverage</h4>
-        <p id="coverage">0%</p>
-    </div>
-
-</div>
-
-<div class="page">
-
-<!-- ================= WARDS ================= -->
-<div class="card">
-    <h4>Ward Breakdown</h4>
-    <div id="wardList" class="scroll-box">Loading...</div>
-</div>
-
-<!-- ================= STATIONS ================= -->
-<div class="card">
-    <h4>📍 Station Drilldown</h4>
-    <div id="stations" class="scroll-box">Select a ward</div>
-</div>
-
-</div>
-
 <script>
 
-let currentConstituency = "";
+let currentConstituency = null;
 
 /* ================= LOAD CONSTITUENCIES ================= */
 async function loadConstituencies(){
@@ -153,10 +16,10 @@ async function loadConstituencies(){
     const select = document.getElementById("constituencySelect");
 
     select.innerHTML = data.map(c =>
-        `<option value="${c}">${c}</option>`
+        `<option value="${c.id}">${c.constituency_name}</option>`
     ).join("");
 
-    currentConstituency = data[0];
+    currentConstituency = data[0].id;
 
     select.addEventListener("change", () => {
         currentConstituency = select.value;
@@ -212,7 +75,7 @@ async function loadWardIntelligence(){
             }
 
             html += `
-            <div class="list-item ${color} ${extra}" onclick="loadStations('${w.ward}')">
+            <div class="list-item ${color} ${extra}" onclick="loadStations(${w.ward_id})">
                 <strong>${w.ward}</strong><br>
                 PF: ${pf} | UPND: ${upnd}<br>
                 Margin: ${margin}<br>
@@ -235,10 +98,10 @@ async function loadWardIntelligence(){
 }
 
 /* ================= LOAD STATIONS ================= */
-async function loadStations(ward){
+async function loadStations(ward_id){
 
     try {
-        const res = await fetch(`/api/station_intelligence/${currentConstituency}/${ward}`);
+        const res = await fetch(`/api/station_drilldown/${ward_id}`);
         const data = await res.json();
 
         if (!Array.isArray(data) || data.length === 0){
@@ -252,13 +115,13 @@ async function loadStations(ward){
 
             let color = "orange";
 
-            if (s.status === "STRONG") color = "green";
-            else if (s.status.includes("LOSS")) color = "red";
+            if (s.margin > 0) color = "green";
+            else if (s.margin < 0) color = "red";
 
             html += `
             <div class="list-item ${color}">
                 <strong>${s.station}</strong><br>
-                PF: ${s.pf_votes} | UPND: ${s.upnd_votes}<br>
+                PF: ${s.pf} | UPND: ${s.upnd}<br>
                 Margin: ${s.margin}
             </div>`;
         });
@@ -274,5 +137,3 @@ async function loadStations(ward){
 loadConstituencies();
 
 </script>
-
-{% endblock %}
