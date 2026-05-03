@@ -1036,27 +1036,22 @@ def ward_intelligence(constituency):
         constituency_id = row[0]
 
         # ======================
-        # WARD INTELLIGENCE QUERY
+        # CORE QUERY (SAFE VERSION)
         # ======================
         cur.execute("""
             SELECT 
+                w.ward_id,
                 w.ward_name,
-                COUNT(DISTINCT ps.id) AS stations,
-                COUNT(DISTINCT r.polling_station) AS reporting,
-                COALESCE(SUM(r.pf_votes), 0) AS pf_votes,
-                COALESCE(SUM(r.upnd_votes), 0) AS upnd_votes
+                COUNT(ps.id) AS stations
 
             FROM wards w
 
             LEFT JOIN polling_stations ps
                 ON ps.ward_id = w.ward_id
 
-            LEFT JOIN polling_station_results r
-                ON LOWER(TRIM(ps.station_name)) = LOWER(TRIM(r.polling_station))
-
             WHERE w.constituency_id = %s
 
-            GROUP BY w.ward_name
+            GROUP BY w.ward_id, w.ward_name
             ORDER BY w.ward_name
         """, (constituency_id,))
 
@@ -1064,34 +1059,18 @@ def ward_intelligence(constituency):
 
         results = []
 
-        for ward, stations, reporting, pf, upnd in rows:
-
-            margin = pf - upnd
-            coverage = (reporting / stations * 100) if stations else 0
-
-            # ======================
-            # STATUS LOGIC
-            # ======================
-            if margin > 1000:
-                status = "STRONGHOLD"
-            elif margin > 0:
-                status = "LEANING WIN"
-            elif margin == 0:
-                status = "TOSS-UP"
-            elif margin > -1000:
-                status = "LEANING LOSS"
-            else:
-                status = "LOST"
+        for ward_id, ward, stations in rows:
 
             results.append({
+                "ward_id": ward_id,
                 "ward": ward,
-                "pf_votes": pf,
-                "upnd_votes": upnd,
-                "margin": margin,
                 "stations": stations,
-                "reporting": reporting,
-                "coverage": round(coverage, 2),
-                "status": status
+                "reporting": 0,
+                "pf_votes": 0,
+                "upnd_votes": 0,
+                "margin": 0,
+                "coverage": 0,
+                "status": "NO DATA"
             })
 
         return jsonify(results)
