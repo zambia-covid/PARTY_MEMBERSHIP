@@ -4,97 +4,159 @@
 
 {% block content %}
 
-<h2 style="margin-bottom:15px;">📡 Ward Intelligence</h2>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<h2>🧭 Ward Intelligence</h2>
 
 <style>
-body { font-family: Arial; background:#f5f5f5; }
-
-.controls {
-    margin-bottom: 15px;
+body {
+    background:#0b0b0b;
+    color:white;
+    font-family:Arial;
 }
 
-select {
-    padding:8px;
-    border-radius:6px;
-}
-
-.grid {
+/* ===== LAYOUT ===== */
+.page {
     display:grid;
     grid-template-columns: 1fr 1fr;
     gap:15px;
 }
 
-.card {
-    background:white;
+@media(max-width:768px){
+    .page { grid-template-columns:1fr; }
+}
+
+/* ===== SELECT ===== */
+select {
+    width:100%;
     padding:12px;
+    margin-bottom:15px;
     border-radius:8px;
-    box-shadow:0 2px 5px rgba(0,0,0,0.1);
+    border:none;
+    font-size:15px;
+}
+
+/* ===== CARDS ===== */
+.card {
+    background:#111;
+    padding:15px;
+    border-radius:10px;
+    box-shadow:0 0 10px rgba(0,0,0,0.3);
+}
+
+/* ===== KPI ===== */
+.grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+    gap:12px;
+    margin-bottom:15px;
+}
+
+.card h4 {
+    font-size:13px;
+    color:#aaa;
+}
+
+.card p {
+    font-size:20px;
+    font-weight:bold;
+}
+
+/* ===== LIST ===== */
+.scroll-box {
+    max-height:350px;
+    overflow-y:auto;
 }
 
 .list-item {
-    padding:8px;
-    border-bottom:1px solid #eee;
+    padding:10px;
+    border-bottom:1px solid #222;
     cursor:pointer;
+    transition:0.2s;
 }
 
-.green { background:#e6ffe6; }
-.red { background:#ffe6e6; }
-.orange { background:#fff4e6; }
-
-.low { border-left:5px solid red; }
-
-.kpi {
-    display:flex;
-    justify-content:space-between;
-    margin-bottom:10px;
-    font-size:14px;
+.list-item:hover {
+    background:#1a1a1a;
 }
+
+/* ===== COLORS ===== */
+.green { color:#00ff00; }
+.red { color:#ff4444; }
+.orange { color:#ffaa00; }
+
+/* ===== ALERT ===== */
+.low-coverage {
+    background:#2a0000;
+}
+
 </style>
 
-<div class="controls">
-    <select id="constituencySelect"></select>
-</div>
+<!-- ================= SELECT ================= -->
+<select id="constituencySelect"></select>
 
+<!-- ================= KPI ================= -->
 <div class="grid">
 
-    <!-- LEFT: WARDS -->
     <div class="card">
-        <h4>Wards</h4>
-
-        <div class="kpi">
-            <span>Total: <b id="totalWards">0</b></span>
-            <span>Strongholds: <b id="strongholds">0</b></span>
-            <span>Risk: <b id="risk">0</b></span>
-            <span>Coverage: <b id="coverage">0%</b></span>
-        </div>
-
-        <div id="wardList">Loading...</div>
+        <h4>Total Wards</h4>
+        <p id="totalWards">0</p>
     </div>
 
-    <!-- RIGHT: STATIONS -->
     <div class="card">
-        <h4>Polling Stations</h4>
-        <div id="stations">Select a ward</div>
+        <h4>Strongholds</h4>
+        <p id="strongholds">0</p>
     </div>
+
+    <div class="card">
+        <h4>Risk</h4>
+        <p id="risk">0</p>
+    </div>
+
+    <div class="card">
+        <h4>Coverage</h4>
+        <p id="coverage">0%</p>
+    </div>
+
+</div>
+
+<div class="page">
+
+<!-- ================= WARDS ================= -->
+<div class="card">
+    <h4>Ward Breakdown</h4>
+    <div id="wardList" class="scroll-box">Loading...</div>
+</div>
+
+<!-- ================= STATIONS ================= -->
+<div class="card">
+    <h4>📍 Station Drilldown</h4>
+    <div id="stations" class="scroll-box">Select a ward</div>
+</div>
 
 </div>
 
 <script>
 
-let currentConstituency = null;
+let currentConstituency = "";
 
 /* ================= LOAD CONSTITUENCIES ================= */
 async function loadConstituencies(){
+
     const res = await fetch("/api/constituencies");
     const data = await res.json();
+
+    if (!data || data.length === 0){
+        console.error("No constituencies");
+        return;
+    }
 
     const select = document.getElementById("constituencySelect");
 
     select.innerHTML = data.map(c =>
-        `<option value="${c.id}">${c.constituency_name}</option>`
+        `<option value="${c}">${c}</option>`
     ).join("");
 
-    currentConstituency = data[0].id;
+    currentConstituency = data[0];
 
     select.addEventListener("change", () => {
         currentConstituency = select.value;
@@ -107,95 +169,105 @@ async function loadConstituencies(){
 /* ================= LOAD WARDS ================= */
 async function loadWardIntelligence(){
 
-    const res = await fetch(`/api/ward_intelligence/${currentConstituency}`);
-    const data = await res.json();
+    if (!currentConstituency) return;
 
-    console.log("WARD DATA:", data);
+    try {
+        const res = await fetch(`/api/ward_intelligence/${currentConstituency}`);
+        const data = await res.json();
 
-    if (!Array.isArray(data) || data.length === 0){
-        document.getElementById("wardList").innerHTML = "No data";
-        return;
+        if (!Array.isArray(data) || data.length === 0){
+            document.getElementById("wardList").innerHTML = "No ward data";
+            return;
+        }
+
+        let html = "";
+        let total = data.length;
+        let strong = 0;
+        let risk = 0;
+        let coverageTotal = 0;
+
+        data.forEach(w => {
+
+            const pf = w.pf_votes || 0;
+            const upnd = w.upnd_votes || 0;
+            const margin = w.margin || 0;
+            const coverage = w.coverage || 0;
+
+            coverageTotal += coverage;
+
+            let color = "orange";
+            let extra = "";
+
+            if (w.status === "STRONGHOLD"){
+                color = "green";
+                strong++;
+            }
+            else if (w.status.includes("LOSS")){
+                color = "red";
+                risk++;
+            }
+
+            if (coverage < 30){
+                extra = "low-coverage";
+            }
+
+            html += `
+            <div class="list-item ${color} ${extra}" onclick="loadStations('${w.ward}')">
+                <strong>${w.ward}</strong><br>
+                PF: ${pf} | UPND: ${upnd}<br>
+                Margin: ${margin}<br>
+                Coverage: ${coverage}%
+            </div>`;
+        });
+
+        document.getElementById("wardList").innerHTML = html;
+
+        document.getElementById("totalWards").innerText = total;
+        document.getElementById("strongholds").innerText = strong;
+        document.getElementById("risk").innerText = risk;
+
+        let avgCoverage = (coverageTotal / total).toFixed(1);
+        document.getElementById("coverage").innerText = avgCoverage + "%";
+
+    } catch (err){
+        document.getElementById("wardList").innerHTML = "Error loading wards";
     }
-
-    let html = "";
-    let total = data.length;
-    let strong = 0;
-    let risk = 0;
-    let coverageTotal = 0;
-
-    data.forEach(w => {
-
-        const pf = w.pf_votes || 0;
-        const upnd = w.upnd_votes || 0;
-        const margin = w.margin || 0;
-        const coverage = w.coverage || 0;
-
-        coverageTotal += coverage;
-
-        let color = "orange";
-        let extra = "";
-
-        if (w.status === "STRONGHOLD"){
-            color = "green";
-            strong++;
-        }
-        else if (w.status.includes("LOSS")){
-            color = "red";
-            risk++;
-        }
-
-        if (coverage < 30){
-            extra = "low";
-        }
-
-        html += `
-        <div class="list-item ${color} ${extra}" onclick="loadStations(${w.ward_id})">
-            <strong>${w.ward}</strong><br>
-            PF: ${pf} | UPND: ${upnd}<br>
-            Margin: ${margin}<br>
-            Coverage: ${coverage}%
-        </div>`;
-    });
-
-    document.getElementById("wardList").innerHTML = html;
-
-    document.getElementById("totalWards").innerText = total;
-    document.getElementById("strongholds").innerText = strong;
-    document.getElementById("risk").innerText = risk;
-
-    let avgCoverage = (coverageTotal / total).toFixed(1);
-    document.getElementById("coverage").innerText = avgCoverage + "%";
 }
 
 /* ================= LOAD STATIONS ================= */
-async function loadStations(ward_id){
+async function loadStations(ward){
 
-    const res = await fetch(`/api/station_drilldown/${ward_id}`);
-    const data = await res.json();
+    try {
+        const res = await fetch(`/api/station_intelligence/${currentConstituency}/${ward}`);
+        const data = await res.json();
 
-    if (!Array.isArray(data) || data.length === 0){
-        document.getElementById("stations").innerHTML = "No stations";
-        return;
+        if (!Array.isArray(data) || data.length === 0){
+            document.getElementById("stations").innerHTML = "No station data";
+            return;
+        }
+
+        let html = "";
+
+        data.forEach(s => {
+
+            let color = "orange";
+
+            if (s.status === "STRONG") color = "green";
+            else if (s.status.includes("LOSS")) color = "red";
+
+            html += `
+            <div class="list-item ${color}">
+                <strong>${s.station}</strong><br>
+                PF: ${s.pf_votes} | UPND: ${s.upnd_votes}<br>
+                Margin: ${s.margin}
+            </div>`;
+        });
+
+        document.getElementById("stations").innerHTML = html;
+
+    } catch (err){
+        document.getElementById("stations").innerHTML = "Error loading stations";
     }
-
-    let html = "";
-
-    data.forEach(s => {
-
-        let color = "orange";
-
-        if (s.margin > 0) color = "green";
-        else if (s.margin < 0) color = "red";
-
-        html += `
-        <div class="list-item ${color}">
-            <strong>${s.station}</strong><br>
-            PF: ${s.pf} | UPND: ${s.upnd}<br>
-            Margin: ${s.margin}
-        </div>`;
-    });
-
-    document.getElementById("stations").innerHTML = html;
 }
 
 /* ================= INIT ================= */
