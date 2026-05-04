@@ -15,58 +15,84 @@ body {
     font-family:Arial;
 }
 
-.page {
-    display:grid;
-    grid-template-columns: 1fr 1fr;
-    gap:15px;
-}
-
-@media(max-width:768px){
-    .page { grid-template-columns:1fr; }
-}
-
 select {
     width:100%;
     padding:12px;
-    margin-bottom:15px;
+    margin-bottom:12px;
     border-radius:8px;
     border:none;
     font-size:15px;
 }
 
+/* GRID */
+.page {
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:15px;
+    height:65vh;
+}
+
+@media(max-width:768px){
+    .page { 
+        grid-template-columns:1fr; 
+        height:auto;
+    }
+}
+
+/* CARDS */
 .card {
     background:#111;
     padding:15px;
     border-radius:10px;
+    display:flex;
+    flex-direction:column;
 }
 
+/* SCROLL */
+.scroll-box {
+    flex:1;
+    overflow-y:auto;
+}
+
+/* LIST ITEMS */
+.list-item {
+    padding:10px;
+    border-bottom:1px solid #222;
+    cursor:pointer;
+    transition:0.2s;
+}
+
+.list-item:hover {
+    background:#1a1a1a;
+}
+
+/* ACTIVE */
+.active-ward {
+    background:#003300 !important;
+    border-left:4px solid #00ff00;
+}
+
+/* COLORS */
+.green { color:#00ff00; }
+.red { color:#ff4444; }
+.orange { color:#ffaa00; }
+
+.low-coverage { background:#2a0000; }
+
+/* KPI */
 .grid {
     display:grid;
     grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
     gap:12px;
     margin-bottom:15px;
 }
-
-.scroll-box {
-    max-height:350px;
-    overflow-y:auto;
-}
-
-.list-item {
-    padding:10px;
-    border-bottom:1px solid #222;
-    cursor:pointer;
-}
-
-.green { color:#00ff00; }
-.red { color:#ff4444; }
-.orange { color:#ffaa00; }
-
-.low-coverage { background:#2a0000; }
 </style>
 
+<!-- 🔥 DRILLDOWN -->
+<select id="provinceSelect"></select>
 <select id="constituencySelect"></select>
 
+<!-- KPI -->
 <div class="grid">
     <div class="card"><h4>Total</h4><p id="totalWards">0</p></div>
     <div class="card"><h4>Strongholds</h4><p id="strongholds">0</p></div>
@@ -74,6 +100,7 @@ select {
     <div class="card"><h4>Coverage</h4><p id="coverage">0%</p></div>
 </div>
 
+<!-- SIDE BY SIDE -->
 <div class="page">
 
 <div class="card">
@@ -91,17 +118,32 @@ select {
 <script>
 
 let currentConstituency = null;
+let selectedWard = null;
 
-/* ================= LOAD CONSTITUENCIES ================= */
-async function loadConstituencies(){
+/* ================= PROVINCES ================= */
+async function loadProvinces(){
 
-    const res = await fetch("/api/constituencies");
+    const res = await fetch("/api/provinces_list");
     const data = await res.json();
 
-    if (!Array.isArray(data) || data.length === 0){
-        console.error("No constituencies");
-        return;
-    }
+    const select = document.getElementById("provinceSelect");
+
+    select.innerHTML = data.map(p =>
+        `<option value="${p}">${p}</option>`
+    ).join("");
+
+    select.addEventListener("change", () => {
+        loadConstituencies(select.value);
+    });
+
+    loadConstituencies(data[0]);
+}
+
+/* ================= CONSTITUENCIES ================= */
+async function loadConstituencies(province){
+
+    const res = await fetch(`/api/constituencies_by_province/${province}`);
+    const data = await res.json();
 
     const select = document.getElementById("constituencySelect");
 
@@ -109,7 +151,7 @@ async function loadConstituencies(){
         `<option value="${c.id}">${c.constituency_name}</option>`
     ).join("");
 
-    currentConstituency = data[0].id;
+    currentConstituency = data[0]?.id;
 
     select.addEventListener("change", () => {
         currentConstituency = select.value;
@@ -117,6 +159,19 @@ async function loadConstituencies(){
     });
 
     loadWardIntelligence();
+}
+
+/* ================= WARD CLICK ================= */
+function selectWard(element, ward_id){
+
+    document.querySelectorAll(".list-item")
+        .forEach(el => el.classList.remove("active-ward"));
+
+    element.classList.add("active-ward");
+
+    selectedWard = ward_id;
+
+    loadStations(ward_id);
 }
 
 /* ================= LOAD WARDS ================= */
@@ -164,7 +219,8 @@ async function loadWardIntelligence(){
         }
 
         html += `
-        <div class="list-item ${color} ${extra}" onclick="loadStations(${w.ward_id})">
+        <div class="list-item ${color} ${extra}" 
+             onclick="selectWard(this, ${w.ward_id})">
             <strong>${w.ward}</strong><br>
             Margin: ${margin}<br>
             Coverage: ${coverage}%
@@ -178,6 +234,14 @@ async function loadWardIntelligence(){
     document.getElementById("risk").innerText = risk;
     document.getElementById("coverage").innerText =
         (coverageTotal / total).toFixed(1) + "%";
+
+    /* 🔥 AUTO SELECT FIRST WARD */
+    setTimeout(()=>{
+        const first = document.querySelector("#wardList .list-item");
+        if(first){
+            first.click();
+        }
+    }, 200);
 }
 
 /* ================= LOAD STATIONS ================= */
@@ -212,7 +276,7 @@ async function loadStations(ward_id){
 }
 
 /* ================= INIT ================= */
-loadConstituencies();
+loadProvinces();
 
 </script>
 
