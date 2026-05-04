@@ -54,7 +54,7 @@ select {
     overflow-y:auto;
 }
 
-/* LIST ITEMS */
+/* LIST */
 .list-item {
     padding:10px;
     border-bottom:1px solid #222;
@@ -88,8 +88,7 @@ select {
 }
 </style>
 
-<!-- 🔥 DRILLDOWN -->
-<select id="provinceSelect"></select>
+<!-- 🔥 ONLY CONSTITUENCY -->
 <select id="constituencySelect"></select>
 
 <!-- KPI -->
@@ -118,31 +117,11 @@ select {
 <script>
 
 let currentConstituency = null;
-let selectedWard = null;
-
-/* ================= PROVINCES ================= */
-async function loadProvinces(){
-
-    const res = await fetch("/api/provinces_list");
-    const data = await res.json();
-
-    const select = document.getElementById("provinceSelect");
-
-    select.innerHTML = data.map(p =>
-        `<option value="${p}">${p}</option>`
-    ).join("");
-
-    select.addEventListener("change", () => {
-        loadConstituencies(select.value);
-    });
-
-    loadConstituencies(data[0]);
-}
 
 /* ================= CONSTITUENCIES ================= */
-async function loadConstituencies(province){
+async function loadConstituencies(){
 
-    const res = await fetch(`/api/constituencies_by_province/${province}`);
+    const res = await fetch("/api/constituencies");
     const data = await res.json();
 
     const select = document.getElementById("constituencySelect");
@@ -168,8 +147,6 @@ function selectWard(element, ward_id){
         .forEach(el => el.classList.remove("active-ward"));
 
     element.classList.add("active-ward");
-
-    selectedWard = ward_id;
 
     loadStations(ward_id);
 }
@@ -222,7 +199,7 @@ async function loadWardIntelligence(){
         <div class="list-item ${color} ${extra}" 
              onclick="selectWard(this, ${w.ward_id})">
             <strong>${w.ward}</strong><br>
-            Margin: ${margin}<br>
+            Margin: ${w.margin}<br>
             Coverage: ${coverage}%
         </div>`;
     });
@@ -235,7 +212,7 @@ async function loadWardIntelligence(){
     document.getElementById("coverage").innerText =
         (coverageTotal / total).toFixed(1) + "%";
 
-    /* 🔥 AUTO SELECT FIRST WARD */
+    /* AUTO SELECT FIRST */
     setTimeout(()=>{
         const first = document.querySelector("#wardList .list-item");
         if(first){
@@ -276,7 +253,7 @@ async function loadStations(ward_id){
 }
 
 /* ================= INIT ================= */
-loadProvinces();
+loadConstituencies();
 
 </script>
 
