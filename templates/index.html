@@ -191,20 +191,49 @@ async function loadStrategy(){
     }
 }
 
-/* 📍 PROVINCES */
+/* 📍 PROVINCES (WITH TOTAL) */
 async function loadProvinces(){
     try{
         const res = await fetch("/api/provinces");
         const data = await res.json();
 
+        if (!Array.isArray(data)){
+            document.getElementById("provinceList").innerHTML = "<li>Invalid data</li>";
+            return;
+        }
+
         let html = "";
+        let total = 0;
+
         data.forEach(p=>{
-            html += `<li><strong>${p.province}</strong>: ${p.voters.toLocaleString()}</li>`;
+            const voters = p.voters || 0;
+
+            html += `
+                <li>
+                    <strong>${p.province}</strong>: 
+                    ${voters.toLocaleString()}
+                </li>
+            `;
+
+            total += voters;
         });
+
+        // 🔥 TOTAL ROW (THIS IS WHAT YOU WANT)
+        html += `
+            <li style="
+                margin-top:10px;
+                border-top:2px solid #000;
+                padding-top:8px;
+                font-size:16px;
+            ">
+                <strong>TOTAL:</strong> ${total.toLocaleString()}
+            </li>
+        `;
 
         document.getElementById("provinceList").innerHTML = html;
 
-    } catch {
+    } catch (e){
+        console.error("Province error:", e);
         document.getElementById("provinceList").innerHTML =
             "<li>Error loading provinces</li>";
     }
